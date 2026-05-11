@@ -43,53 +43,45 @@ jobs:
         working-directory: backend
         run: npm run build
 
+      # ── KONFIGURACJA KLUCZA SSH ────────────────────────────────────────────────
+      - name: Skonfiguruj klucz SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H s61.mydevil.net >> ~/.ssh/known_hosts
+
       # ── DEPLOY: frontend → public_nodejs/public ────────────────────────────────
       - name: Wgraj frontend (React build) na serwer
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          source: "frontend/dist/*"
-          target: "/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/public"
-          strip_components: 2
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            frontend/dist/ \
+            Pluszek@s61.mydevil.net:/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/public/
 
       # ── DEPLOY: backend dist/ ──────────────────────────────────────────────────
       - name: Wgraj backend dist/ na serwer
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          source: "backend/dist/*"
-          target: "/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/dist"
-          strip_components: 2
+        run: |
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            backend/dist/ \
+            Pluszek@s61.mydevil.net:/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/dist/
 
       # ── DEPLOY: app.js + package.json ─────────────────────────────────────────
       - name: Wgraj app.js i package.json
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          source: "backend/app.js,backend/package.json"
-          target: "/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs"
-          strip_components: 1
+        run: |
+          scp -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            backend/app.js backend/package.json \
+            Pluszek@s61.mydevil.net:/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/
 
       # ── npm install + restart ──────────────────────────────────────────────────
       - name: npm install i restart aplikacji
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          password: ${{ secrets.SSH_PASSWORD }}
-          port: 22
-          script: |
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            Pluszek@s61.mydevil.net << 'ENDSSH'
             cd /usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs
             npm20 install --production
             mkdir -p public/uploads
             devil www restart crm.antyramy.eu
             echo "✅ Deploy zakończony!"
+          ENDSSH
