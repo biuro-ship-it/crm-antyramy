@@ -1,10 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage } from '../services/firebase';
+import { getAuth } from 'firebase/auth';
 import {
   Product, ProductFormData,
   getProductsList, createProduct, updateProduct, deleteProduct
 } from '../services/api';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+
+const uploadImage = async (file: File): Promise<string> => {
+  const auth = getAuth();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const formData = new FormData();
+  formData.append('image', file);
+  const response = await fetch(`${API_URL}/api/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Błąd uploadu zdjęcia');
+  }
+  const data = await response.json();
+  return data.imageUrl;
+};
 
 // ─── Pusty formularz ────────────────────────────────────────────────────────
 const emptyForm = (): ProductFormData => ({
@@ -35,12 +54,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onSave, onCancel, sa
     setUploading(true);
     setUploadError('');
     try {
-      const storageRef = ref(storage, `products/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
+      const url = await uploadImage(file);
       setForm(prev => ({ ...prev, imageUrl: url }));
-    } catch {
-      setUploadError('Nie udało się wgrać zdjęcia. Spróbuj ponownie.');
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : 'Nie udało się wgrać zdjęcia. Spróbuj ponownie.');
     } finally {
       setUploading(false);
     }

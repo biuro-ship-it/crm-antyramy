@@ -9,6 +9,7 @@ dotenv.config();
 import clientsRouter from './routes/clients';
 import productsRouter from './routes/products';
 import followupsRouter from './routes/followups';
+import uploadRouter from './routes/upload';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -45,10 +46,19 @@ app.get('/health', (_req, res) => {
 app.use('/api/clients', clientsRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/followups', followupsRouter);
+app.use('/api/upload', uploadRouter);
 
-// 404
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Nie znaleziono zasobu' });
+// Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
+// (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)
+import path from 'path';
+import fs from 'fs';
+const frontendIndex = path.join(__dirname, '../public/index.html');
+app.use((req, res) => {
+  if (!req.path.startsWith('/api') && fs.existsSync(frontendIndex)) {
+    res.sendFile(frontendIndex);
+  } else {
+    res.status(404).json({ error: 'Nie znaleziono zasobu' });
+  }
 });
 
 app.listen(PORT, () => {

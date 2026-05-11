@@ -1,0 +1,95 @@
+name: Deploy CRM Antyramy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repozytorium
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── FRONTEND: build ────────────────────────────────────────────────────────
+      - name: Zainstaluj zależności frontendu
+        working-directory: frontend
+        run: npm ci
+
+      - name: Zbuduj frontend
+        working-directory: frontend
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_API_URL: https://crm.antyramy.eu
+        run: npm run build
+
+      # ── BACKEND: build ─────────────────────────────────────────────────────────
+      - name: Zainstaluj zależności backendu
+        working-directory: backend
+        run: npm ci
+
+      - name: Skompiluj backend TypeScript → JS
+        working-directory: backend
+        run: npm run build
+
+      # ── DEPLOY: frontend → public_nodejs/public ────────────────────────────────
+      - name: Wgraj frontend (React build) na serwer
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          source: "frontend/dist/*"
+          target: "/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/public"
+          strip_components: 2
+
+      # ── DEPLOY: backend dist/ ──────────────────────────────────────────────────
+      - name: Wgraj backend dist/ na serwer
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          source: "backend/dist/*"
+          target: "/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/dist"
+          strip_components: 2
+
+      # ── DEPLOY: app.js + package.json ─────────────────────────────────────────
+      - name: Wgraj app.js i package.json
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          source: "backend/app.js,backend/package.json"
+          target: "/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs"
+          strip_components: 1
+
+      # ── npm install + restart ──────────────────────────────────────────────────
+      - name: npm install i restart aplikacji
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          script: |
+            cd /usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs
+            npm20 install --production
+            mkdir -p public/uploads
+            devil www restart crm.antyramy.eu
+            echo "✅ Deploy zakończony!"
