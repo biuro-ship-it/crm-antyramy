@@ -1,0 +1,33 @@
+# Zależności
+node_modules/
+**/node_modules/
+
+# Skompilowany backend
+backend/dist/
+
+# Zmienne środowiskowe — NIGDY nie commituj tych plików!
+.env
+**/.env
+**/serviceAccountKey.json
+serviceAccountKey.json
+
+# Frontend build
+frontend/dist/
+
+# Logi
+*.log
+npm-debug.log*
+
+# System operacyjny
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Vite cache
+frontend/.vite/
+
+# Uploadowane zdjęcia (lokalnie)
+uploads/
