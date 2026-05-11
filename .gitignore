@@ -29,5 +29,4 @@ Thumbs.db
 # Vite cache
 frontend/.vite/
 
-# Uploadowane zdjęcia (lokalnie)
-uploads/
+info.md
