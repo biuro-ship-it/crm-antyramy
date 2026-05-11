@@ -34,6 +34,7 @@ const limiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { xForwardedForHeader: false }, // Passenger ustawia ten nagłówek — wyłączamy walidację
 });
 app.use(limiter);
 
