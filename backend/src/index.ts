@@ -15,6 +15,9 @@ const app = express();
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://crm.antyramy.eu';
 
+// Zaufaj proxy (Phusion Passenger na mydevil.net)
+app.set('trust proxy', 1);
+
 // Bezpieczeństwo
 app.use(helmet());
 
