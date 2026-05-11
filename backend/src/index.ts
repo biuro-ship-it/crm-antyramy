@@ -18,12 +18,20 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'https://crm.antyramy.eu';
 // Zaufaj proxy (Phusion Passenger na mydevil.net)
 app.set('trust proxy', 1);
 
-// Bezpieczeństwo
-app.use(helmet());
+// Bezpieczeństwo (COOP ustawione na unsafe-none — wymagane dla Google Sign-In popup)
+app.use(helmet({
+  crossOriginOpenerPolicy: { policy: 'unsafe-none' },
+}));
 
 // CORS
 app.use(cors({
-  origin: [FRONTEND_URL, 'http://localhost:5174', 'http://localhost:5173'],
+  origin: [
+    FRONTEND_URL,
+    'https://crm.antyramy.eu',
+    'http://crm.antyramy.eu',
+    'http://localhost:5174',
+    'http://localhost:5173',
+  ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
