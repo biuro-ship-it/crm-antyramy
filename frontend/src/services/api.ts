@@ -138,14 +138,30 @@ export const deleteClient = async (id: string): Promise<void> => {
 };
 
 export const getNipData = async (nip: string): Promise<NipData> => {
-  const headers = await getHeaders();
   const nipClean = nip.replace(/[-\s]/g, '');
-  const response = await fetch(`${API_URL}/api/nip/${nipClean}`, { headers });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({})) as { error?: string };
-    throw new Error(err.error || 'Nie udało się pobrać danych firmy');
-  }
-  return response.json();
+  if (!/^\d{10}$/.test(nipClean)) throw new Error('NIP musi mieć 10 cyfr');
+
+  const today = new Date().toISOString().split('T')[0];
+  const response = await fetch(
+    `https://wl-api.mf.gov.pl/api/search/nip/${nipClean}?date=${today}`,
+    { headers: { 'Accept': 'application/json' } }
+  );
+
+  if (response.status === 404) throw new Error('Nie znaleziono firmy o podanym NIP w rejestrze VAT');
+  if (!response.ok) throw new Error('Błąd połączenia z bazą Ministerstwa Finansów');
+
+  const data = await response.json() as {
+    result?: { subject?: { name?: string; regon?: string; workingAddress?: string; residenceAddress?: string } };
+  };
+  const subject = data?.result?.subject;
+  if (!subject) throw new Error('Nie znaleziono firmy o podanym NIP');
+
+  return {
+    nip: nipClean,
+    companyName: subject.name || '',
+    regon: subject.regon || '',
+    address: subject.workingAddress || subject.residenceAddress || '',
+  };
 };
 
 // --- INTERAKCJE ---
