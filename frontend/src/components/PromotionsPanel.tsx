@@ -18,6 +18,7 @@ const PromotionsPanel: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<'' | 'sklep' | 'zakład' | 'agencja'>('');
 
   // Treść promocji
+  const [subject, setSubject] = useState('Promocja — Antyramy');
   const [message, setMessage] = useState('');
 
   // Wysyłanie
@@ -95,7 +96,29 @@ const PromotionsPanel: React.FC = () => {
 
     setSending(false);
     setResult({ ok, fail });
+
     if (ok > 0) {
+      // Otwórz klienta poczty z BCC do wszystkich klientów którzy mają e-mail
+      const emailTargets = targets.filter(c => c.email);
+      if (emailTargets.length > 0) {
+        const bcc = emailTargets.map(c => c.email).join(',');
+        const encodedSubject = encodeURIComponent(subject || 'Promocja — Antyramy');
+
+        // Treść maila: wiadomość + lista produktów
+        const productLines = chosenProducts.map(p => {
+          const parts = [];
+          if (p.code) parts.push(`Kod: ${p.code}`);
+          if (p.priceNetto > 0) parts.push(`Cena netto: ${p.priceNetto.toFixed(2)} zł`);
+          return `• ${p.name}${parts.length ? ' (' + parts.join(', ') + ')' : ''}`;
+        }).join('\n');
+
+        const body = encodeURIComponent(
+          `${message}\n\nProdukty objęte promocją:\n${productLines}\n\nPozdrawiam serdecznie,`
+        );
+
+        window.open(`mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodedSubject}&body=${body}`, '_blank');
+      }
+
       // Wyczyść zaznaczenia po udanym wysłaniu
       setSelectedClients(new Set());
       setSelectedProducts(new Set());
@@ -224,8 +247,20 @@ const PromotionsPanel: React.FC = () => {
             Treść promocji
           </h3>
 
+          <div className="mb-3">
+            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Temat maila</label>
+            <input
+              type="text"
+              className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400"
+              value={subject}
+              onChange={e => setSubject(e.target.value)}
+              placeholder="Temat wiadomości..."
+            />
+          </div>
+
+          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Treść</label>
           <textarea
-            rows={6}
+            rows={5}
             className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 resize-none flex-1 mb-4"
             placeholder="Np. Ruszamy z promocją wiosenną! Produkty w obniżonej cenie do końca miesiąca..."
             value={message}
@@ -256,8 +291,8 @@ const PromotionsPanel: React.FC = () => {
           {result && (
             <div className={`mt-4 p-4 rounded-xl text-sm font-semibold ${result.fail === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
               {result.fail === 0
-                ? `✅ Promocja wysłana do ${result.ok} klientów! Wpisy dodane do historii kontaktów.`
-                : `⚠️ Wysłano do ${result.ok}, błąd przy ${result.fail} klientach.`
+                ? `✅ Zapisano do historii ${result.ok} klientów. Sprawdź czy otworzył się klient poczty (Outlook/Thunderbird) z gotowym mailem.`
+                : `⚠️ Zapisano do historii: ${result.ok}, błąd przy: ${result.fail} klientach.`
               }
             </div>
           )}
