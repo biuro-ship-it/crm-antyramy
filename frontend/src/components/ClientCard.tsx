@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Client, Interaction, InteractionFormData, Product,
   getClientInteractions, createClientInteraction, updateClientInteraction,
@@ -192,6 +192,41 @@ interface InteractionFormProps {
   clientName?: string;
 }
 
+// ─── Hook: dyktowanie głosem (Web Speech API) ──────────────────────────────
+const useSpeechRecognition = (onResult: (text: string) => void) => {
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [listening, setListening] = useState(false);
+  const [supported] = useState(() =>
+    typeof window !== 'undefined' &&
+    ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)
+  );
+
+  const start = useCallback(() => {
+    if (!supported) return;
+    const SR = (window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition);
+    const rec = new SR();
+    rec.lang = 'pl-PL';
+    rec.interimResults = false;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      const transcript = Array.from(e.results).map(r => r[0].transcript).join(' ');
+      onResult(transcript);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recognitionRef.current = rec;
+    rec.start();
+    setListening(true);
+  }, [supported, onResult]);
+
+  const stop = useCallback(() => {
+    recognitionRef.current?.stop();
+    setListening(false);
+  }, []);
+
+  return { listening, supported, start, stop };
+};
+
 const InteractionForm: React.FC<InteractionFormProps> = ({
   initialData, products, onSave, onCancel, saveLabel,
   withFollowUp = false, clientId, clientName
@@ -200,6 +235,11 @@ const InteractionForm: React.FC<InteractionFormProps> = ({
   const [planFollowUp, setPlanFollowUp] = useState(false);
   const [followUpData, setFollowUpData] = useState({ dueDate: '', reminderText: '' });
   const [saving, setSaving] = useState(false);
+
+  const { listening, supported: speechSupported, start: startSpeech, stop: stopSpeech } =
+    useSpeechRecognition((text) => {
+      setData(prev => ({ ...prev, notes: prev.notes ? `${prev.notes} ${text}` : text }));
+    });
 
   const handleProductToggle = (name: string) => {
     setData(prev => ({
@@ -253,9 +293,28 @@ const InteractionForm: React.FC<InteractionFormProps> = ({
       </div>
 
       <div className="mb-6">
-        <label className="text-xs font-bold text-slate-500 uppercase ml-1">Przebieg rozmowy (Notatki)</label>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-xs font-bold text-slate-500 uppercase ml-1">Przebieg rozmowy (Notatki)</label>
+          {speechSupported && (
+            <button
+              type="button"
+              onClick={listening ? stopSpeech : startSpeech}
+              title={listening ? 'Zatrzymaj nagrywanie' : 'Dyktuj głosem'}
+              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+                listening
+                  ? 'bg-red-100 text-red-600 animate-pulse'
+                  : 'bg-slate-100 text-slate-500 hover:bg-blue-100 hover:text-blue-600'
+              }`}
+            >
+              <span>{listening ? '⏹' : '🎙️'}</span>
+              {listening ? 'Nagrywam...' : 'Dyktuj'}
+            </button>
+          )}
+        </div>
         <textarea required rows={3}
-          className="w-full bg-white border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 resize-none"
+          className={`w-full bg-white border rounded-xl p-3 outline-none focus:border-blue-500 resize-none transition-colors ${
+            listening ? 'border-red-300 bg-red-50' : 'border-slate-200'
+          }`}
           placeholder="O czym rozmawialiście?"
           value={data.notes}
           onChange={e => setData({ ...data, notes: e.target.value })} />
