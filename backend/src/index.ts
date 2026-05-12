@@ -10,6 +10,7 @@ import clientsRouter from './routes/clients';
 import productsRouter from './routes/products';
 import followupsRouter from './routes/followups';
 import uploadRouter from './routes/upload';
+import nipRouter from './routes/nip';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -59,6 +60,7 @@ app.use('/api/clients', clientsRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/followups', followupsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/nip', nipRouter);
 
 // Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
 // (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)

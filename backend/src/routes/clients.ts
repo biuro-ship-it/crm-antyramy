@@ -20,6 +20,7 @@ const AddressSchema = z.object({
 const ClientSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
   type: z.enum(['sklep', 'zakład', 'agencja']),
+  nip: z.string().default(''),
   contactPerson: z.string().default(''),
   email: z.string().optional().default(''),
   phone: z.string().default(''),

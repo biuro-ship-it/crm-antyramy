@@ -407,6 +407,11 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
           <p className="text-slate-500 font-medium">
             Osoba kontaktowa: <span className="text-slate-800 font-bold">{client.contactPerson || 'Brak'}</span>
           </p>
+          {client.nip && (
+            <p className="text-slate-400 text-sm mt-1">
+              NIP: <span className="text-slate-600 font-mono font-semibold">{client.nip}</span>
+            </p>
+          )}
         </div>
         <div className="text-sm text-slate-500 bg-slate-50 p-4 rounded-2xl md:text-right w-full md:w-auto">
           <p className="flex items-center gap-2 md:justify-end mb-1">

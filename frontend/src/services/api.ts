@@ -14,6 +14,7 @@ export interface Client {
   id: string;
   companyName: string;
   type: 'sklep' | 'zakład' | 'agencja';
+  nip: string;
   contactPerson: string;
   email: string;
   phone: string;
@@ -26,10 +27,18 @@ export interface Client {
 export interface ClientFormData {
   companyName: string;
   type: 'sklep' | 'zakład' | 'agencja';
+  nip: string;
   contactPerson: string;
   email: string;
   phone: string;
   address: Address;
+}
+
+export interface NipData {
+  nip: string;
+  companyName: string;
+  regon: string;
+  address: string;
 }
 
 export interface Interaction {
@@ -126,6 +135,17 @@ export const deleteClient = async (id: string): Promise<void> => {
   const headers = await getHeaders();
   const response = await fetch(`${CLIENTS_URL}/${id}`, { method: 'DELETE', headers });
   if (!response.ok) throw new Error('Nie udało się usunąć klienta');
+};
+
+export const getNipData = async (nip: string): Promise<NipData> => {
+  const headers = await getHeaders();
+  const nipClean = nip.replace(/[-\s]/g, '');
+  const response = await fetch(`${API_URL}/api/nip/${nipClean}`, { headers });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({})) as { error?: string };
+    throw new Error(err.error || 'Nie udało się pobrać danych firmy');
+  }
+  return response.json();
 };
 
 // --- INTERAKCJE ---

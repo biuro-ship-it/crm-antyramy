@@ -1,5 +1,5 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
-import { ClientFormData, Client } from '../services/api';
+import { ClientFormData, Client, getNipData } from '../services/api';
 
 // Props dopasowane do Dashboard.tsx
 interface ClientFormProps {
@@ -21,45 +21,42 @@ const voivodeshipMap: { [key: string]: string } = {
   '9': 'Łódzkie'
 };
 
+const emptyForm = (c?: Client | null): ClientFormData => ({
+  companyName: c?.companyName || '',
+  type: (c?.type as 'sklep' | 'zakład' | 'agencja') || 'sklep',
+  nip: c?.nip || '',
+  contactPerson: c?.contactPerson || '',
+  email: c?.email || '',
+  phone: c?.phone || '',
+  address: {
+    street:   c?.address?.street   || '',
+    number:   c?.address?.number   || '',
+    city:     c?.address?.city     || '',
+    zipCode:  c?.address?.zipCode  || '',
+    province: c?.address?.province || '',
+  },
+});
 
 const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) => {
-  // Mapowanie danych z obiektu Client na pola formularza (kluczowe przy edycji!)
-  const [formData, setFormData] = useState<ClientFormData>({
-    companyName: initial?.companyName || '',
-    type: initial?.type || 'sklep',
-    contactPerson: initial?.contactPerson || '',
-    email: initial?.email || '',
-    phone: initial?.phone || '',
-    address: {
-      street:   initial?.address?.street   || '',
-      number:   initial?.address?.number   || '',
-      city:     initial?.address?.city     || '',
-      zipCode:  initial?.address?.zipCode  || '',
-      province: initial?.address?.province || ''
-    }
-  });
+  const [formData, setFormData] = useState<ClientFormData>(emptyForm(initial));
+  const [nipLoading, setNipLoading] = useState(false);
+  const [nipError, setNipError] = useState('');
+  const [nipSuccess, setNipSuccess] = useState('');
 
   // Reset formularza gdy zmienia się 'initial' (przełączanie między nowy/edytuj)
   useEffect(() => {
-    setFormData({
-      companyName: initial?.companyName || '',
-      type: initial?.type || 'sklep',
-      contactPerson: initial?.contactPerson || '',
-      email: initial?.email || '',
-      phone: initial?.phone || '',
-      address: {
-        street:   initial?.address?.street   || '',
-        number:   initial?.address?.number   || '',
-        city:     initial?.address?.city     || '',
-        zipCode:  initial?.address?.zipCode  || '',
-        province: initial?.address?.province || ''
-      }
-    });
+    setFormData(emptyForm(initial));
+    setNipError('');
+    setNipSuccess('');
   }, [initial]);
 
-  // Obsługa zmian pól płaskich (companyName, type, contactPerson, email, phone)
+  // Obsługa zmian pól płaskich (companyName, type, nip, contactPerson, email, phone)
   const handleTopChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+    if (name === 'nip') {
+      setNipError('');
+      setNipSuccess('');
+    }
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -77,6 +74,30 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
       ...prev,
       address: { ...prev.address, [name]: value, province }
     }));
+  };
+
+  // Pobierz dane firmy z GUS na podstawie NIP
+  const handleNipLookup = async () => {
+    const nipClean = formData.nip.replace(/[-\s]/g, '');
+    if (nipClean.length !== 10) {
+      setNipError('NIP musi mieć 10 cyfr');
+      return;
+    }
+    setNipLoading(true);
+    setNipError('');
+    setNipSuccess('');
+    try {
+      const data = await getNipData(nipClean);
+      setFormData(prev => ({
+        ...prev,
+        companyName: data.companyName || prev.companyName,
+      }));
+      setNipSuccess(`✓ Pobrano dane: ${data.companyName}`);
+    } catch (err) {
+      setNipError(err instanceof Error ? err.message : 'Błąd pobierania danych');
+    } finally {
+      setNipLoading(false);
+    }
   };
 
   return (
@@ -100,6 +121,32 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
           <label style={styles.label}>Nazwa firmy / Klienta</label>
           <input type="text" name="companyName" value={formData.companyName} onChange={handleTopChange} style={styles.input} />
         </div>
+      </div>
+
+      {/* NIP */}
+      <div style={styles.fieldGroup}>
+        <label style={styles.label}>NIP</label>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <input
+            type="text"
+            name="nip"
+            value={formData.nip}
+            onChange={handleTopChange}
+            style={{ ...styles.input, flex: 1 }}
+            placeholder="np. 123-456-78-90"
+            maxLength={13}
+          />
+          <button
+            type="button"
+            onClick={handleNipLookup}
+            disabled={nipLoading}
+            style={styles.nipBtn}
+          >
+            {nipLoading ? '⏳' : '🔍 Pobierz dane'}
+          </button>
+        </div>
+        {nipError && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '4px' }}>{nipError}</p>}
+        {nipSuccess && <p style={{ color: '#16a34a', fontSize: '13px', marginTop: '4px' }}>{nipSuccess}</p>}
       </div>
 
       {/* OSOBA KONTAKTOWA */}
@@ -182,6 +229,18 @@ const styles: { [key: string]: React.CSSProperties } = {
     color: '#000',
     width: '100%',
     boxSizing: 'border-box' as const
+  },
+  nipBtn: {
+    backgroundColor: '#1d4ed8',
+    color: '#fff',
+    padding: '10px 16px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
   },
   saveBtn: {
     backgroundColor: '#000',
