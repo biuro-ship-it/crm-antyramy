@@ -10,19 +10,19 @@ router.use(authenticate);
 const COLLECTION = 'clients';
 
 const AddressSchema = z.object({
-  province: z.string().min(1),
-  zipCode: z.string().min(1),
-  city: z.string().min(1),
-  street: z.string().min(1),
-  number: z.string().min(1),
+  province: z.string().default(''),
+  zipCode: z.string().default(''),
+  city: z.string().default(''),
+  street: z.string().default(''),
+  number: z.string().default(''),
 });
 
 const ClientSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
-  type: z.enum(['hurt', 'sklep']),
-  contactPerson: z.string().min(1, 'Osoba kontaktowa jest wymagana'),
-  email: z.string().email('Nieprawidłowy adres e-mail'),
-  phone: z.string().min(1, 'Telefon jest wymagany'),
+  type: z.enum(['sklep', 'zakład', 'agencja']),
+  contactPerson: z.string().default(''),
+  email: z.string().optional().default(''),
+  phone: z.string().default(''),
   address: AddressSchema,
 });
 

@@ -109,7 +109,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
           >
             <option value="alpha">🔤 Alfabetycznie (A-Z)</option>
             <option value="oldest">⏳ Od najstarszego kontaktu</option>
-            <option value="type">🏢 Według kategorii (Hurt/Sklep)</option>
+            <option value="type">🏢 Według kategorii (Sklep/Zakład/Agencja)</option>
           </select>
         </div>
       </div>
@@ -120,7 +120,9 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
           <div key={client.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow group relative flex flex-col h-full">
             <div className="flex justify-between items-start mb-4">
               <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider ${
-                client.type === 'hurt' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'
+                client.type === 'agencja' ? 'bg-violet-100 text-violet-700' :
+                client.type === 'zakład' ? 'bg-amber-100 text-amber-700' :
+                'bg-emerald-100 text-emerald-700'
               }`}>
                 {client.type}
               </span>

@@ -91,8 +91,9 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
         <div style={{ flex: 1 }}>
           <label style={styles.label}>Typ</label>
           <select name="type" value={formData.type} onChange={handleTopChange} style={styles.input}>
-            <option value="hurt">Hurt</option>
             <option value="sklep">Sklep</option>
+            <option value="zakład">Zakład</option>
+            <option value="agencja">Agencja</option>
           </select>
         </div>
         <div style={{ flex: 3 }}>

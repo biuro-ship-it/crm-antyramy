@@ -13,7 +13,7 @@ export interface Address {
 export interface Client {
   id: string;
   companyName: string;
-  type: 'hurt' | 'sklep';
+  type: 'sklep' | 'zakład' | 'agencja';
   contactPerson: string;
   email: string;
   phone: string;
@@ -25,7 +25,7 @@ export interface Client {
 
 export interface ClientFormData {
   companyName: string;
-  type: 'hurt' | 'sklep';
+  type: 'sklep' | 'zakład' | 'agencja';
   contactPerson: string;
   email: string;
   phone: string;

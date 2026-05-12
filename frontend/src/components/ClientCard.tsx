@@ -396,7 +396,11 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
         <div>
           <div className="flex items-center gap-3 mb-2">
             <h2 className="text-3xl font-black text-slate-800">{client.companyName}</h2>
-            <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider ${client.type === 'hurt' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider ${
+              client.type === 'agencja' ? 'bg-violet-100 text-violet-700' :
+              client.type === 'zakład' ? 'bg-amber-100 text-amber-700' :
+              'bg-emerald-100 text-emerald-700'
+            }`}>
               {client.type}
             </span>
           </div>
