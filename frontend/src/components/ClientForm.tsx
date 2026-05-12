@@ -62,7 +62,15 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
 
   // Obsługa zmian pól adresowych (address.*)
   const handleAddressChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+    const { name } = e.target;
+    let value = e.target.value;
+
+    if (name === 'zipCode') {
+      // Zostaw tylko cyfry, maksymalnie 5
+      const digits = value.replace(/\D/g, '').slice(0, 5);
+      // Auto-wstaw myślnik po 2 cyfrach: XX-XXX
+      value = digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
+    }
 
     // Automatyczne uzupełnianie województwa na podstawie kodu pocztowego
     let province = formData.address.province;
