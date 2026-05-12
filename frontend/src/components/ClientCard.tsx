@@ -193,8 +193,11 @@ interface InteractionFormProps {
 }
 
 // ─── Hook: dyktowanie głosem (Web Speech API) ──────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnySpeechRecognition = any;
+
 const useSpeechRecognition = (onResult: (text: string) => void) => {
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<AnySpeechRecognition>(null);
   const [listening, setListening] = useState(false);
   const [supported] = useState(() =>
     typeof window !== 'undefined' &&
@@ -203,13 +206,17 @@ const useSpeechRecognition = (onResult: (text: string) => void) => {
 
   const start = useCallback(() => {
     if (!supported) return;
-    const SR = (window.SpeechRecognition || (window as unknown as { webkitSpeechRecognition: typeof SpeechRecognition }).webkitSpeechRecognition);
-    const rec = new SR();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const w = window as any;
+    const SR = w.SpeechRecognition || w.webkitSpeechRecognition;
+    const rec: AnySpeechRecognition = new SR();
     rec.lang = 'pl-PL';
     rec.interimResults = false;
     rec.continuous = false;
-    rec.onresult = (e) => {
-      const transcript = Array.from(e.results).map(r => r[0].transcript).join(' ');
+    rec.onresult = (e: AnySpeechRecognition) => {
+      const transcript = Array.from(e.results as AnySpeechRecognition[])
+        .map((r: AnySpeechRecognition) => r[0].transcript as string)
+        .join(' ');
       onResult(transcript);
     };
     rec.onend = () => setListening(false);
