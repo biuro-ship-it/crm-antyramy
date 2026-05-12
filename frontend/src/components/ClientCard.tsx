@@ -422,9 +422,22 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
             <span>✉️</span>
             <a href={`mailto:${client.email}`} className="hover:text-blue-600 font-bold">{client.email || 'Brak'}</a>
           </p>
-          <p className="flex items-center gap-2 md:justify-end mt-2 text-xs">
-            <span>📍</span> {client.address?.city}, {client.address?.street}
-          </p>
+          {(client.address?.street || client.address?.city || client.address?.zipCode) ? (
+            <div className="mt-2 text-xs md:text-right leading-5">
+              <span className="mr-1">📍</span>
+              {[
+                client.address.street && client.address.number
+                  ? `${client.address.street} ${client.address.number}`
+                  : client.address.street || '',
+                client.address.zipCode && client.address.city
+                  ? `${client.address.zipCode} ${client.address.city}`
+                  : client.address.city || client.address.zipCode || '',
+                client.address.province || '',
+              ].filter(Boolean).join(', ')}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs text-slate-400 md:text-right">📍 Brak adresu</p>
+          )}
           {client.email && (
             <div className="mt-4 flex flex-col gap-2">
               <button
