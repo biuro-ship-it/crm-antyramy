@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -55,6 +57,9 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', app: 'CRM Antyramy', timestamp: new Date().toISOString() });
 });
 
+// Serwowanie przesłanych zdjęć
+app.use('/uploads', express.static(path.join(__dirname, '../public/uploads')));
+
 // Routy
 app.use('/api/clients', clientsRouter);
 app.use('/api/products', productsRouter);
@@ -64,8 +69,6 @@ app.use('/api/nip', nipRouter);
 
 // Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
 // (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)
-import path from 'path';
-import fs from 'fs';
 const frontendIndex = path.join(__dirname, '../public/index.html');
 app.use((req, res) => {
   if (!req.path.startsWith('/api') && fs.existsSync(frontendIndex)) {

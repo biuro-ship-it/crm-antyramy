@@ -49,18 +49,29 @@ const upload = multer({
 });
 
 // POST /api/upload — prześlij zdjęcie produktu
-router.post('/', upload.single('image'), (req: AuthenticatedRequest, res: Response) => {
-  if (!req.file) {
-    res.status(400).json({ error: 'Brak pliku lub niedozwolony format' });
-    return;
-  }
+router.post('/', (req: AuthenticatedRequest, res: Response) => {
+  upload.single('image')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      res.status(400).json({ error: `Błąd uploadu: ${err.message}` });
+      return;
+    }
+    if (err) {
+      console.error('[upload] błąd multer:', err);
+      res.status(400).json({ error: err.message || 'Nie udało się zapisać pliku' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'Brak pliku lub niedozwolony format' });
+      return;
+    }
 
-  // Zdjęcia serwowane przez Passenger z public_nodejs/public/uploads/
-  // URL: https://api.crm.antyramy.eu/uploads/nazwa.jpg
-  const baseUrl = process.env.API_URL || 'https://api.crm.antyramy.eu';
-  const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    // Zdjęcia serwowane przez Passenger z public_nodejs/public/uploads/
+    // URL: https://api.crm.antyramy.eu/uploads/nazwa.jpg
+    const baseUrl = process.env.API_URL || 'https://api.crm.antyramy.eu';
+    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
-  res.json({ imageUrl });
+    res.json({ imageUrl });
+  });
 });
 
 // DELETE /api/upload/:filename — usuń zdjęcie
