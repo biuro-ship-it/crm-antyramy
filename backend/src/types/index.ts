@@ -18,7 +18,7 @@ export interface Address {
 export interface Client {
   id?: string;
   companyName: string;
-  type: 'hurt' | 'sklep';
+  type: 'zakład' | 'sklep' | 'agencja' | 'inne';
   contactPerson: string;
   email: string;
   phone: string;

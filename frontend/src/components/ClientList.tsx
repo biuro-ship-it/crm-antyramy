@@ -47,7 +47,6 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
       return (a.companyName || '').localeCompare(b.companyName || '');
     }
     if (sortBy === 'type') {
-      // Sortowanie: najpierw Hurt, potem Sklep
       return (a.type || '').localeCompare(b.type || '');
     }
     if (sortBy === 'oldest') {
@@ -109,7 +108,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
           >
             <option value="alpha">🔤 Alfabetycznie (A-Z)</option>
             <option value="oldest">⏳ Od najstarszego kontaktu</option>
-            <option value="type">🏢 Według kategorii (Sklep/Zakład/Agencja)</option>
+            <option value="type">Według kategorii</option>
           </select>
         </div>
       </div>
@@ -122,6 +121,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
               <span className={`text-[10px] font-black px-2 py-1 rounded-md uppercase tracking-wider ${
                 client.type === 'agencja' ? 'bg-violet-100 text-violet-700' :
                 client.type === 'zakład' ? 'bg-amber-100 text-amber-700' :
+                client.type === 'inne' ? 'bg-slate-100 text-slate-600' :
                 'bg-emerald-100 text-emerald-700'
               }`}>
                 {client.type}

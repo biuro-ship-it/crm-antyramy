@@ -1,34 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import {
   Client, Product,
-  getClients, getProductsList, createClientInteraction
+  getClients, getProductsList,
+  sendPromotion, previewPromotionPdf,
+  PromotionSendResult,
 } from '../services/api';
+
+type Step = 1 | 2 | 3;
+
+const INITIAL_SUBJECT = 'Nowa oferta — Antyramy';
 
 const PromotionsPanel: React.FC = () => {
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Zaznaczenia
+  const [step, setStep] = useState<Step>(1);
+
+  // Krok 1 — wybór produktów
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
+
+  // Krok 2 — wybór klientów
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set());
+  const [clientSearch, setClientSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<'' | 'zakład' | 'sklep' | 'agencja' | 'inne'>('');
 
-  // Filtr klientów
-  const [clientFilter, setClientFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState<'' | 'sklep' | 'zakład' | 'agencja'>('');
+  // Krok 3 — treść
+  const [title, setTitle] = useState('');
+  const [subject, setSubject] = useState(INITIAL_SUBJECT);
+  const [content, setContent] = useState('');
 
-  // Treść promocji
-  const [subject, setSubject] = useState('Promocja — Antyramy');
-  const [message, setMessage] = useState('');
-
-  // Wysyłanie
+  // Stan wysyłki
   const [sending, setSending] = useState(false);
-  const [result, setResult] = useState<{ ok: number; fail: number } | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [result, setResult] = useState<PromotionSendResult | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     Promise.all([getClients(), getProductsList()])
       .then(([c, p]) => { setClients(c); setProducts(p); })
-      .catch(console.error)
+      .catch(() => setError('Błąd wczytywania danych'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -39,265 +50,415 @@ const PromotionsPanel: React.FC = () => {
     setSelectedClients(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const filteredClients = clients.filter(c => {
-    const matchName = c.companyName.toLowerCase().includes(clientFilter.toLowerCase());
+    const q = clientSearch.toLowerCase();
+    const matchName = c.companyName.toLowerCase().includes(q) || (c.address?.city || '').toLowerCase().includes(q);
     const matchType = !typeFilter || c.type === typeFilter;
     return matchName && matchType;
   });
 
-  const allFilteredSelected = filteredClients.length > 0 &&
-    filteredClients.every(c => selectedClients.has(c.id));
+  const allVisible = filteredClients.length > 0 && filteredClients.every(c => selectedClients.has(c.id));
 
-  const toggleAllFiltered = () => {
-    if (allFilteredSelected) {
-      setSelectedClients(prev => {
-        const n = new Set(prev);
-        filteredClients.forEach(c => n.delete(c.id));
-        return n;
-      });
-    } else {
-      setSelectedClients(prev => {
-        const n = new Set(prev);
-        filteredClients.forEach(c => n.add(c.id));
-        return n;
-      });
-    }
+  const toggleAllVisible = () => {
+    setSelectedClients(prev => {
+      const n = new Set(prev);
+      if (allVisible) filteredClients.forEach(c => n.delete(c.id));
+      else filteredClients.forEach(c => n.add(c.id));
+      return n;
+    });
   };
 
   const chosenProducts = products.filter(p => selectedProducts.has(p.id));
+  const chosenClients = clients.filter(c => selectedClients.has(c.id));
+  const recipientsWithEmail = chosenClients.filter(c => c.email);
+
+  const canGoStep2 = selectedProducts.size > 0;
+  const canGoStep3 = selectedClients.size > 0;
+  const canSend = title.trim() && content.trim() && recipientsWithEmail.length > 0 && !sending;
+
+  const handlePreviewPdf = async () => {
+    if (!title.trim() || !content.trim()) {
+      setError('Uzupełnij tytuł i treść przed podglądem');
+      return;
+    }
+    setPreviewing(true);
+    setError('');
+    try {
+      await previewPromotionPdf(title, content, [...selectedProducts]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setPreviewing(false);
+    }
+  };
 
   const handleSend = async () => {
-    if (!message.trim()) { alert('Wpisz treść promocji'); return; }
-    if (selectedClients.size === 0) { alert('Zaznacz przynajmniej jednego klienta'); return; }
-    if (selectedProducts.size === 0) { alert('Zaznacz przynajmniej jeden produkt'); return; }
-
+    if (!canSend) return;
     setSending(true);
+    setError('');
     setResult(null);
-    let ok = 0, fail = 0;
-
-    const today = new Date().toISOString().split('T')[0];
-    const productNames = chosenProducts.map(p => p.name);
-
-    const targets = clients.filter(c => selectedClients.has(c.id));
-
-    for (const client of targets) {
-      try {
-        await createClientInteraction(client.id, {
-          contactDate: today,
-          channel: 'inne',
-          notes: message,
-          tradeNotes: '',
-          products: productNames,
-        });
-        ok++;
-      } catch {
-        fail++;
+    try {
+      const res = await sendPromotion({
+        title,
+        subject,
+        content,
+        productIds: [...selectedProducts],
+        clientIds: [...selectedClients],
+      });
+      setResult(res);
+      if (res.sent > 0) {
+        setSelectedProducts(new Set());
+        setSelectedClients(new Set());
+        setTitle('');
+        setSubject(INITIAL_SUBJECT);
+        setContent('');
+        setStep(1);
       }
-    }
-
-    setSending(false);
-    setResult({ ok, fail });
-
-    if (ok > 0) {
-      // Otwórz klienta poczty z BCC do wszystkich klientów którzy mają e-mail
-      const emailTargets = targets.filter(c => c.email);
-      if (emailTargets.length > 0) {
-        const bcc = emailTargets.map(c => c.email).join(',');
-        const encodedSubject = encodeURIComponent(subject || 'Promocja — Antyramy');
-
-        // Treść maila: wiadomość + lista produktów
-        const productLines = chosenProducts.map(p => {
-          const parts = [];
-          if (p.code) parts.push(`Kod: ${p.code}`);
-          if (p.priceNetto > 0) parts.push(`Cena netto: ${p.priceNetto.toFixed(2)} zł`);
-          return `• ${p.name}${parts.length ? ' (' + parts.join(', ') + ')' : ''}`;
-        }).join('\n');
-
-        const body = encodeURIComponent(
-          `${message}\n\nProdukty objęte promocją:\n${productLines}\n\nPozdrawiam serdecznie,`
-        );
-
-        window.open(`mailto:?bcc=${encodeURIComponent(bcc)}&subject=${encodedSubject}&body=${body}`, '_blank');
-      }
-
-      // Wyczyść zaznaczenia po udanym wysłaniu
-      setSelectedClients(new Set());
-      setSelectedProducts(new Set());
-      setMessage('');
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSending(false);
     }
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center py-24 text-slate-400 text-lg">
-      Ładowanie danych...
-    </div>
+    <div className="flex items-center justify-center py-32 text-slate-400">Wczytywanie...</div>
   );
 
   return (
-    <div className="animate-in slide-in-from-top-4">
-      <div className="mb-6">
-        <h2 className="text-3xl font-extrabold text-slate-900">📢 Panel Promocji</h2>
-        <p className="text-slate-500 mt-1">Zaznacz produkty, wybierz klientów i wyślij promocję — trafi do historii kontaktów każdego klienta.</p>
+    <div className="max-w-6xl mx-auto">
+
+      {/* Nagłówek */}
+      <div className="mb-8">
+        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Wysyłka promocji</h2>
+        <p className="text-slate-500 mt-1 text-sm">Wybierz produkty, klientów i treść — backend wyśle maile z PDF i zapisze historię kontaktów.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Pasek kroków */}
+      <div className="flex items-center gap-0 mb-8 bg-slate-100 rounded-xl p-1">
+        {([
+          { n: 1 as Step, label: 'Produkty', sub: `${selectedProducts.size} wybranych` },
+          { n: 2 as Step, label: 'Odbiorcy', sub: `${selectedClients.size} wybranych` },
+          { n: 3 as Step, label: 'Treść i wysyłka', sub: recipientsWithEmail.length > 0 ? `${recipientsWithEmail.length} z emailem` : '' },
+        ] as const).map(({ n, label, sub }) => (
+          <button
+            key={n}
+            onClick={() => { if (n === 2 && !canGoStep2) return; if (n === 3 && !canGoStep3) return; setStep(n); }}
+            className={`flex-1 flex flex-col items-center py-3 px-4 rounded-lg transition-all text-sm font-medium ${
+              step === n
+                ? 'bg-white shadow-sm text-slate-900'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
+                step === n ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'
+              }`}>{n}</span>
+              {label}
+            </span>
+            {sub && <span className="text-xs text-slate-400 mt-0.5">{sub}</span>}
+          </button>
+        ))}
+      </div>
 
-        {/* KROK 1 — Wybierz produkty */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <h3 className="font-black text-slate-800 text-lg mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 bg-blue-600 text-white text-sm rounded-full flex items-center justify-center font-black">1</span>
-            Wybierz produkty
-          </h3>
-          {products.length === 0
-            ? <p className="text-slate-400 text-sm">Brak produktów. Dodaj je w zakładce Produkty.</p>
-            : (
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {products.map(p => (
-                  <label key={p.id} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border transition-colors ${selectedProducts.has(p.id) ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-slate-50'}`}>
-                    <input
-                      type="checkbox"
-                      checked={selectedProducts.has(p.id)}
-                      onChange={() => toggleProduct(p.id)}
-                      className="w-4 h-4 rounded text-blue-600"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-slate-800 text-sm truncate">{p.name}</p>
-                      {p.code && <p className="text-xs text-slate-400">{p.code}</p>}
+      {/* ===== KROK 1 — PRODUKTY ===== */}
+      {step === 1 && (
+        <div>
+          {products.length === 0 ? (
+            <div className="text-center py-16 text-slate-400">
+              <p className="font-medium">Brak produktów w katalogu</p>
+              <p className="text-sm mt-1">Dodaj produkty w zakładce Produkty</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+              {products.map(p => {
+                const selected = selectedProducts.has(p.id);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => toggleProduct(p.id)}
+                    className={`text-left rounded-xl border-2 overflow-hidden transition-all ${
+                      selected
+                        ? 'border-blue-500 shadow-md shadow-blue-100'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="aspect-square bg-slate-100 overflow-hidden relative">
+                      {p.imageUrl
+                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">brak zdjęcia</div>
+                      }
+                      {selected && (
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                          <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      )}
                     </div>
-                    {p.priceNetto > 0 && (
-                      <span className="text-xs font-bold text-emerald-600 whitespace-nowrap">{p.priceNetto.toFixed(2)} zł</span>
-                    )}
-                  </label>
-                ))}
-              </div>
-            )
-          }
-          {selectedProducts.size > 0 && (
-            <p className="mt-3 text-xs text-blue-600 font-bold">✓ Wybrano: {selectedProducts.size} {selectedProducts.size === 1 ? 'produkt' : 'produkty/ów'}</p>
+                    <div className="p-3">
+                      <p className="font-semibold text-slate-800 text-sm leading-tight line-clamp-2">{p.name}</p>
+                      {p.code && <p className="text-xs text-slate-400 mt-0.5">{p.code}</p>}
+                      {p.priceNetto > 0 && (
+                        <p className="text-sm font-bold text-blue-600 mt-1">{p.priceNetto.toFixed(2)} zł</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           )}
+
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-slate-500">
+              {selectedProducts.size > 0
+                ? `Wybrano ${selectedProducts.size} z ${products.length} produktów`
+                : 'Kliknij produkt aby go wybrać'}
+            </p>
+            <button
+              onClick={() => setStep(2)}
+              disabled={!canGoStep2}
+              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+            >
+              Dalej: wybór odbiorców
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* KROK 2 — Wybierz klientów */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <h3 className="font-black text-slate-800 text-lg mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 bg-blue-600 text-white text-sm rounded-full flex items-center justify-center font-black">2</span>
-            Wybierz klientów
-          </h3>
-
-          {/* Filtry */}
-          <div className="flex gap-2 mb-3">
+      {/* ===== KROK 2 — ODBIORCY ===== */}
+      {step === 2 && (
+        <div>
+          <div className="flex gap-3 mb-4">
             <input
               type="text"
-              placeholder="Szukaj..."
-              value={clientFilter}
-              onChange={e => setClientFilter(e.target.value)}
-              className="flex-1 border border-slate-200 rounded-lg p-2 text-sm outline-none focus:border-blue-400"
+              placeholder="Szukaj po nazwie lub mieście..."
+              value={clientSearch}
+              onChange={e => setClientSearch(e.target.value)}
+              className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
             />
             <select
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value as typeof typeFilter)}
-              className="border border-slate-200 rounded-lg p-2 text-sm outline-none focus:border-blue-400 bg-white"
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 bg-white"
             >
-              <option value="">Wszyscy</option>
-              <option value="sklep">Sklep</option>
+              <option value="">Wszystkie typy</option>
               <option value="zakład">Zakład</option>
+              <option value="sklep">Sklep</option>
               <option value="agencja">Agencja</option>
+              <option value="inne">Inne</option>
             </select>
           </div>
 
-          {/* Zaznacz wszystkich z filtra */}
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={allFilteredSelected}
-              onChange={toggleAllFiltered}
-              className="rounded text-blue-600"
-            />
-            Zaznacz wszystkich ({filteredClients.length})
-          </label>
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+            {/* Nagłówek tabeli */}
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
+              <input
+                type="checkbox"
+                checked={allVisible}
+                onChange={toggleAllVisible}
+                className="rounded border-slate-300 text-blue-600"
+              />
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                {filteredClients.length} firm{filteredClients.length === 1 ? 'a' : ''}
+                {clientSearch || typeFilter ? ' (przefiltrowanych)' : ''}
+              </span>
+            </div>
 
-          <div className="space-y-1 max-h-60 overflow-y-auto">
-            {filteredClients.length === 0
-              ? <p className="text-slate-400 text-sm py-2">Brak klientów</p>
-              : filteredClients.map(c => (
-                <label key={c.id} className={`flex items-center gap-3 p-2 rounded-xl cursor-pointer border transition-colors ${selectedClients.has(c.id) ? 'bg-blue-50 border-blue-200' : 'border-transparent hover:bg-slate-50'}`}>
-                  <input
-                    type="checkbox"
-                    checked={selectedClients.has(c.id)}
-                    onChange={() => toggleClient(c.id)}
-                    className="w-4 h-4 rounded text-blue-600"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-slate-800 text-sm truncate">{c.companyName}</p>
-                    <p className="text-xs text-slate-400">{c.type} · {c.address?.city || 'brak miasta'}</p>
-                  </div>
-                </label>
-              ))
-            }
+            {/* Lista */}
+            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+              {filteredClients.length === 0 ? (
+                <p className="text-sm text-slate-400 px-4 py-6">Brak wyników</p>
+              ) : filteredClients.map(c => {
+                const selected = selectedClients.has(c.id);
+                const hasEmail = !!c.email;
+                return (
+                  <label key={c.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${selected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      onChange={() => toggleClient(c.id)}
+                      className="rounded border-slate-300 text-blue-600 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-800 text-sm truncate">{c.companyName}</p>
+                      <p className="text-xs text-slate-400 truncate">
+                        {c.type} {c.address?.city ? `· ${c.address.city}` : ''}
+                        {c.email ? ` · ${c.email}` : ''}
+                      </p>
+                    </div>
+                    {!hasEmail && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0">brak e-mail</span>
+                    )}
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           {selectedClients.size > 0 && (
-            <p className="mt-3 text-xs text-blue-600 font-bold">✓ Wybrano: {selectedClients.size} {selectedClients.size === 1 ? 'klienta' : 'klientów'}</p>
+            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-6 text-sm text-blue-800">
+              Wybrano <strong>{selectedClients.size}</strong> klientów,
+              z czego <strong>{recipientsWithEmail.length}</strong> ma adres email (do nich trafi mail).
+              {selectedClients.size !== recipientsWithEmail.length && (
+                <span className="text-amber-700"> {selectedClients.size - recipientsWithEmail.length} bez emaila zostanie pominięte.</span>
+              )}
+            </div>
           )}
+
+          <div className="flex justify-between">
+            <button onClick={() => setStep(1)} className="px-6 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+              Wstecz
+            </button>
+            <button
+              onClick={() => setStep(3)}
+              disabled={!canGoStep3}
+              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+            >
+              Dalej: treść maila
+            </button>
+          </div>
         </div>
+      )}
 
-        {/* KROK 3 — Treść i wysyłka */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col">
-          <h3 className="font-black text-slate-800 text-lg mb-4 flex items-center gap-2">
-            <span className="w-7 h-7 bg-blue-600 text-white text-sm rounded-full flex items-center justify-center font-black">3</span>
-            Treść promocji
-          </h3>
+      {/* ===== KROK 3 — TREŚĆ I WYSYŁKA ===== */}
+      {step === 3 && (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
 
-          <div className="mb-3">
-            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Temat maila</label>
-            <input
-              type="text"
-              className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400"
-              value={subject}
-              onChange={e => setSubject(e.target.value)}
-              placeholder="Temat wiadomości..."
-            />
+          {/* Formularz — lewa strona */}
+          <div className="lg:col-span-3 space-y-5">
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Tytuł oferty (na PDF)</label>
+              <input
+                type="text"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="np. Wiosenna promocja ram drewnianych"
+                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Temat maila</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Treść maila</label>
+              <textarea
+                rows={9}
+                value={content}
+                onChange={e => setContent(e.target.value)}
+                placeholder="Szanowni Państwo,&#10;&#10;Z przyjemnością informujemy o naszej aktualnej ofercie..."
+                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none font-sans"
+              />
+              <p className="text-xs text-slate-400 mt-1">Treść pojawi się zarówno w mailu jak i w PDF.</p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                {error}
+              </div>
+            )}
+
+            {result && (
+              <div className={`rounded-lg px-4 py-3 text-sm ${result.failed.length === 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+                <p className="font-semibold">
+                  Wysłano {result.sent} z {result.total} maili.
+                </p>
+                {result.failed.length > 0 && (
+                  <ul className="mt-2 space-y-0.5">
+                    {result.failed.map(f => (
+                      <li key={f.email} className="text-xs">{f.email}: {f.error}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button onClick={() => setStep(2)} className="px-5 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+                Wstecz
+              </button>
+              <button
+                onClick={handlePreviewPdf}
+                disabled={previewing || !title.trim() || !content.trim()}
+                className="px-5 py-2.5 border border-blue-200 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {previewing ? 'Generuję...' : 'Podgląd PDF'}
+              </button>
+              <button
+                onClick={handleSend}
+                disabled={!canSend}
+                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+              >
+                {sending
+                  ? 'Wysyłam...'
+                  : `Wyślij do ${recipientsWithEmail.length} odbiorców`}
+              </button>
+            </div>
           </div>
 
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Treść</label>
-          <textarea
-            rows={5}
-            className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-400 resize-none flex-1 mb-4"
-            placeholder="Np. Ruszamy z promocją wiosenną! Produkty w obniżonej cenie do końca miesiąca..."
-            value={message}
-            onChange={e => setMessage(e.target.value)}
-          />
+          {/* Podsumowanie — prawa strona */}
+          <div className="lg:col-span-2">
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 sticky top-4">
+              <h3 className="text-sm font-semibold text-slate-700 mb-4">Podsumowanie kampanii</h3>
 
-          {/* Podsumowanie */}
-          {(selectedProducts.size > 0 || selectedClients.size > 0) && (
-            <div className="bg-slate-50 rounded-xl p-3 mb-4 text-xs text-slate-600 space-y-1">
-              {selectedProducts.size > 0 && (
-                <p>📦 <strong>Produkty:</strong> {chosenProducts.map(p => p.name).join(', ')}</p>
-              )}
-              {selectedClients.size > 0 && (
-                <p>🏢 <strong>Odbiorcy:</strong> {selectedClients.size} {selectedClients.size === 1 ? 'klient' : 'klientów'}</p>
-              )}
+              <div className="space-y-4">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Produkty ({chosenProducts.length})</p>
+                  <div className="space-y-1">
+                    {chosenProducts.map(p => (
+                      <div key={p.id} className="flex items-center gap-2">
+                        <div className="w-8 h-8 bg-white rounded border border-slate-200 overflow-hidden shrink-0">
+                          {p.imageUrl
+                            ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                            : <div className="w-full h-full bg-slate-100" />
+                          }
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-slate-700 truncate">{p.name}</p>
+                          {p.priceNetto > 0 && <p className="text-xs text-blue-600">{p.priceNetto.toFixed(2)} zł</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 pt-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Odbiorcy</p>
+                  <p className="text-sm text-slate-700"><span className="font-bold">{recipientsWithEmail.length}</span> firm z adresem email</p>
+                  {chosenClients.length !== recipientsWithEmail.length && (
+                    <p className="text-xs text-amber-600 mt-0.5">{chosenClients.length - recipientsWithEmail.length} bez emaila</p>
+                  )}
+                </div>
+
+                <div className="border-t border-slate-200 pt-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Co wyślemy</p>
+                  <ul className="space-y-1 text-xs text-slate-600">
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      Mail HTML z tabelą produktów
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      PDF z logo, treścią i zdjęciami
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      Wpis w historii każdego klienta
+                    </li>
+                  </ul>
+                </div>
+              </div>
             </div>
-          )}
-
-          <button
-            onClick={handleSend}
-            disabled={sending || selectedClients.size === 0 || selectedProducts.size === 0 || !message.trim()}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
-          >
-            {sending ? '⏳ Wysyłam...' : `📢 Wyślij do ${selectedClients.size} klientów`}
-          </button>
-
-          {/* Wynik */}
-          {result && (
-            <div className={`mt-4 p-4 rounded-xl text-sm font-semibold ${result.fail === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}`}>
-              {result.fail === 0
-                ? `✅ Zapisano do historii ${result.ok} klientów. Sprawdź czy otworzył się klient poczty (Outlook/Thunderbird) z gotowym mailem.`
-                : `⚠️ Zapisano do historii: ${result.ok}, błąd przy: ${result.fail} klientach.`
-              }
-            </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };

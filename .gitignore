@@ -10,6 +10,8 @@ backend/dist/
 **/.env
 **/serviceAccountKey.json
 serviceAccountKey.json
+**/gmail_credentials.json
+gmail_credentials.json
 
 # Frontend build
 frontend/dist/
@@ -28,7 +30,8 @@ Thumbs.db
 
 # Vite cache
 frontend/.vite/
-
+# foldery tylko lokalnie
+secret/
 info.md
 crm.md
 notatki.md

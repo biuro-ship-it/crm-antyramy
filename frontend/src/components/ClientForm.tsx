@@ -23,7 +23,7 @@ const voivodeshipMap: { [key: string]: string } = {
 
 const emptyForm = (c?: Client | null): ClientFormData => ({
   companyName: c?.companyName || '',
-  type: (c?.type as 'sklep' | 'zakład' | 'agencja') || 'sklep',
+  type: (c?.type as 'zakład' | 'sklep' | 'agencja' | 'inne') || 'zakład',
   nip: c?.nip || '',
   contactPerson: c?.contactPerson || '',
   email: c?.email || '',
@@ -120,9 +120,10 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
         <div style={{ flex: 1 }}>
           <label style={styles.label}>Typ</label>
           <select name="type" value={formData.type} onChange={handleTopChange} style={styles.input}>
-            <option value="sklep">Sklep</option>
             <option value="zakład">Zakład</option>
+            <option value="sklep">Sklep</option>
             <option value="agencja">Agencja</option>
+            <option value="inne">Inne</option>
           </select>
         </div>
         <div style={{ flex: 3 }}>

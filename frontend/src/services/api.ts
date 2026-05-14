@@ -13,7 +13,7 @@ export interface Address {
 export interface Client {
   id: string;
   companyName: string;
-  type: 'sklep' | 'zakład' | 'agencja';
+  type: 'zakład' | 'sklep' | 'agencja' | 'inne';
   nip: string;
   contactPerson: string;
   email: string;
@@ -26,7 +26,7 @@ export interface Client {
 
 export interface ClientFormData {
   companyName: string;
-  type: 'sklep' | 'zakład' | 'agencja';
+  type: 'zakład' | 'sklep' | 'agencja' | 'inne';
   nip: string;
   contactPerson: string;
   email: string;
@@ -94,6 +94,20 @@ export interface FollowUpFormData {
   reminderText: string;
 }
 
+export interface PromotionSendData {
+  title: string;
+  subject: string;
+  content: string;
+  productIds: string[];
+  clientIds: string[];
+}
+
+export interface PromotionSendResult {
+  sent: number;
+  failed: Array<{ email: string; error: string }>;
+  total: number;
+}
+
 // --- KONFIGURACJA API ---
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
@@ -141,27 +155,13 @@ export const getNipData = async (nip: string): Promise<NipData> => {
   const nipClean = nip.replace(/[-\s]/g, '');
   if (!/^\d{10}$/.test(nipClean)) throw new Error('NIP musi mieć 10 cyfr');
 
-  const today = new Date().toISOString().split('T')[0];
-  const response = await fetch(
-    `https://wl-api.mf.gov.pl/api/search/nip/${nipClean}?date=${today}`,
-    { headers: { 'Accept': 'application/json' } }
-  );
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/nip/${nipClean}`, { headers });
 
   if (response.status === 404) throw new Error('Nie znaleziono firmy o podanym NIP w rejestrze VAT');
   if (!response.ok) throw new Error('Błąd połączenia z bazą Ministerstwa Finansów');
 
-  const data = await response.json() as {
-    result?: { subject?: { name?: string; regon?: string; workingAddress?: string; residenceAddress?: string } };
-  };
-  const subject = data?.result?.subject;
-  if (!subject) throw new Error('Nie znaleziono firmy o podanym NIP');
-
-  return {
-    nip: nipClean,
-    companyName: subject.name || '',
-    regon: subject.regon || '',
-    address: subject.workingAddress || subject.residenceAddress || '',
-  };
+  return response.json();
 };
 
 // --- INTERAKCJE ---
@@ -238,4 +238,42 @@ export const updateFollowUpStatus = async (id: string, status: 'zrealizowane' | 
   const headers = await getHeaders();
   const response = await fetch(`${FOLLOWUPS_URL}/${id}/status`, { method: 'PATCH', headers, body: JSON.stringify({ status }) });
   if (!response.ok) throw new Error('Błąd zmiany statusu zadania');
+};
+
+// --- PROMOCJE ---
+
+export const sendPromotion = async (data: PromotionSendData): Promise<PromotionSendResult> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/promotions/send`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(data),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Błąd wysyłki' }));
+    throw new Error(err.error || 'Błąd wysyłki promocji');
+  }
+  return response.json();
+};
+
+export const previewPromotionPdf = async (
+  title: string,
+  content: string,
+  productIds: string[]
+): Promise<void> => {
+  const auth = getAuth();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+
+  const response = await fetch(`${API_URL}/api/promotions/preview-pdf`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify({ title, content, productIds }),
+  });
+
+  if (!response.ok) throw new Error('Błąd generowania podglądu PDF');
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
