@@ -5,10 +5,11 @@ import ClientList from '../components/ClientList';
 import ClientCard from '../components/ClientCard';
 import ProductsPanel from '../components/ProductsPanel';
 import PromotionsPanel from '../components/PromotionsPanel';
+import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
-type ActiveTab = 'clients' | 'products' | 'promotions';
+type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates';
 
 interface DashboardProps {
   user: User;
@@ -99,6 +100,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               onClick={() => { setActiveTab('promotions'); setShowForm(false); setViewClient(null); }}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'promotions' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >📢 Promocje</button>
+            <button
+              onClick={() => { setActiveTab('email-templates'); setShowForm(false); setViewClient(null); }}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'email-templates' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >✉️ Szablony maili</button>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -185,6 +190,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           <ProductsPanel />
         ) : activeTab === 'promotions' ? (
           <PromotionsPanel />
+        ) : activeTab === 'email-templates' ? (
+          <EmailTemplatesPanel />
         ) : (
           <>
             {error && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6">⚠️ {error}</div>}

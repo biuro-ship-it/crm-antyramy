@@ -14,6 +14,7 @@ import followupsRouter from './routes/followups';
 import uploadRouter from './routes/upload';
 import nipRouter from './routes/nip';
 import promotionsRouter from './routes/promotions';
+import emailTemplatesRouter from './routes/emailTemplates';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -68,6 +69,7 @@ app.use('/api/followups', followupsRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/nip', nipRouter);
 app.use('/api/promotions', promotionsRouter);
+app.use('/api/email-templates', emailTemplatesRouter);
 
 // Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
 // (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)

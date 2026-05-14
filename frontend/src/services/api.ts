@@ -256,6 +256,73 @@ export const sendPromotion = async (data: PromotionSendData): Promise<PromotionS
   return response.json();
 };
 
+// --- SZABLONY MAILI ---
+
+export interface EmailTemplateVersion {
+  body: string;
+  subject: string;
+  savedAt: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+  currentVersion: number;
+  versions: Record<string, EmailTemplateVersion>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplateFormData {
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+}
+
+export const getEmailTemplates = async (): Promise<EmailTemplate[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/email-templates`, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać szablonów maili');
+  return response.json();
+};
+
+export const createEmailTemplate = async (data: EmailTemplateFormData): Promise<EmailTemplate> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/email-templates`, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zapisać szablonu');
+  return response.json();
+};
+
+export const updateEmailTemplate = async (id: string, data: EmailTemplateFormData): Promise<EmailTemplate> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/email-templates/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zaktualizować szablonu');
+  return response.json();
+};
+
+export const deleteEmailTemplate = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/email-templates/${id}`, { method: 'DELETE', headers });
+  if (!response.ok) throw new Error('Nie udało się usunąć szablonu');
+};
+
+export const sendEmailFromTemplate = async (
+  id: string,
+  payload: { to: string; subject: string; body: string }
+): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/email-templates/${id}/send`, { method: 'POST', headers, body: JSON.stringify(payload) });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Błąd wysyłki' }));
+    throw new Error(err.error || 'Błąd wysyłki maila');
+  }
+};
+
 export const previewPromotionPdf = async (
   title: string,
   content: string,

@@ -32,6 +32,7 @@ Thumbs.db
 frontend/.vite/
 # foldery tylko lokalnie
 secret/
+.claude/
 info.md
 crm.md
 notatki.md

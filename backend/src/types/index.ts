@@ -59,3 +59,29 @@ export interface FollowUp {
   createdAt: string;
   completedAt?: string;
 }
+
+export interface EmailTemplateVersion {
+  body: string;
+  subject: string;
+  savedAt: string;
+}
+
+export interface EmailTemplate {
+  id?: string;
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+  currentVersion: number;
+  versions: Record<string, EmailTemplateVersion>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplateFormData {
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+}

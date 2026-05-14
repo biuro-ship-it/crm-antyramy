@@ -4,6 +4,7 @@ import {
   getClientInteractions, createClientInteraction, updateClientInteraction,
   getProductsList, createFollowUp
 } from '../services/api';
+import EmailSendModal from './EmailSendModal';
 
 // ─── Modal wysyłki produktów mailem ─────────────────────────────────────────
 interface ProductEmailModalProps {
@@ -407,6 +408,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showEmailSendModal, setShowEmailSendModal] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -517,6 +519,12 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
                 className="w-full bg-blue-100 hover:bg-blue-200 text-blue-700 font-bold py-2.5 px-4 rounded-xl transition-colors text-xs flex items-center justify-center gap-2 shadow-sm"
               >
                 <span className="text-base">📝</span> Generuj maila z ofertą
+              </button>
+              <button
+                onClick={() => setShowEmailSendModal(true)}
+                className="w-full bg-violet-100 hover:bg-violet-200 text-violet-700 font-bold py-2.5 px-4 rounded-xl transition-colors text-xs flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span className="text-base">📋</span> Wyślij mail z szablonu
               </button>
             </div>
           )}
@@ -635,6 +643,14 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
           client={client}
           products={products}
           onClose={() => setShowEmailModal(false)}
+        />
+      )}
+
+      {/* Modal wysyłki z szablonu */}
+      {showEmailSendModal && (
+        <EmailSendModal
+          client={client}
+          onClose={() => setShowEmailSendModal(false)}
         />
       )}
     </div>
