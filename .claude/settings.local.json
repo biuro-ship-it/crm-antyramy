@@ -5,7 +5,13 @@
       "PowerShell(Start-Sleep 10; try { $r = Invoke-WebRequest -Uri \"http://localhost:4000/health\" -TimeoutSec 5; $r.Content } catch { \"Backend nie odpowiada: $_\" })",
       "PowerShell($proc = Get-NetTCPConnection -LocalPort 4000 -ErrorAction SilentlyContinue | Select-Object -First 1; if \\($proc\\) { Stop-Process -Id $proc.OwningProcess -Force; Write-Output \"Zabito PID $\\($proc.OwningProcess\\)\" } else { Write-Output \"Port 4000 wolny\" })",
       "Bash(curl -s \"http://localhost:4000/health\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:4000/api/clients\" -H \"Origin: http://localhost:5174\" -H \"Authorization: Bearer test\")"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"http://localhost:4000/api/clients\" -H \"Origin: http://localhost:5174\" -H \"Authorization: Bearer test\")",
+      "Bash(ls backend/src/services/gmail.test.ts)",
+      "Bash(ls backend/src/services/)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('jest'\\)\")",
+      "Bash(echo \"EXIT:$?\")",
+      "PowerShell(npm install *)"
     ]
   }
 }

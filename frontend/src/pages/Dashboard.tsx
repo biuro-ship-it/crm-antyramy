@@ -82,12 +82,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
       <nav className="bg-white border-b border-slate-200 px-6 py-3 flex justify-between items-center sticky top-0 z-10">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🖼️</span>
+            <img src="/icona.png" alt="CRM Antyramy Logo" className="h-6 w-6" />
             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
-              CRM Antyramy
+                CRM Antyramy
             </h1>
-          </div>
-          <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+          </div>          <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
             <button
               onClick={() => { setActiveTab('clients'); setShowForm(false); setViewClient(null); }}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'clients' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}

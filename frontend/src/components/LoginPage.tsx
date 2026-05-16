@@ -7,7 +7,7 @@ export default function LoginPage({ onSignIn, error }: Props) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
       <div className="bg-white rounded-2xl px-10 py-12 shadow-lg text-center w-full max-w-sm">
-        <div className="text-5xl mb-3">🖼️</div>
+        <img src="/icona.png" alt="CRM Antyramy Logo" className="h-12 w-12 mx-auto mb-3" />
         <h1 className="text-2xl font-bold text-slate-800 mb-1">CRM Antyramy</h1>
         <p className="text-slate-500 text-sm mb-7">Zaloguj się, aby kontynuować</p>
 
