@@ -18,6 +18,11 @@ if (typeof globalThis.FormData === 'undefined') {
   globalThis.FormData = require('form-data');
 }
 
+if (typeof globalThis.crypto === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  globalThis.crypto = require('crypto').webcrypto;
+}
+
 if (typeof globalThis.ReadableStream === 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const { ReadableStream, WritableStream, TransformStream } = require('stream/web');
