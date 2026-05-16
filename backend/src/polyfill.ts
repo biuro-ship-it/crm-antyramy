@@ -17,3 +17,11 @@ if (typeof globalThis.FormData === 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   globalThis.FormData = require('form-data');
 }
+
+if (typeof globalThis.ReadableStream === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { ReadableStream, WritableStream, TransformStream } = require('stream/web');
+  globalThis.ReadableStream = ReadableStream;
+  globalThis.WritableStream = WritableStream;
+  globalThis.TransformStream = TransformStream;
+}
