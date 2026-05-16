@@ -12,3 +12,8 @@ if (typeof globalThis.Blob === 'undefined') {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   globalThis.Blob = require('buffer').Blob;
 }
+
+if (typeof globalThis.FormData === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  globalThis.FormData = require('form-data');
+}
