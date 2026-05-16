@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 
-const getGmailClient = () => {
+export const getGmailClient = () => {
   const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = process.env;
 
   if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
