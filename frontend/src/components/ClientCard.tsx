@@ -60,7 +60,7 @@ Pozdrawiam serdecznie,`;
   const handleSend = () => {
     const subject = encodeURIComponent(`Oferta produktów — Antyramy`);
     const body = encodeURIComponent(emailBody);
-    window.location.href = `mailto:${client.email}?subject=${subject}&body=${body}`;
+    window.open(`mailto:${client.email}?subject=${subject}&body=${body}`);
     onClose();
   };
 
@@ -450,7 +450,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
     const body = encodeURIComponent(
       `${greeting}\n\nNawiązując do naszej rozmowy, przesyłam zarys propozycji współpracy...\n\n[Tutaj wpisz szczegóły wyceny lub załącz plik z ofertą]\n\nW razie jakichkolwiek pytań, pozostaję do dyspozycji.\n\nPozdrawiam serdecznie,`
     );
-    window.location.href = `mailto:${client.email}?subject=${subject}&body=${body}`;
+    window.open(`mailto:${client.email}?subject=${subject}&body=${body}`);
   };
 
   return (

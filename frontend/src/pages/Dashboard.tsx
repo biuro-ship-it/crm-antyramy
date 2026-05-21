@@ -6,10 +6,11 @@ import ClientCard from '../components/ClientCard';
 import ProductsPanel from '../components/ProductsPanel';
 import PromotionsPanel from '../components/PromotionsPanel';
 import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
+import NotesPanel from '../components/NotesPanel'; // DODANE: import nowej tablicy notatek
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
-type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates';
+type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates' | 'notes'; // MODYFIKACJA: dodane 'notes'
 
 interface DashboardProps {
   user: User;
@@ -86,7 +87,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             <h1 className="text-xl font-bold bg-gradient-to-r from-blue-700 to-indigo-600 bg-clip-text text-transparent">
                 CRM Antyramy
             </h1>
-          </div>          <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
+          </div>
+          <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1">
             <button
               onClick={() => { setActiveTab('clients'); setShowForm(false); setViewClient(null); }}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'clients' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
@@ -103,6 +105,10 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               onClick={() => { setActiveTab('email-templates'); setShowForm(false); setViewClient(null); }}
               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'email-templates' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >✉️ Szablony maili</button>
+            <button
+              onClick={() => { setActiveTab('notes'); setShowForm(false); setViewClient(null); }}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-colors ${activeTab === 'notes' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >📋 Notatki</button> {/* DODANE: Przycisk w menu */}
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -191,6 +197,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           <PromotionsPanel />
         ) : activeTab === 'email-templates' ? (
           <EmailTemplatesPanel />
+        ) : activeTab === 'notes' ? (
+          <NotesPanel /> // DODANE: Warunek renderujący nową zakładkę
         ) : (
           <>
             {error && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-6">⚠️ {error}</div>}

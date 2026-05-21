@@ -1,6 +1,6 @@
 import { getAuth } from 'firebase/auth';
 
-// --- INTERFEJSY I MODELE DANYCH ---
+// ─── INTERFEJSY I MODELE DANYCH ─────────────────────────────────────────────
 
 export interface Address {
   province: string;
@@ -50,6 +50,8 @@ export interface Interaction {
   products?: string[];
   createdBy: string;
   createdAt: string;
+  updatedAt?: string;
+  updatedBy?: string;
 }
 
 export interface InteractionFormData {
@@ -108,7 +110,63 @@ export interface PromotionSendResult {
   total: number;
 }
 
-// --- KONFIGURACJA API ---
+export interface EmailTemplateVersion {
+  body: string;
+  subject: string;
+  savedAt: string;
+}
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+  currentVersion: number;
+  versions: Record<string, EmailTemplateVersion>;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmailTemplateFormData {
+  name: string;
+  category: string;
+  subject: string;
+  body: string;
+}
+
+export type NoteColor = 'blue' | 'yellow' | 'red' | 'green' | 'default';
+
+export interface NoteAttachment {
+  name: string;
+  url: string;
+  type: string;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  attachments: NoteAttachment[];
+  color: NoteColor;
+  isImportant: boolean;
+  isUrgent: boolean;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
+export interface NoteFormData {
+  title: string;
+  content: string;
+  color: NoteColor;
+  isImportant: boolean;
+  isUrgent: boolean;
+  attachments: NoteAttachment[];
+}
+
+// ─── KONFIGURACJA API ────────────────────────────────────────────────────────
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const CLIENTS_URL = `${API_URL}/api/clients`;
@@ -122,7 +180,7 @@ const getHeaders = async () => {
   };
 };
 
-// --- KLIENCI ---
+// ─── KLIENCI ─────────────────────────────────────────────────────────────────
 
 export const getClients = async (): Promise<Client[]> => {
   const headers = await getHeaders();
@@ -151,20 +209,32 @@ export const deleteClient = async (id: string): Promise<void> => {
   if (!response.ok) throw new Error('Nie udało się usunąć klienta');
 };
 
+// ─── NIP (MF Whitelist API — wywołanie z przeglądarki, serwer mydevil blokuje ruch wychodzący) ───
+
 export const getNipData = async (nip: string): Promise<NipData> => {
   const nipClean = nip.replace(/[-\s]/g, '');
   if (!/^\d{10}$/.test(nipClean)) throw new Error('NIP musi mieć 10 cyfr');
-
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/nip/${nipClean}`, { headers });
-
+  const today = new Date().toISOString().split('T')[0];
+  const response = await fetch(
+    `https://wl-api.mf.gov.pl/api/search/nip/${nipClean}?date=${today}`,
+    { headers: { 'Accept': 'application/json' } }
+  );
   if (response.status === 404) throw new Error('Nie znaleziono firmy o podanym NIP w rejestrze VAT');
   if (!response.ok) throw new Error('Błąd połączenia z bazą Ministerstwa Finansów');
-
-  return response.json();
+  const data = await response.json() as {
+    result?: { subject?: { name?: string; regon?: string; workingAddress?: string; residenceAddress?: string } }
+  };
+  const subject = data?.result?.subject;
+  if (!subject) throw new Error('Nie znaleziono firmy o podanym NIP');
+  return {
+    nip: nipClean,
+    companyName: subject.name || '',
+    regon: subject.regon || '',
+    address: subject.workingAddress || subject.residenceAddress || '',
+  };
 };
 
-// --- INTERAKCJE ---
+// ─── INTERAKCJE ───────────────────────────────────────────────────────────────
 
 export const getClientInteractions = async (clientId: string): Promise<Interaction[]> => {
   const headers = await getHeaders();
@@ -187,7 +257,24 @@ export const updateClientInteraction = async (clientId: string, interactionId: s
   return response.json();
 };
 
-// --- PRODUKTY ---
+// ─── UPLOAD PLIKÓW / ZDJĘĆ ───────────────────────────────────────────────────
+
+export const uploadImage = async (file: File): Promise<string> => {
+  const auth = getAuth();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const formData = new FormData();
+  formData.append('image', file); // backend multer oczekuje pola 'image'
+  const response = await fetch(`${API_URL}/api/upload`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) throw new Error('Nie udało się wgrać pliku');
+  const data = await response.json() as { imageUrl: string };
+  return data.imageUrl;
+};
+
+// ─── PRODUKTY ─────────────────────────────────────────────────────────────────
 
 export const getProductsList = async (): Promise<Product[]> => {
   const headers = await getHeaders();
@@ -216,7 +303,7 @@ export const deleteProduct = async (id: string): Promise<void> => {
   if (!response.ok) throw new Error('Nie udało się usunąć produktu');
 };
 
-// --- FOLLOW-UPS ---
+// ─── FOLLOW-UPS ───────────────────────────────────────────────────────────────
 
 const FOLLOWUPS_URL = `${API_URL}/api/followups`;
 
@@ -240,7 +327,7 @@ export const updateFollowUpStatus = async (id: string, status: 'zrealizowane' | 
   if (!response.ok) throw new Error('Błąd zmiany statusu zadania');
 };
 
-// --- PROMOCJE ---
+// ─── PROMOCJE ─────────────────────────────────────────────────────────────────
 
 export const sendPromotion = async (data: PromotionSendData): Promise<PromotionSendResult> => {
   const headers = await getHeaders();
@@ -250,77 +337,10 @@ export const sendPromotion = async (data: PromotionSendData): Promise<PromotionS
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: 'Błąd wysyłki' }));
+    const err = await response.json().catch(() => ({ error: 'Błąd wysyłki' })) as { error: string };
     throw new Error(err.error || 'Błąd wysyłki promocji');
   }
   return response.json();
-};
-
-// --- SZABLONY MAILI ---
-
-export interface EmailTemplateVersion {
-  body: string;
-  subject: string;
-  savedAt: string;
-}
-
-export interface EmailTemplate {
-  id: string;
-  name: string;
-  category: string;
-  subject: string;
-  body: string;
-  currentVersion: number;
-  versions: Record<string, EmailTemplateVersion>;
-  createdBy: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface EmailTemplateFormData {
-  name: string;
-  category: string;
-  subject: string;
-  body: string;
-}
-
-export const getEmailTemplates = async (): Promise<EmailTemplate[]> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/email-templates`, { headers });
-  if (!response.ok) throw new Error('Nie udało się pobrać szablonów maili');
-  return response.json();
-};
-
-export const createEmailTemplate = async (data: EmailTemplateFormData): Promise<EmailTemplate> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/email-templates`, { method: 'POST', headers, body: JSON.stringify(data) });
-  if (!response.ok) throw new Error('Nie udało się zapisać szablonu');
-  return response.json();
-};
-
-export const updateEmailTemplate = async (id: string, data: EmailTemplateFormData): Promise<EmailTemplate> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/email-templates/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
-  if (!response.ok) throw new Error('Nie udało się zaktualizować szablonu');
-  return response.json();
-};
-
-export const deleteEmailTemplate = async (id: string): Promise<void> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/email-templates/${id}`, { method: 'DELETE', headers });
-  if (!response.ok) throw new Error('Nie udało się usunąć szablonu');
-};
-
-export const sendEmailFromTemplate = async (
-  id: string,
-  payload: { to: string; subject: string; body: string }
-): Promise<void> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/email-templates/${id}/send`, { method: 'POST', headers, body: JSON.stringify(payload) });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({ error: 'Błąd wysyłki' }));
-    throw new Error(err.error || 'Błąd wysyłki maila');
-  }
 };
 
 export const previewPromotionPdf = async (
@@ -330,17 +350,88 @@ export const previewPromotionPdf = async (
 ): Promise<void> => {
   const auth = getAuth();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-
   const response = await fetch(`${API_URL}/api/promotions/preview-pdf`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
     body: JSON.stringify({ title, content, productIds }),
   });
-
   if (!response.ok) throw new Error('Błąd generowania podglądu PDF');
-
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   window.open(url, '_blank');
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
+// ─── SZABLONY MAILI ───────────────────────────────────────────────────────────
+
+const TEMPLATES_URL = `${API_URL}/api/email-templates`;
+
+export const getEmailTemplates = async (): Promise<EmailTemplate[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(TEMPLATES_URL, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać szablonów maili');
+  return response.json();
+};
+
+export const createEmailTemplate = async (data: EmailTemplateFormData): Promise<EmailTemplate> => {
+  const headers = await getHeaders();
+  const response = await fetch(TEMPLATES_URL, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zapisać szablonu');
+  return response.json();
+};
+
+export const updateEmailTemplate = async (id: string, data: EmailTemplateFormData): Promise<EmailTemplate> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${TEMPLATES_URL}/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zaktualizować szablonu');
+  return response.json();
+};
+
+export const deleteEmailTemplate = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${TEMPLATES_URL}/${id}`, { method: 'DELETE', headers });
+  if (!response.ok) throw new Error('Nie udało się usunąć szablonu');
+};
+
+export const sendEmailFromTemplate = async (
+  id: string,
+  payload: { to: string; subject: string; body: string }
+): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${TEMPLATES_URL}/${id}/send`, { method: 'POST', headers, body: JSON.stringify(payload) });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Błąd wysyłki' })) as { error: string };
+    throw new Error(err.error || 'Błąd wysyłki maila');
+  }
+};
+
+// ─── NOTATKI ─────────────────────────────────────────────────────────────────
+
+const NOTES_URL = `${API_URL}/api/notes`;
+
+export const getNotes = async (): Promise<Note[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(NOTES_URL, { headers });
+  if (!response.ok) throw new Error('Błąd pobierania notatek');
+  return response.json();
+};
+
+export const createNote = async (data: NoteFormData): Promise<Note> => {
+  const headers = await getHeaders();
+  const response = await fetch(NOTES_URL, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się dodać notatki');
+  return response.json();
+};
+
+export const updateNote = async (id: string, data: NoteFormData): Promise<Note> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${NOTES_URL}/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zaktualizować notatki');
+  return response.json();
+};
+
+export const deleteNote = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${NOTES_URL}/${id}`, { method: 'DELETE', headers });
+  if (!response.ok) throw new Error('Nie udało się usunąć notatki');
 };
