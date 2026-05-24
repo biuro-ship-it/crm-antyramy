@@ -36,6 +36,8 @@ app.use(cors({
     FRONTEND_URL,
     'https://crm.antyramy.eu',
     'http://crm.antyramy.eu',
+    'https://www.crm.antyramy.eu', // DODANE
+    'http://www.crm.antyramy.eu',  // DODANE
     'http://localhost:5174',
     'http://localhost:5173',
     'http://localhost:5175', // DODANE

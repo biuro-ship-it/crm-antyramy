@@ -3,7 +3,11 @@ RewriteEngine On
 
 # Wymusz HTTPS
 RewriteCond %{HTTPS} off
-RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Wymusz usunięcie "www." (nowe)
+RewriteCond %{HTTP_HOST} ^www\.(.*)$ [NC]
+RewriteRule ^(.*)$ https://%1/$1 [R=301,L]
 
 # SPA routing — wszystko do index.html
 RewriteCond %{REQUEST_FILENAME} !-f
