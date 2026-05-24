@@ -91,36 +91,36 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex justify-center items-center p-4">
-      <div className="bg-white w-full max-w-3xl rounded-xl shadow-xl flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-primary/40 backdrop-blur-sm flex justify-center items-center p-4">
+      <div className="bg-canvas w-full max-w-3xl rounded-xl shadow-xl flex flex-col max-h-[90vh]">
         
         {/* Modal Header */}
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
-          <h2 className="text-lg font-semibold text-slate-900">
+        <div className="p-4 border-b border-hairline-soft flex justify-between items-center bg-surface-soft rounded-t-xl">
+          <h2 className="text-lg font-semibold text-ink">
             {note ? '📝 Edytuj Notatkę' : '✨ Nowa Notatka'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 font-bold text-xl">✕</button>
+          <button onClick={onClose} className="text-ink font-light hover:text-ink font-light font-bold text-xl">✕</button>
         </div>
 
         {/* Modal Body (Scrollable) */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {/* Tytuł */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Temat</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-ink font-light mb-1">Temat</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Wpisz krótki temat..."
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink"
             />
           </div>
 
           {/* Kolor i Priorytety */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-surface-soft p-3 rounded-lg border border-hairline">
             {/* Wybór Koloru */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Kolor kafelka</label>
+              <label className="block text-xs font-semibold text-ink font-light mb-1">Kolor kafelka</label>
               <div className="flex gap-2 mt-1">
                 {(['default', 'blue', 'yellow', 'red', 'green'] as NoteColor[]).map((c) => (
                   <button
@@ -128,11 +128,11 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                     type="button"
                     onClick={() => setColor(c)}
                     className={`w-7 h-7 rounded-full border-2 transition ${
-                      c === 'default' ? 'bg-white border-slate-300' :
-                      c === 'blue' ? 'bg-blue-300 border-blue-400' :
+                      c === 'default' ? 'bg-canvas border-hairline' :
+                      c === 'blue' ? 'bg-block-lilac border-hairline' :
                       c === 'yellow' ? 'bg-yellow-300 border-yellow-400' :
                       c === 'red' ? 'bg-red-300 border-red-400' : 'bg-green-300 border-green-400'
-                    } ${color === c ? 'scale-110 ring-2 ring-indigo-500' : 'opacity-70'}`}
+                    } ${color === c ? 'scale-110 ring-2 ring-ink' : 'opacity-70'}`}
                   />
                 ))}
               </div>
@@ -145,7 +145,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                   type="checkbox"
                   checked={isImportant}
                   onChange={(e) => setIsImportant(e.target.checked)}
-                  className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+                  className="w-4 h-4 text-ink rounded border-hairline focus:ring-ink"
                 />
                 ⭐ Ważne
               </label>
@@ -154,7 +154,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                   type="checkbox"
                   checked={isUrgent}
                   onChange={(e) => setIsUrgent(e.target.checked)}
-                  className="w-4 h-4 text-red-600 rounded border-slate-300 focus:ring-red-500"
+                  className="w-4 h-4 text-red-600 rounded border-hairline focus:ring-red-500"
                 />
                 🧨 Pilne (Na górę)
               </label>
@@ -162,14 +162,14 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
           </div>
 
           {/* Pasek narzędzi TipTap */}
-          <div className="border border-slate-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
-            <div className="bg-slate-50 p-2 border-b border-slate-200 flex flex-wrap gap-1 text-xs">
-              <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={`px-2 py-1 rounded ${editor?.isActive('bold') ? 'bg-indigo-200 font-bold' : 'hover:bg-slate-200'}`}>B</button>
-              <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={`px-2 py-1 rounded ${editor?.isActive('italic') ? 'bg-indigo-200 italic' : 'hover:bg-slate-200'}`}>I</button>
+          <div className="border border-hairline rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-ink">
+            <div className="bg-surface-soft p-2 border-b border-hairline flex flex-wrap gap-1 text-xs">
+              <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={`px-2 py-1 rounded ${editor?.isActive('bold') ? 'bg-block-lilac font-bold' : 'hover:bg-surface-soft'}`}>B</button>
+              <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={`px-2 py-1 rounded ${editor?.isActive('italic') ? 'bg-block-lilac italic' : 'hover:bg-surface-soft'}`}>I</button>
               <span className="text-slate-300 px-1">|</span>
-              <button type="button" onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} className="px-2 py-1 rounded hover:bg-slate-200 bg-white border border-slate-200">➕ Tabela 3x3</button>
-              <button type="button" onClick={() => editor?.chain().focus().addColumnAfter().run()} className="px-2 py-1 rounded hover:bg-slate-200 text-slate-600">Kolumna +</button>
-              <button type="button" onClick={() => editor?.chain().focus().addRowAfter().run()} className="px-2 py-1 rounded hover:bg-slate-200 text-slate-600">Wiersz +</button>
+              <button type="button" onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} className="px-2 py-1 rounded hover:bg-surface-soft bg-canvas border border-hairline">➕ Tabela 3x3</button>
+              <button type="button" onClick={() => editor?.chain().focus().addColumnAfter().run()} className="px-2 py-1 rounded hover:bg-surface-soft text-ink font-light">Kolumna +</button>
+              <button type="button" onClick={() => editor?.chain().focus().addRowAfter().run()} className="px-2 py-1 rounded hover:bg-surface-soft text-ink font-light">Wiersz +</button>
             </div>
 
             {/* Pole Edytora */}
@@ -181,7 +181,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
 
           {/* Załączniki */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">Załączniki (PDF, Zdjęcia)</label>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-ink font-light mb-1">Załączniki (PDF, Zdjęcia)</label>
             <div className="flex items-center gap-3">
               <input
                 type="file"
@@ -192,7 +192,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
               />
               <label
                 htmlFor="modal-file-upload"
-                className={`cursor-pointer text-xs font-semibold px-3 py-2 border rounded-lg shadow-sm transition ${uploading ? 'bg-slate-100 text-slate-400 border-slate-200' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'}`}
+                className={`cursor-pointer text-xs font-semibold px-3 py-2 border rounded-lg shadow-sm transition ${uploading ? 'bg-surface-soft text-ink font-light border-hairline' : 'bg-canvas hover:bg-surface-soft text-ink border-hairline'}`}
               >
                 {uploading ? 'Wgrywanie pliku...' : '📎 Wybierz plik'}
               </label>
@@ -202,12 +202,12 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
             {attachments.length > 0 && (
               <div className="mt-3 space-y-2">
                 {attachments.map((file, idx) => (
-                  <div key={idx} className="flex justify-between items-center p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                  <div key={idx} className="flex justify-between items-center p-2 bg-surface-soft border border-hairline rounded-lg text-sm">
                     <div className="flex items-center gap-2 truncate">
                       <span className="text-xs">
                         {file.type.startsWith('image/') ? '🖼️' : '📄'}
                       </span>
-                      <a href={file.url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline truncate font-medium">
+                      <a href={file.url} target="_blank" rel="noreferrer" className="text-ink hover:underline truncate font-medium">
                         {file.name}
                       </a>
                     </div>
@@ -226,18 +226,18 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center rounded-b-xl">
-          <span className="text-xs text-slate-400 hidden sm:inline">💡 Zapisuj szybciej skrótem <kbd className="bg-white px-1 py-0.5 border rounded shadow-sm">Ctrl+Enter</kbd></span>
+        <div className="p-4 border-t border-hairline-soft bg-surface-soft flex justify-between items-center rounded-b-xl">
+          <span className="text-xs text-ink font-light hidden sm:inline">💡 Zapisuj szybciej skrótem <kbd className="bg-canvas px-1 py-0.5 border rounded shadow-sm">Ctrl+Enter</kbd></span>
           <div className="flex gap-2 ml-auto">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg"
+              className="px-4 py-2 text-sm font-medium text-ink hover:bg-surface-soft rounded-lg"
             >
               Anuluj
             </button>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow"
+              className="px-4 py-2 text-sm font-medium text-white bg-primary hover:opacity-90 rounded-lg shadow"
             >
               Zapisz
             </button>

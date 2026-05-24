@@ -22,6 +22,7 @@ export interface Client {
   lastContactAt: string | null;
   createdAt: string;
   updatedAt: string;
+  relationshipColor?: string; // DODANE: Typowanie koloru relacji
 }
 
 export interface ClientFormData {
@@ -32,6 +33,7 @@ export interface ClientFormData {
   email: string;
   phone: string;
   address: Address;
+  relationshipColor?: string; // DODANE: Typowanie koloru relacji formularza
 }
 
 export interface NipData {

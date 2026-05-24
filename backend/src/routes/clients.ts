@@ -25,6 +25,7 @@ const ClientSchema = z.object({
   email: z.string().optional().default(''),
   phone: z.string().default(''),
   address: AddressSchema,
+  relationshipColor: z.string().optional().default('default'), // DODANE: Walidacja koloru
 });
 
 const InteractionSchema = z.object({

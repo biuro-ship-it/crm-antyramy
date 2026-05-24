@@ -9,7 +9,7 @@ function Root() {
   const { user, loading, error, signIn, signOut } = useAuth();
 
   if (loading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-slate-500">
+    <div className="min-h-screen bg-canvas flex items-center justify-center font-medium text-ink">
       Ładowanie CRM...
     </div>
   );

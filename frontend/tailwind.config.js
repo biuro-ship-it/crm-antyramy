@@ -1,6 +1,65 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
-  theme: { extend: {} },
+  theme: {
+    extend: {
+      colors: {
+        primary: '#000000',
+        'on-primary': '#ffffff',
+        ink: '#000000',
+        canvas: '#ffffff',
+        'inverse-canvas': '#000000',
+        'inverse-ink': '#ffffff',
+        'surface-soft': '#f7f7f5',
+        hairline: '#e6e6e6',
+        'hairline-soft': '#f1f1f1',
+        'block-lime': '#dceeb1',
+        'block-lilac': '#c5b0f4',
+        'block-cream': '#f4ecd6',
+        'block-pink': '#efd4d4',
+        'block-mint': '#c8e6cd',
+        'block-coral': '#f3c9b6',
+        'block-navy': '#1f1d3d',
+        'accent-magenta': '#ff3d8b',
+        success: '#1ea64a',
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'Helvetica', 'Arial', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'Menlo', 'monospace'],
+      },
+      fontSize: {
+        display: ['2.5rem', { lineHeight: '1.1', letterSpacing: '-0.02em', fontWeight: '400' }],
+        'display-lg': ['4rem', { lineHeight: '1.1', letterSpacing: '-0.015em', fontWeight: '400' }],
+        headline: ['1.625rem', { lineHeight: '1.35', letterSpacing: '-0.01em', fontWeight: '600' }],
+        subhead: ['1.625rem', { lineHeight: '1.35', letterSpacing: '-0.01em', fontWeight: '400' }],
+        'card-title': ['1.5rem', { lineHeight: '1.45', fontWeight: '700' }],
+        'body-lg': ['1.25rem', { lineHeight: '1.4', letterSpacing: '-0.007em', fontWeight: '400' }],
+        body: ['1.125rem', { lineHeight: '1.45', letterSpacing: '-0.014em', fontWeight: '400' }],
+        'body-sm': ['1rem', { lineHeight: '1.45', letterSpacing: '-0.009em', fontWeight: '400' }],
+        btn: ['1.25rem', { lineHeight: '1.4', letterSpacing: '-0.005em', fontWeight: '500' }],
+        eyebrow: ['1.125rem', { lineHeight: '1.3', letterSpacing: '0.03em', fontWeight: '400' }],
+        caption: ['0.75rem', { lineHeight: '1', letterSpacing: '0.05em', fontWeight: '400' }],
+      },
+      borderRadius: {
+        xs: '2px',
+        sm: '6px',
+        md: '8px',
+        lg: '24px',
+        xl: '32px',
+        pill: '50px',
+      },
+      spacing: {
+        xxs: '4px',
+        section: '96px',
+        xxl: '48px',
+      },
+      maxWidth: {
+        content: '1280px',
+      },
+      boxShadow: {
+        soft: '0 4px 16px rgba(0, 0, 0, 0.06)',
+      },
+    },
+  },
   plugins: [],
 };

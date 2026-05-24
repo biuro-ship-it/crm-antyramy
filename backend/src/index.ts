@@ -38,6 +38,8 @@ app.use(cors({
     'http://crm.antyramy.eu',
     'http://localhost:5174',
     'http://localhost:5173',
+    'http://localhost:5175', // DODANE
+    'http://localhost:5176', // DODANE na zapas
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],

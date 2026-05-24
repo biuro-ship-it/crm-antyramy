@@ -1,24 +1,41 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { ClientFormData, Client, getNipData } from '../services/api';
 
-// Props dopasowane do Dashboard.tsx
 interface ClientFormProps {
-  initial?: Client | null; // Przyjmuje 'Client' lub null
+  initial?: Client | null;
   onSubmit: (data: ClientFormData) => Promise<void> | void;
   onCancel: () => void;
 }
 
-const voivodeshipMap: { [key: string]: string } = {
-  '0': 'Mazowieckie',
-  '1': 'Podlaskie / Warmińsko-Mazurskie',
-  '2': 'Lubelskie / Świętokrzyskie',
-  '3': 'Małopolskie / Podkarpackie',
-  '4': 'Śląskie / Opolskie',
-  '5': 'Dolnośląskie',
-  '6': 'Wielkopolskie / Lubuskie',
-  '7': 'Zachodniopomorskie / Pomorskie',
-  '8': 'Kujawsko-Pomorskie / Pomorskie',
-  '9': 'Łódzkie'
+// Funkcja pomocnicza do precyzyjnego mapowania dwucyfrowych prefiksów PNA na Województwa
+const getVoivodeshipByZip = (zipCode: string): string => {
+  const digits = zipCode.replace(/\D/g, '');
+  if (digits.length < 2) return '';
+  
+  const prefix = parseInt(digits.slice(0, 2), 10);
+
+  if (prefix >= 0 && prefix <= 9) {
+    // Okręg 26 to Radom i okolice (woj. mazowieckie)
+    if (prefix === 26) return 'Mazowieckie';
+    return 'Mazowieckie';
+  }
+  if (prefix >= 10 && prefix <= 14) return 'Warmińsko-Mazurskie';
+  if (prefix >= 15 && prefix <= 19) return 'Podlaskie';
+  if (prefix >= 20 && prefix <= 24) return 'Lubelskie';
+  if (prefix === 25 || prefix === 27 || prefix === 28 || prefix === 29) return 'Świętokrzyskie';
+  if (prefix >= 30 && prefix <= 34) return 'Małopolskie';
+  if (prefix >= 35 && prefix <= 39) return 'Podkarpackie';
+  if (prefix >= 40 && prefix <= 44) return 'Śląskie';
+  if (prefix >= 45 && prefix <= 49) return 'Opolskie';
+  if (prefix >= 50 && prefix <= 59) return 'Dolnośląskie';
+  if (prefix >= 60 && prefix <= 64) return 'Wielkopolskie';
+  if (prefix >= 65 && prefix <= 69) return 'Lubuskie';
+  if (prefix >= 70 && prefix <= 79) return 'Zachodniopomorskie';
+  if (prefix >= 80 && prefix <= 84) return 'Pomorskie';
+  if (prefix >= 85 && prefix <= 89) return 'Kujawsko-Pomorskie';
+  if (prefix >= 90 && prefix <= 99) return 'Łódzkie';
+  
+  return '';
 };
 
 const emptyForm = (c?: Client | null): ClientFormData => ({
@@ -29,12 +46,13 @@ const emptyForm = (c?: Client | null): ClientFormData => ({
   email: c?.email || '',
   phone: c?.phone || '',
   address: {
-    street:   c?.address?.street   || '',
-    number:   c?.address?.number   || '',
-    city:     c?.address?.city     || '',
-    zipCode:  c?.address?.zipCode  || '',
+    street: c?.address?.street || '',
+    number: c?.address?.number || '',
+    city: c?.address?.city || '',
+    zipCode: c?.address?.zipCode || '',
     province: c?.address?.province || '',
   },
+  relationshipColor: c?.relationshipColor || 'default',
 });
 
 const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) => {
@@ -43,14 +61,12 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
   const [nipError, setNipError] = useState('');
   const [nipSuccess, setNipSuccess] = useState('');
 
-  // Reset formularza gdy zmienia się 'initial' (przełączanie między nowy/edytuj)
   useEffect(() => {
     setFormData(emptyForm(initial));
     setNipError('');
     setNipSuccess('');
   }, [initial]);
 
-  // Obsługa zmian pól płaskich (companyName, type, nip, contactPerson, email, phone)
   const handleTopChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     if (name === 'nip') {
@@ -60,31 +76,27 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Obsługa zmian pól adresowych (address.*)
   const handleAddressChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name } = e.target;
     let value = e.target.value;
 
     if (name === 'zipCode') {
-      // Zostaw tylko cyfry, maksymalnie 5
       const digits = value.replace(/\D/g, '').slice(0, 5);
-      // Auto-wstaw myślnik po 2 cyfrach: XX-XXX
       value = digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
     }
 
-    // Automatyczne uzupełnianie województwa na podstawie kodu pocztowego
+    // Wyznaczenie województwa na podstawie pierwszych dwóch cyfr nowego kodu pocztowego
     let province = formData.address.province;
-    if (name === 'zipCode' && value.length >= 1) {
-      province = voivodeshipMap[value[0]] || '';
+    if (name === 'zipCode') {
+      province = getVoivodeshipByZip(value);
     }
 
     setFormData(prev => ({
       ...prev,
-      address: { ...prev.address, [name]: value, province }
+      address: { ...prev.address, [name]: value, province },
     }));
   };
 
-  // Pobierz dane firmy z GUS na podstawie NIP
   const handleNipLookup = async () => {
     const nipClean = formData.nip.replace(/[-\s]/g, '');
     if (nipClean.length !== 10) {
@@ -100,7 +112,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
         ...prev,
         companyName: data.companyName || prev.companyName,
       }));
-      setNipSuccess(`✓ Pobrano dane: ${data.companyName}`);
+      setNipSuccess(`Pobrano dane: ${data.companyName}`);
     } catch (err) {
       setNipError(err instanceof Error ? err.message : 'Błąd pobierania danych');
     } finally {
@@ -108,162 +120,128 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
     }
   };
 
+  const labelClass = 'eyebrow block mb-2';
+
   return (
-    <div style={styles.container}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h2 style={{ margin: 0 }}>{initial ? 'Edytuj dane' : 'Dodaj nowego klienta'}</h2>
-        <button onClick={onCancel} style={styles.closeBtn}>✕</button>
+    <div className={`card-padded transition-colors ${
+      formData.relationshipColor === 'lilac' ? 'bg-block-lilac' :
+      formData.relationshipColor === 'cream' ? 'bg-block-cream' :
+      formData.relationshipColor === 'pink' ? 'bg-block-pink' :
+      formData.relationshipColor === 'mint' ? 'bg-block-mint' : 'bg-canvas'
+    }`}>
+      <div className="flex justify-between items-start mb-6">
+        <h2 className="section-title">{initial ? 'Edytuj dane' : 'Dodaj nowego klienta'}</h2>
+        <button type="button" onClick={onCancel} className="btn-tertiary" aria-label="Zamknij">
+          ✕
+        </button>
       </div>
 
-      {/* TYP + NAZWA */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-        <div style={{ flex: 1 }}>
-          <label style={styles.label}>Typ</label>
-          <select name="type" value={formData.type} onChange={handleTopChange} style={styles.input}>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+        <div className="md:col-span-1">
+          <label className={labelClass}>Typ</label>
+          <select name="type" value={formData.type} onChange={handleTopChange} className="select-field bg-white">
             <option value="zakład">Zakład</option>
             <option value="sklep">Sklep</option>
             <option value="agencja">Agencja</option>
             <option value="inne">Inne</option>
           </select>
         </div>
-        <div style={{ flex: 3 }}>
-          <label style={styles.label}>Nazwa firmy / Klienta</label>
-          <input type="text" name="companyName" value={formData.companyName} onChange={handleTopChange} style={styles.input} />
+        <div className="md:col-span-2">
+          <label className={labelClass}>Nazwa firmy</label>
+          <input type="text" name="companyName" value={formData.companyName} onChange={handleTopChange} className="input-field bg-white" />
+        </div>
+        
+        {/* WYBÓR KOLORU KARTY */}
+        <div className="md:col-span-2">
+          <label className={labelClass}>Kolor etykiety na liście</label>
+          <div className="flex gap-3 mt-3">
+            {[
+              { id: 'default', bg: 'bg-white' },
+              { id: 'lilac', bg: 'bg-block-lilac' },
+              { id: 'cream', bg: 'bg-block-cream' },
+              { id: 'pink', bg: 'bg-block-pink' },
+              { id: 'mint', bg: 'bg-block-mint' },
+            ].map(c => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, relationshipColor: c.id }))}
+                className={`w-8 h-8 rounded-full border border-hairline transition-transform shadow-sm ${c.bg} ${
+                  formData.relationshipColor === c.id ? 'ring-2 ring-offset-2 ring-ink scale-110' : 'opacity-50 hover:opacity-100 hover:scale-105'
+                }`}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* NIP */}
-      <div style={styles.fieldGroup}>
-        <label style={styles.label}>NIP</label>
-        <div style={{ display: 'flex', gap: '10px' }}>
+      <div className="mb-4">
+        <label className={labelClass}>NIP</label>
+        <div className="flex gap-3">
           <input
             type="text"
             name="nip"
             value={formData.nip}
             onChange={handleTopChange}
-            style={{ ...styles.input, flex: 1 }}
+            className="input-field flex-1 bg-white"
             placeholder="np. 123-456-78-90"
             maxLength={13}
           />
-          <button
-            type="button"
-            onClick={handleNipLookup}
-            disabled={nipLoading}
-            style={styles.nipBtn}
-          >
-            {nipLoading ? '⏳' : '🔍 Pobierz dane'}
+          <button type="button" onClick={handleNipLookup} disabled={nipLoading} className="btn-secondary shrink-0 bg-white">
+            {nipLoading ? '…' : 'Pobierz dane'}
           </button>
         </div>
-        {nipError && <p style={{ color: '#dc2626', fontSize: '13px', marginTop: '4px' }}>{nipError}</p>}
-        {nipSuccess && <p style={{ color: '#16a34a', fontSize: '13px', marginTop: '4px' }}>{nipSuccess}</p>}
+        {nipError && <p className="text-body-sm mt-2">{nipError}</p>}
+        {nipSuccess && <p className="text-body-sm font-medium mt-2 text-success">✓ {nipSuccess}</p>}
       </div>
 
-      {/* OSOBA KONTAKTOWA */}
-      <div style={styles.fieldGroup}>
-        <label style={styles.label}>Osoba kontaktowa</label>
-        <input type="text" name="contactPerson" value={formData.contactPerson} onChange={handleTopChange} style={styles.input} />
+      <div className="mb-4">
+        <label className={labelClass}>Osoba kontaktowa</label>
+        <input type="text" name="contactPerson" value={formData.contactPerson} onChange={handleTopChange} className="input-field bg-white" />
       </div>
 
-      {/* EMAIL */}
-      <div style={styles.fieldGroup}>
-        <label style={styles.label}>Adres E-mail</label>
-        <input type="email" name="email" value={formData.email} onChange={handleTopChange} style={styles.input} />
+      <div className="mb-4">
+        <label className={labelClass}>E-mail</label>
+        <input type="email" name="email" value={formData.email} onChange={handleTopChange} className="input-field bg-white" />
       </div>
 
-      {/* TELEFON */}
-      <div style={styles.fieldGroup}>
-        <label style={styles.label}>Telefon</label>
-        <input type="tel" name="phone" value={formData.phone} onChange={handleTopChange} style={styles.input} />
+      <div className="mb-4">
+        <label className={labelClass}>Telefon</label>
+        <input type="tel" name="phone" value={formData.phone} onChange={handleTopChange} className="input-field bg-white" />
       </div>
 
-      {/* ULICA + NUMER */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-        <div style={{ flex: 3 }}>
-          <label style={styles.label}>Ulica</label>
-          <input type="text" name="street" value={formData.address.street} onChange={handleAddressChange} style={styles.input} />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="md:col-span-3">
+          <label className={labelClass}>Ulica</label>
+          <input type="text" name="street" value={formData.address.street} onChange={handleAddressChange} className="input-field bg-white" />
         </div>
-        <div style={{ flex: 1 }}>
-          <label style={styles.label}>Numer</label>
-          <input type="text" name="number" value={formData.address.number} onChange={handleAddressChange} style={styles.input} placeholder="np. 12A" />
+        <div>
+          <label className={labelClass}>Numer</label>
+          <input type="text" name="number" value={formData.address.number} onChange={handleAddressChange} className="input-field bg-white" placeholder="12A" />
         </div>
       </div>
 
-      {/* MIASTO */}
-      <div style={styles.fieldGroup}>
-        <label style={styles.label}>Miasto</label>
-        <input type="text" name="city" value={formData.address.city} onChange={handleAddressChange} style={styles.input} placeholder="np. Warszawa" />
+      <div className="mb-4">
+        <label className={labelClass}>Miasto</label>
+        <input type="text" name="city" value={formData.address.city} onChange={handleAddressChange} className="input-field bg-white" />
       </div>
 
-      {/* KOD POCZTOWY + WOJEWÓDZTWO */}
-      <div style={{ display: 'flex', gap: '15px', marginBottom: '15px' }}>
-        <div style={{ flex: 1 }}>
-          <label style={styles.label}>Kod pocztowy</label>
-          <input
-            type="text"
-            name="zipCode"
-            value={formData.address.zipCode}
-            onChange={handleAddressChange}
-            style={styles.input}
-            placeholder="00-000"
-          />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div>
+          <label className={labelClass}>Kod pocztowy</label>
+          <input type="text" name="zipCode" value={formData.address.zipCode} onChange={handleAddressChange} className="input-field bg-white" placeholder="00-000" />
         </div>
-        <div style={{ flex: 2 }}>
-          <label style={styles.label}>Województwo (wypełnia się samo)</label>
-          <input
-            type="text"
-            name="province"
-            value={formData.address.province}
-            readOnly
-            style={{ ...styles.input, backgroundColor: '#f0f0f0' }}
-          />
+        <div className="md:col-span-2">
+          <label className={labelClass}>Województwo</label>
+          <input type="text" name="province" value={formData.address.province} readOnly className="input-field bg-white/50" />
         </div>
       </div>
 
-      <button onClick={() => onSubmit(formData)} style={styles.saveBtn}>
+      <button type="button" onClick={() => onSubmit(formData)} className="btn-primary w-full">
         {initial ? 'Zapisz zmiany' : 'Dodaj klienta'}
       </button>
     </div>
   );
-};
-
-const styles: { [key: string]: React.CSSProperties } = {
-  container: { padding: '20px', backgroundColor: '#fff' },
-  fieldGroup: { marginBottom: '15px', display: 'flex', flexDirection: 'column' as const },
-  label: { fontWeight: 'bold', marginBottom: '5px', fontSize: '14px' },
-  input: {
-    border: '2px solid #000',
-    padding: '10px',
-    fontSize: '16px',
-    borderRadius: '4px',
-    color: '#000',
-    width: '100%',
-    boxSizing: 'border-box' as const
-  },
-  nipBtn: {
-    backgroundColor: '#1d4ed8',
-    color: '#fff',
-    padding: '10px 16px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 'bold',
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-  },
-  saveBtn: {
-    backgroundColor: '#000',
-    color: '#fff',
-    padding: '14px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    width: '100%',
-    fontSize: '16px',
-    fontWeight: 'bold',
-    marginTop: '10px'
-  },
-  closeBtn: { background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }
 };
 
 export default ClientForm;

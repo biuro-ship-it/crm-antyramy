@@ -10,10 +10,10 @@ interface EmailSendModalProps {
 }
 
 const CATEGORY_BADGE: Record<string, string> = {
-  'oferta': 'bg-blue-100 text-blue-700',
+  'oferta': 'badge-lilac',
   'follow-up': 'bg-amber-100 text-amber-700',
-  'podziękowanie': 'bg-emerald-100 text-emerald-700',
-  'inne': 'bg-slate-100 text-slate-600',
+  'podziękowanie': 'badge-mint',
+  'inne': 'bg-surface-soft text-ink font-light',
 };
 
 const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
@@ -56,25 +56,25 @@ const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
 
         {/* Nagłówek */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
+        <div className="flex justify-between items-center px-6 py-4 border-b border-hairline-soft">
           <div>
-            <h3 className="text-lg font-bold text-slate-800">Wyślij mail z szablonu</h3>
-            <p className="text-xs text-slate-400 mt-0.5">Do: <span className="font-semibold text-slate-600">{client.email}</span></p>
+            <h3 className="text-lg font-bold text-ink">Wyślij mail z szablonu</h3>
+            <p className="text-xs text-ink font-light mt-0.5">Do: <span className="font-semibold text-ink font-light">{client.email}</span></p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 text-2xl leading-none">✕</button>
+          <button onClick={onClose} className="text-ink font-light hover:text-ink text-2xl leading-none">✕</button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
           {sent ? (
             <div className="text-center py-10">
               <div className="text-5xl mb-4">✅</div>
-              <p className="text-lg font-bold text-slate-800">Mail wysłany</p>
-              <p className="text-sm text-slate-500 mt-1">Wiadomość do <span className="font-semibold">{client.email}</span> została wysłana.</p>
+              <p className="text-lg font-bold text-ink">Mail wysłany</p>
+              <p className="text-sm text-ink font-light mt-1">Wiadomość do <span className="font-semibold">{client.email}</span> została wysłana.</p>
               <button onClick={onClose}
-                className="mt-6 bg-slate-900 hover:bg-blue-600 text-white font-bold px-6 py-2.5 rounded-xl transition-colors">
+                className="mt-6 bg-primary hover:bg-primary text-white font-bold px-6 py-2.5 rounded-xl transition-colors">
                 Zamknij
               </button>
             </div>
@@ -87,11 +87,11 @@ const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
               {/* Wybór szablonu */}
               {!selected && (
                 <>
-                  <p className="text-xs font-bold text-slate-500 uppercase mb-3">Wybierz szablon</p>
+                  <p className="text-xs font-bold text-ink font-light uppercase mb-3">Wybierz szablon</p>
                   {loading ? (
-                    <p className="text-slate-400 text-center py-6 animate-pulse">Ładowanie szablonów...</p>
+                    <p className="text-ink font-light text-center py-6 animate-pulse">Ładowanie szablonów...</p>
                   ) : templates.length === 0 ? (
-                    <div className="text-center py-8 text-slate-400">
+                    <div className="text-center py-8 text-ink font-light">
                       <p>Brak szablonów.</p>
                       <p className="text-xs mt-1">Dodaj szablony w zakładce "Szablony maili".</p>
                     </div>
@@ -101,15 +101,15 @@ const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
                         <button
                           key={t.id}
                           onClick={() => handleSelect(t)}
-                          className="w-full text-left px-4 py-3 rounded-xl border border-slate-200 hover:border-blue-400 hover:bg-blue-50 transition-colors"
+                          className="w-full text-left px-4 py-3 rounded-xl border border-hairline hover:border-ink hover:bg-surface-soft transition-colors"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <span className="font-semibold text-slate-800 text-sm">{t.name}</span>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-md uppercase shrink-0 ${CATEGORY_BADGE[t.category] ?? 'bg-slate-100 text-slate-600'}`}>
+                            <span className="font-semibold text-ink text-sm">{t.name}</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-md uppercase shrink-0 ${CATEGORY_BADGE[t.category] ?? 'bg-surface-soft text-ink font-light'}`}>
                               {t.category}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-400 mt-0.5 truncate">{t.subject}</p>
+                          <p className="text-xs text-ink font-light mt-0.5 truncate">{t.subject}</p>
                         </button>
                       ))}
                     </div>
@@ -121,30 +121,30 @@ const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
               {selected && (
                 <>
                   <div className="flex items-center justify-between mb-4">
-                    <p className="text-xs font-bold text-slate-500 uppercase">Edytuj przed wysyłką</p>
+                    <p className="text-xs font-bold text-ink font-light uppercase">Edytuj przed wysyłką</p>
                     <button onClick={() => setSelected(null)}
-                      className="text-xs text-blue-600 hover:underline font-semibold">
+                      className="text-xs text-ink hover:underline font-semibold">
                       ← Zmień szablon
                     </button>
                   </div>
 
                   <div className="mb-4">
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Temat</label>
+                    <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Temat</label>
                     <input
                       type="text"
                       value={subject}
                       onChange={e => setSubject(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500"
+                      className="w-full border border-hairline rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-ink"
                     />
                   </div>
 
                   <div>
-                    <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Treść</label>
+                    <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Treść</label>
                     <textarea
                       rows={10}
                       value={body}
                       onChange={e => setBody(e.target.value)}
-                      className="w-full border border-slate-200 rounded-xl p-3 text-sm outline-none focus:border-blue-500 resize-none font-mono leading-relaxed"
+                      className="w-full border border-hairline rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-ink resize-none font-mono leading-relaxed"
                     />
                   </div>
                 </>
@@ -155,12 +155,12 @@ const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
 
         {/* Stopka */}
         {!sent && selected && (
-          <div className="px-6 py-4 border-t border-slate-100 flex justify-between items-center">
-            <span className="text-xs text-slate-400">Wysyłka przez Gmail API</span>
+          <div className="px-6 py-4 border-t border-hairline-soft flex justify-between items-center">
+            <span className="text-xs text-ink font-light">Wysyłka przez Gmail API</span>
             <button
               onClick={handleSend}
               disabled={sending || !subject || !body}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="btn-primary disabled:opacity-50"
             >
               {sending ? 'Wysyłam...' : '✉️ Wyślij'}
             </button>

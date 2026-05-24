@@ -1,3 +1,140 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    @apply font-sans text-ink bg-canvas antialiased;
+    font-feature-settings: 'kern' 1;
+  }
+
+  body {
+    @apply min-h-screen bg-canvas text-ink;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-medium text-btn rounded-pill px-5 py-2.5 min-h-[44px] transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 bg-canvas text-ink font-medium text-btn rounded-pill border border-hairline px-[18px] py-2 min-h-[44px] transition-colors hover:bg-surface-soft disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .btn-tertiary {
+    @apply inline-flex items-center justify-center gap-1 text-ink font-medium text-body-sm rounded-pill px-3 py-2 transition-colors hover:bg-surface-soft;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 bg-canvas text-ink font-medium text-body-sm rounded-pill border border-hairline px-4 py-2 min-h-[44px] transition-colors hover:bg-block-pink;
+  }
+
+  .input-field {
+    @apply w-full bg-canvas text-ink text-body border border-hairline rounded-md px-[14px] py-3 outline-none focus:ring-2 focus:ring-ink focus:ring-offset-0;
+  }
+
+  .select-field {
+    @apply input-field cursor-pointer;
+  }
+
+  .card {
+    @apply bg-canvas border border-hairline rounded-lg;
+  }
+
+  .card-padded {
+    @apply card p-6;
+  }
+
+  .card-soft {
+    @apply bg-surface-soft border border-hairline rounded-md p-4 text-body-sm;
+  }
+
+  .eyebrow {
+    @apply font-mono text-eyebrow uppercase tracking-widest text-ink;
+  }
+
+  .caption {
+    @apply font-mono text-caption uppercase tracking-widest text-ink;
+  }
+
+  .nav-tab {
+    @apply px-4 py-2 rounded-pill text-body-sm font-medium transition-colors whitespace-nowrap;
+  }
+
+  .nav-tab-active {
+    @apply nav-tab bg-primary text-on-primary;
+  }
+
+  .nav-tab-inactive {
+    @apply nav-tab text-ink hover:bg-canvas;
+  }
+
+  .color-block {
+    @apply rounded-lg p-xxl;
+  }
+
+  .color-block-lime {
+    @apply color-block bg-block-lime;
+  }
+
+  .color-block-lilac {
+    @apply color-block bg-block-lilac;
+  }
+
+  .color-block-cream {
+    @apply color-block bg-block-cream;
+  }
+
+  .color-block-mint {
+    @apply color-block bg-block-mint;
+  }
+
+  .color-block-pink {
+    @apply color-block bg-block-pink;
+  }
+
+  .color-block-coral {
+    @apply color-block bg-block-coral;
+  }
+
+  .color-block-navy {
+    @apply color-block bg-block-navy text-inverse-ink;
+  }
+
+  .alert-error {
+    @apply bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-4;
+  }
+
+  .badge {
+    @apply font-mono text-caption uppercase tracking-widest px-2 py-1 rounded-sm;
+  }
+
+  .badge-lime {
+    @apply badge bg-block-lime;
+  }
+
+  .badge-lilac {
+    @apply badge bg-block-lilac;
+  }
+
+  .badge-cream {
+    @apply badge bg-block-cream;
+  }
+
+  .badge-mint {
+    @apply badge bg-block-mint;
+  }
+
+  .badge-coral {
+    @apply badge bg-block-coral;
+  }
+
+  .page-title {
+    @apply text-display font-normal text-ink tracking-tight;
+  }
+
+  .section-title {
+    @apply text-headline text-ink;
+  }
+}

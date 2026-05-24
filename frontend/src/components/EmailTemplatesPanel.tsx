@@ -8,10 +8,10 @@ const CATEGORIES = ['oferta', 'follow-up', 'podziękowanie', 'inne'] as const;
 type Category = typeof CATEGORIES[number];
 
 const CATEGORY_BADGE: Record<Category, string> = {
-  'oferta': 'bg-blue-100 text-blue-700',
-  'follow-up': 'bg-amber-100 text-amber-700',
-  'podziękowanie': 'bg-emerald-100 text-emerald-700',
-  'inne': 'bg-slate-100 text-slate-600',
+  'oferta': 'badge-lilac',
+  'follow-up': 'badge-cream',
+  'podziękowanie': 'badge-mint',
+  'inne': 'badge-lime',
 };
 
 const emptyForm = (): EmailTemplateFormData => ({
@@ -44,27 +44,27 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ initial, onSave, onCancel, 
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-2xl border border-slate-200 p-6 mb-6 animate-in fade-in">
+    <form onSubmit={handleSubmit} className="bg-surface-soft rounded-lg border border-hairline p-6 mb-6 animate-in fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Nazwa szablonu *</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Nazwa szablonu *</label>
           <input
             required
             type="text"
             value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
             placeholder="np. Pierwsze powitanie klienta"
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas"
           />
         </div>
 
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Kategoria *</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Kategoria *</label>
           <select
             value={form.category}
             onChange={e => setForm({ ...form, category: e.target.value })}
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas"
           >
             {CATEGORIES.map(c => (
               <option key={c} value={c}>{c.charAt(0).toUpperCase() + c.slice(1)}</option>
@@ -73,37 +73,37 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ initial, onSave, onCancel, 
         </div>
 
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Temat maila *</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Temat maila *</label>
           <input
             required
             type="text"
             value={form.subject}
             onChange={e => setForm({ ...form, subject: e.target.value })}
             placeholder="np. Oferta współpracy — Antyramy"
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas"
           />
         </div>
 
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Treść *</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Treść *</label>
           <textarea
             required
             rows={10}
             value={form.body}
             onChange={e => setForm({ ...form, body: e.target.value })}
             placeholder="Treść wiadomości e-mail..."
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white resize-y font-mono text-sm leading-relaxed"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas resize-y font-mono text-sm leading-relaxed"
           />
         </div>
       </div>
 
       <div className="flex justify-end gap-3">
         <button type="button" onClick={onCancel}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-100 transition-colors">
+          className="px-5 py-2.5 rounded-xl border border-hairline text-ink font-light font-semibold hover:bg-surface-soft transition-colors">
           Anuluj
         </button>
         <button type="submit" disabled={saving}
-          className="px-6 py-2.5 bg-slate-900 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-60">
+          className="px-6 py-2.5 bg-primary hover:bg-primary text-white font-bold rounded-xl transition-colors disabled:opacity-60">
           {saving ? 'Zapisuję...' : saveLabel}
         </button>
       </div>
@@ -160,14 +160,14 @@ const EmailTemplatesPanel: React.FC = () => {
       {/* Nagłówek */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Szablony Maili</h2>
-          <p className="text-slate-500 text-sm mt-1">
+          <h2 className="text-2xl font-extrabold text-ink">Szablony Maili</h2>
+          <p className="text-ink font-light text-sm mt-1">
             Gotowe szablony wiadomości sprzedażowych — {templates.length} {templates.length === 1 ? 'szablon' : 'szablonów'}
           </p>
         </div>
         <button
           onClick={() => { setShowAddForm(v => !v); setEditingId(null); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
+          className="btn-primary"
         >
           {showAddForm ? '✕ Anuluj' : '＋ Nowy szablon'}
         </button>
@@ -189,42 +189,42 @@ const EmailTemplatesPanel: React.FC = () => {
 
       {/* Treść */}
       {loading ? (
-        <div className="text-center text-slate-400 py-12 animate-pulse">Ładowanie szablonów...</div>
+        <div className="text-center text-ink font-light py-12 animate-pulse">Ładowanie szablonów...</div>
       ) : templates.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
+        <div className="bg-canvas rounded-lg border border-dashed border-hairline p-12 text-center">
           <span className="text-4xl block mb-3">✉️</span>
-          <p className="text-slate-500">Brak szablonów. Dodaj pierwszy szablon powyżej.</p>
+          <p className="text-ink font-light">Brak szablonów. Dodaj pierwszy szablon powyżej.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-canvas rounded-lg border border-hairline shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Nazwa</th>
-                <th className="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Kategoria</th>
-                <th className="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">Temat</th>
-                <th className="text-center px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Wersja</th>
-                <th className="text-left px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Data</th>
+              <tr className="bg-surface-soft border-b border-hairline-soft">
+                <th className="text-left px-5 py-3 text-xs font-bold text-ink font-light uppercase tracking-wide">Nazwa</th>
+                <th className="text-left px-5 py-3 text-xs font-bold text-ink font-light uppercase tracking-wide">Kategoria</th>
+                <th className="text-left px-5 py-3 text-xs font-bold text-ink font-light uppercase tracking-wide hidden md:table-cell">Temat</th>
+                <th className="text-center px-5 py-3 text-xs font-bold text-ink font-light uppercase tracking-wide hidden lg:table-cell">Wersja</th>
+                <th className="text-left px-5 py-3 text-xs font-bold text-ink font-light uppercase tracking-wide hidden lg:table-cell">Data</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
             <tbody>
               {templates.map(template => (
                 <React.Fragment key={template.id}>
-                  <tr className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4 font-semibold text-slate-800">{template.name}</td>
+                  <tr className="border-b border-hairline-soft hover:bg-surface-soft transition-colors">
+                    <td className="px-5 py-4 font-semibold text-ink">{template.name}</td>
                     <td className="px-5 py-4">
-                      <span className={`text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide ${CATEGORY_BADGE[template.category as Category] ?? 'bg-slate-100 text-slate-600'}`}>
+                      <span className={`text-xs font-bold px-2 py-1 rounded-md uppercase tracking-wide ${CATEGORY_BADGE[template.category as Category] ?? 'bg-surface-soft text-ink font-light'}`}>
                         {template.category}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-slate-500 hidden md:table-cell max-w-xs truncate">{template.subject}</td>
+                    <td className="px-5 py-4 text-ink font-light hidden md:table-cell max-w-xs truncate">{template.subject}</td>
                     <td className="px-5 py-4 text-center hidden lg:table-cell">
-                      <span className="text-xs font-mono bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                      <span className="text-xs font-mono bg-surface-soft text-ink font-light px-2 py-0.5 rounded">
                         v{template.currentVersion}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-slate-400 text-xs hidden lg:table-cell">{formatDate(template.updatedAt)}</td>
+                    <td className="px-5 py-4 text-ink font-light text-xs hidden lg:table-cell">{formatDate(template.updatedAt)}</td>
                     <td className="px-5 py-4">
                       {deleteConfirm === template.id ? (
                         <div className="flex gap-2 justify-end">
@@ -233,7 +233,7 @@ const EmailTemplatesPanel: React.FC = () => {
                             Usuń
                           </button>
                           <button onClick={() => setDeleteConfirm(null)}
-                            className="border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
+                            className="border border-hairline text-ink font-light text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-surface-soft transition-colors">
                             Anuluj
                           </button>
                         </div>
@@ -241,7 +241,7 @@ const EmailTemplatesPanel: React.FC = () => {
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => { setEditingId(template.id); setShowAddForm(false); }}
-                            className="border border-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-slate-50 transition-colors"
+                            className="border border-hairline text-ink text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-surface-soft transition-colors"
                           >
                             ✎ Edytuj
                           </button>
@@ -259,7 +259,7 @@ const EmailTemplatesPanel: React.FC = () => {
                   {/* Formularz edycji inline pod wierszem */}
                   {editingId === template.id && (
                     <tr>
-                      <td colSpan={6} className="px-5 py-4 bg-slate-50/50">
+                      <td colSpan={6} className="px-5 py-4 bg-surface-soft/50">
                         <TemplateForm
                           initial={{ name: template.name, category: template.category, subject: template.subject, body: template.body }}
                           onSave={(data) => handleUpdate(template.id, data)}

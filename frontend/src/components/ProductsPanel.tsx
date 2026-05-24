@@ -74,37 +74,37 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onSave, onCancel, sa
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-50 rounded-2xl border border-slate-200 p-6 mb-6 animate-in fade-in">
+    <form onSubmit={handleSubmit} className="bg-surface-soft rounded-lg border border-hairline p-6 mb-6 animate-in fade-in">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
 
         {/* Nazwa */}
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Nazwa produktu *</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Nazwa produktu *</label>
           <input
             required
             type="text"
             value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
             placeholder="np. Pluszek Maxi mix"
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas"
           />
         </div>
 
         {/* Kod produktu */}
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Kod produktu</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Kod produktu</label>
           <input
             type="text"
             value={form.code}
             onChange={e => setForm({ ...form, code: e.target.value })}
             placeholder="np. PLX-001"
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas"
           />
         </div>
 
         {/* Cena netto */}
         <div>
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Cena netto (zł)</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Cena netto (zł)</label>
           <input
             type="number"
             min="0"
@@ -112,30 +112,30 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onSave, onCancel, sa
             value={form.priceNetto}
             onChange={e => setForm({ ...form, priceNetto: parseFloat(e.target.value) || 0 })}
             placeholder="0.00"
-            className="w-full border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-500 bg-white"
+            className="w-full border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink bg-canvas"
           />
         </div>
 
         {/* Zdjęcie */}
         <div className="md:col-span-2">
-          <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Zdjęcie produktu</label>
+          <label className="text-xs font-bold text-ink font-light uppercase mb-1 block">Zdjęcie produktu</label>
           <div className="flex items-center gap-4">
             {form.imageUrl && (
-              <img src={form.imageUrl} alt="podgląd" className="w-16 h-16 object-cover rounded-xl border border-slate-200 shrink-0" />
+              <img src={form.imageUrl} alt="podgląd" className="w-16 h-16 object-cover rounded-xl border border-hairline shrink-0" />
             )}
             <div className="flex-1">
               <button
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 disabled={uploading}
-                className="w-full border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-xl p-4 text-sm text-slate-500 hover:text-blue-600 transition-colors text-center disabled:opacity-60"
+                className="w-full border-2 border-dashed border-hairline hover:border-ink rounded-xl p-4 text-sm text-ink font-light hover:underline transition-colors text-center disabled:opacity-60"
               >
                 {uploading ? '⏳ Wgrywam zdjęcie...' : '📸 Kliknij aby wybrać zdjęcie (JPG, PNG)'}
               </button>
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
               {uploadError && <p className="text-red-500 text-xs mt-1">{uploadError}</p>}
               {form.imageUrl && !uploading && (
-                <p className="text-emerald-600 text-xs mt-1">✓ Zdjęcie wgrane</p>
+                <p className="text-success text-xs mt-1">✓ Zdjęcie wgrane</p>
               )}
             </div>
           </div>
@@ -143,12 +143,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ initial, onSave, onCancel, sa
       </div>
 
       <div className="flex justify-end gap-3">
-        <button type="button" onClick={onCancel}
-          className="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-semibold hover:bg-slate-100 transition-colors">
+        <button type="button" onClick={onCancel} className="btn-secondary">
           Anuluj
         </button>
-        <button type="submit" disabled={saving || uploading}
-          className="px-6 py-2.5 bg-slate-900 hover:bg-blue-600 text-white font-bold rounded-xl transition-colors disabled:opacity-60">
+        <button type="submit" disabled={saving || uploading} className="btn-primary disabled:opacity-60">
           {saving ? 'Zapisuję...' : saveLabel}
         </button>
       </div>
@@ -202,18 +200,18 @@ const ProductsPanel: React.FC = () => {
       {/* Nagłówek + przycisk dodaj */}
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-extrabold text-slate-900">Baza Produktów</h2>
-          <p className="text-slate-500 text-sm mt-1">Zarządzaj swoją ofertą — {products.length} {products.length === 1 ? 'produkt' : 'produktów'}</p>
+          <h2 className="page-title text-display">Baza produktów</h2>
+          <p className="text-ink font-light text-sm mt-1">Zarządzaj swoją ofertą — {products.length} {products.length === 1 ? 'produkt' : 'produktów'}</p>
         </div>
         <button
           onClick={() => { setShowAddForm(v => !v); setEditingId(null); }}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
+          className="btn-primary"
         >
           {showAddForm ? '✕ Anuluj' : '＋ Dodaj produkt'}
         </button>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-4">⚠️ {error}</div>}
+      {error && <div className="alert-error mb-4">⚠️ {error}</div>}
 
       {/* Formularz dodawania */}
       {showAddForm && (
@@ -227,11 +225,11 @@ const ProductsPanel: React.FC = () => {
 
       {/* Lista produktów */}
       {loading ? (
-        <div className="text-center text-slate-400 py-12 animate-pulse">Ładowanie produktów...</div>
+        <div className="text-center text-ink font-light py-12 animate-pulse">Ładowanie produktów...</div>
       ) : products.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-dashed border-slate-200 p-12 text-center">
+        <div className="bg-canvas rounded-lg border border-dashed border-hairline p-12 text-center">
           <span className="text-4xl block mb-3">📦</span>
-          <p className="text-slate-500">Brak produktów. Dodaj pierwszy produkt powyżej.</p>
+          <p className="text-ink font-light">Brak produktów. Dodaj pierwszy produkt powyżej.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -245,21 +243,21 @@ const ProductsPanel: React.FC = () => {
                   saveLabel="Zapisz zmiany"
                 />
               ) : (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                <div className="bg-canvas rounded-lg border border-hairline shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                   {/* Zdjęcie */}
                   {product.imageUrl ? (
                     <img src={product.imageUrl} alt={product.name} className="w-full h-40 object-cover" />
                   ) : (
-                    <div className="w-full h-40 bg-slate-100 flex items-center justify-center text-slate-400 text-4xl">📦</div>
+                    <div className="w-full h-40 bg-surface-soft flex items-center justify-center text-ink font-light text-4xl">📦</div>
                   )}
 
                   {/* Dane */}
                   <div className="p-4">
-                    <h3 className="font-bold text-slate-800 text-base leading-tight mb-1">{product.name}</h3>
+                    <h3 className="font-bold text-ink text-base leading-tight mb-1">{product.name}</h3>
                     <div className="flex justify-between items-center mb-4">
-                      <span className="text-xs text-slate-400 font-mono">{product.code || '—'}</span>
-                      <span className="text-base font-black text-slate-900">
-                        {product.priceNetto > 0 ? `${product.priceNetto.toFixed(2)} zł` : <span className="text-slate-300">brak ceny</span>}
+                      <span className="text-xs text-ink font-light font-mono">{product.code || '—'}</span>
+                      <span className="text-base font-black text-ink">
+                        {product.priceNetto > 0 ? `${product.priceNetto.toFixed(2)} zł` : <span className="text-ink font-light opacity-50">brak ceny</span>}
                       </span>
                     </div>
 
@@ -271,14 +269,14 @@ const ProductsPanel: React.FC = () => {
                           ✓ Tak, usuń
                         </button>
                         <button onClick={() => setDeleteConfirm(null)}
-                          className="flex-1 border border-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                          className="flex-1 border border-hairline text-ink font-light text-xs font-bold py-2 rounded-lg hover:bg-surface-soft transition-colors">
                           Anuluj
                         </button>
                       </div>
                     ) : (
                       <div className="flex gap-2">
                         <button onClick={() => { setEditingId(product.id); setShowAddForm(false); }}
-                          className="flex-1 border border-slate-200 text-slate-700 text-xs font-bold py-2 rounded-lg hover:bg-slate-50 transition-colors">
+                          className="flex-1 border border-hairline text-ink text-xs font-bold py-2 rounded-lg hover:bg-surface-soft transition-colors">
                           ✎ Edytuj
                         </button>
                         <button onClick={() => setDeleteConfirm(product.id)}

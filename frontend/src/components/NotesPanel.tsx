@@ -3,11 +3,11 @@ import { getNotes, deleteNote, Note, NoteColor } from '../services/api';
 import NoteModal from './NoteModal';
 
 const colorClasses: Record<NoteColor, string> = {
-  default: 'bg-white border-slate-200 text-slate-800 shadow-sm',
-  blue: 'bg-blue-50 border-blue-200 text-blue-900 shadow-blue-100/50',
-  yellow: 'bg-yellow-50 border-yellow-200 text-yellow-900 shadow-yellow-100/50',
-  red: 'bg-red-50 border-red-200 text-red-900 shadow-red-100/50',
-  green: 'bg-green-50 border-green-200 text-green-900 shadow-green-100/50',
+  default: 'bg-canvas border-hairline text-ink',
+  blue: 'bg-block-lilac border-hairline text-ink',
+  yellow: 'bg-block-cream border-hairline text-ink',
+  red: 'bg-block-pink border-hairline text-ink',
+  green: 'bg-block-mint border-hairline text-ink',
 };
 
 export default function NotesPanel() {
@@ -60,14 +60,13 @@ export default function NotesPanel() {
       {/* Nagłówek i Akcje */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            📋 Tablica Notatek
-          </h1>
-          <p className="text-sm text-slate-500">Twój podręczny scratchpad i baza procedur.</p>
+          <h1 className="page-title">Tablica notatek</h1>
+          <p className="text-body-sm font-light mt-2">Twój podręczny scratchpad i baza procedur.</p>
         </div>
         <button
+          type="button"
           onClick={() => { setActiveNote(null); setIsModalOpen(true); }}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium px-4 py-2 rounded-lg shadow transition duration-150"
+          className="btn-primary"
         >
           + Nowa notatka
         </button>
@@ -80,15 +79,15 @@ export default function NotesPanel() {
           placeholder="Szukaj notatki po temacie..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full max-w-md border border-slate-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+          className="input-field max-w-md"
         />
       </div>
 
       {/* Siatka Notatek */}
       {loading ? (
-        <div className="text-center py-12 text-slate-500">Ładowanie tablicy notatek...</div>
+        <div className="text-center py-12 text-ink font-light">Ładowanie tablicy notatek...</div>
       ) : sortedAndFilteredNotes.length === 0 ? (
-        <div className="text-center py-12 text-slate-400 border-2 border-dashed border-slate-200 rounded-xl">
+        <div className="text-center py-12 text-ink font-light border-2 border-dashed border-hairline rounded-xl">
           Brak notatek do wyświetlenia.
         </div>
       ) : (
@@ -97,7 +96,7 @@ export default function NotesPanel() {
             <div
               key={note.id}
               onClick={() => { setActiveNote(note); setIsModalOpen(true); }}
-              className={`p-5 rounded-xl border-2 cursor-pointer transition transform hover:-translate-y-1 hover:shadow-md flex flex-col justify-between h-48 relative ${colorClasses[note.color] || colorClasses.default}`}
+              className={`p-5 rounded-md border-2 cursor-pointer transition hover:-translate-y-0.5 flex flex-col justify-between h-48 relative ${colorClasses[note.color] || colorClasses.default}`}
             >
               {/* Ikony znaczników priorytetu */}
               <div className="absolute top-3 right-3 flex gap-1.5 text-lg">
@@ -106,7 +105,7 @@ export default function NotesPanel() {
               </div>
 
               <div>
-                <span className="text-xs font-mono text-slate-400 block mb-1">{note.createdAt}</span>
+                <span className="text-xs font-mono text-ink font-light block mb-1">{note.createdAt}</span>
                 <h3 className="font-semibold text-lg line-clamp-1 pr-12">{note.title}</h3>
                 {/* Prosty podgląd czystego tekstu zamiast HTML stripu dla optymalizacji */}
                 <div 
@@ -121,7 +120,7 @@ export default function NotesPanel() {
                 </span>
                 <button
                   onClick={(e) => handleDelete(note.id, e)}
-                  className="text-xs text-red-600 hover:text-red-800 font-medium px-2 py-1 rounded hover:bg-red-50"
+                  className="btn-tertiary text-caption py-1"
                 >
                   Usuń
                 </button>

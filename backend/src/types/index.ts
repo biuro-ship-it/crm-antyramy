@@ -26,6 +26,7 @@ export interface Client {
   lastContactAt: string | null;
   createdAt: string;
   updatedAt: string;
+  relationshipColor?: string; // DODANE: Kolor relacji klienta
 }
 
 export interface Interaction {

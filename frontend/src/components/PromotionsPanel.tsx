@@ -121,7 +121,7 @@ const PromotionsPanel: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center py-32 text-slate-400">Wczytywanie...</div>
+    <div className="flex items-center justify-center py-32 text-ink font-light">Wczytywanie...</div>
   );
 
   return (
@@ -129,12 +129,12 @@ const PromotionsPanel: React.FC = () => {
 
       {/* Nagłówek */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-900 tracking-tight">Wysyłka promocji</h2>
-        <p className="text-slate-500 mt-1 text-sm">Wybierz produkty, klientów i treść — backend wyśle maile z PDF i zapisze historię kontaktów.</p>
+        <h2 className="text-2xl font-bold text-ink tracking-tight">Wysyłka promocji</h2>
+        <p className="text-ink font-light mt-1 text-sm">Wybierz produkty, klientów i treść — backend wyśle maile z PDF i zapisze historię kontaktów.</p>
       </div>
 
       {/* Pasek kroków */}
-      <div className="flex items-center gap-0 mb-8 bg-slate-100 rounded-xl p-1">
+      <div className="flex items-center gap-0 mb-8 bg-surface-soft rounded-xl p-1">
         {([
           { n: 1 as Step, label: 'Produkty', sub: `${selectedProducts.size} wybranych` },
           { n: 2 as Step, label: 'Odbiorcy', sub: `${selectedClients.size} wybranych` },
@@ -145,17 +145,17 @@ const PromotionsPanel: React.FC = () => {
             onClick={() => { if (n === 2 && !canGoStep2) return; if (n === 3 && !canGoStep3) return; setStep(n); }}
             className={`flex-1 flex flex-col items-center py-3 px-4 rounded-lg transition-all text-sm font-medium ${
               step === n
-                ? 'bg-white shadow-sm text-slate-900'
-                : 'text-slate-500 hover:text-slate-700'
+                ? 'bg-canvas shadow-sm text-ink'
+                : 'text-ink font-light hover:text-ink'
             }`}
           >
             <span className="flex items-center gap-2">
               <span className={`w-5 h-5 rounded-full text-xs flex items-center justify-center font-bold ${
-                step === n ? 'bg-blue-600 text-white' : 'bg-slate-300 text-slate-600'
+                step === n ? 'bg-primary text-on-primary' : 'bg-hairline text-ink font-light'
               }`}>{n}</span>
               {label}
             </span>
-            {sub && <span className="text-xs text-slate-400 mt-0.5">{sub}</span>}
+            {sub && <span className="text-xs text-ink font-light mt-0.5">{sub}</span>}
           </button>
         ))}
       </div>
@@ -164,7 +164,7 @@ const PromotionsPanel: React.FC = () => {
       {step === 1 && (
         <div>
           {products.length === 0 ? (
-            <div className="text-center py-16 text-slate-400">
+            <div className="text-center py-16 text-ink font-light">
               <p className="font-medium">Brak produktów w katalogu</p>
               <p className="text-sm mt-1">Dodaj produkty w zakładce Produkty</p>
             </div>
@@ -178,17 +178,17 @@ const PromotionsPanel: React.FC = () => {
                     onClick={() => toggleProduct(p.id)}
                     className={`text-left rounded-xl border-2 overflow-hidden transition-all ${
                       selected
-                        ? 'border-blue-500 shadow-md shadow-blue-100'
-                        : 'border-slate-200 hover:border-slate-300'
+                        ? 'border-ink '
+                        : 'border-hairline hover:border-hairline'
                     }`}
                   >
-                    <div className="aspect-square bg-slate-100 overflow-hidden relative">
+                    <div className="aspect-square bg-surface-soft overflow-hidden relative">
                       {p.imageUrl
                         ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center text-slate-300 text-xs">brak zdjęcia</div>
+                        : <div className="w-full h-full flex items-center justify-center text-ink font-light opacity-50 text-xs">brak zdjęcia</div>
                       }
                       {selected && (
-                        <div className="absolute top-2 right-2 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                        <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
                           <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
@@ -196,10 +196,10 @@ const PromotionsPanel: React.FC = () => {
                       )}
                     </div>
                     <div className="p-3">
-                      <p className="font-semibold text-slate-800 text-sm leading-tight line-clamp-2">{p.name}</p>
-                      {p.code && <p className="text-xs text-slate-400 mt-0.5">{p.code}</p>}
+                      <p className="font-semibold text-ink text-sm leading-tight line-clamp-2">{p.name}</p>
+                      {p.code && <p className="text-xs text-ink font-light mt-0.5">{p.code}</p>}
                       {p.priceNetto > 0 && (
-                        <p className="text-sm font-bold text-blue-600 mt-1">{p.priceNetto.toFixed(2)} zł</p>
+                        <p className="text-sm font-bold text-ink mt-1">{p.priceNetto.toFixed(2)} zł</p>
                       )}
                     </div>
                   </button>
@@ -209,7 +209,7 @@ const PromotionsPanel: React.FC = () => {
           )}
 
           <div className="flex justify-between items-center">
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-ink font-light">
               {selectedProducts.size > 0
                 ? `Wybrano ${selectedProducts.size} z ${products.length} produktów`
                 : 'Kliknij produkt aby go wybrać'}
@@ -217,7 +217,7 @@ const PromotionsPanel: React.FC = () => {
             <button
               onClick={() => setStep(2)}
               disabled={!canGoStep2}
-              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+              className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
             >
               Dalej: wybór odbiorców
             </button>
@@ -234,12 +234,12 @@ const PromotionsPanel: React.FC = () => {
               placeholder="Szukaj po nazwie lub mieście..."
               value={clientSearch}
               onChange={e => setClientSearch(e.target.value)}
-              className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+              className="flex-1 border border-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ink focus:ring-1 focus:ring-ink"
             />
             <select
               value={typeFilter}
               onChange={e => setTypeFilter(e.target.value as typeof typeFilter)}
-              className="border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-blue-400 bg-white"
+              className="border border-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ink bg-canvas"
             >
               <option value="">Wszystkie typy</option>
               <option value="zakład">Zakład</option>
@@ -249,39 +249,39 @@ const PromotionsPanel: React.FC = () => {
             </select>
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-6">
+          <div className="bg-canvas border border-hairline rounded-xl overflow-hidden mb-6">
             {/* Nagłówek tabeli */}
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 border-b border-slate-200">
+            <div className="flex items-center gap-3 px-4 py-3 bg-surface-soft border-b border-hairline">
               <input
                 type="checkbox"
                 checked={allVisible}
                 onChange={toggleAllVisible}
-                className="rounded border-slate-300 text-blue-600"
+                className="rounded border-hairline text-ink"
               />
-              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              <span className="text-xs font-semibold text-ink font-light uppercase tracking-wide">
                 {filteredClients.length} firm{filteredClients.length === 1 ? 'a' : ''}
                 {clientSearch || typeFilter ? ' (przefiltrowanych)' : ''}
               </span>
             </div>
 
             {/* Lista */}
-            <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+            <div className="divide-y divide-hairline-soft max-h-96 overflow-y-auto">
               {filteredClients.length === 0 ? (
-                <p className="text-sm text-slate-400 px-4 py-6">Brak wyników</p>
+                <p className="text-sm text-ink font-light px-4 py-6">Brak wyników</p>
               ) : filteredClients.map(c => {
                 const selected = selectedClients.has(c.id);
                 const hasEmail = !!c.email;
                 return (
-                  <label key={c.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${selected ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                  <label key={c.id} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${selected ? 'bg-block-lilac' : 'hover:bg-surface-soft'}`}>
                     <input
                       type="checkbox"
                       checked={selected}
                       onChange={() => toggleClient(c.id)}
-                      className="rounded border-slate-300 text-blue-600 shrink-0"
+                      className="rounded border-hairline text-ink shrink-0"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-800 text-sm truncate">{c.companyName}</p>
-                      <p className="text-xs text-slate-400 truncate">
+                      <p className="font-medium text-ink text-sm truncate">{c.companyName}</p>
+                      <p className="text-xs text-ink font-light truncate">
                         {c.type} {c.address?.city ? `· ${c.address.city}` : ''}
                         {c.email ? ` · ${c.email}` : ''}
                       </p>
@@ -296,7 +296,7 @@ const PromotionsPanel: React.FC = () => {
           </div>
 
           {selectedClients.size > 0 && (
-            <div className="bg-blue-50 border border-blue-100 rounded-lg px-4 py-3 mb-6 text-sm text-blue-800">
+            <div className="bg-block-lilac border border-hairline rounded-lg px-4 py-3 mb-6 text-sm text-ink">
               Wybrano <strong>{selectedClients.size}</strong> klientów,
               z czego <strong>{recipientsWithEmail.length}</strong> ma adres email (do nich trafi mail).
               {selectedClients.size !== recipientsWithEmail.length && (
@@ -306,13 +306,13 @@ const PromotionsPanel: React.FC = () => {
           )}
 
           <div className="flex justify-between">
-            <button onClick={() => setStep(1)} className="px-6 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+            <button onClick={() => setStep(1)} className="px-6 py-2.5 border border-hairline text-ink text-sm font-medium rounded-lg hover:bg-surface-soft transition-colors">
               Wstecz
             </button>
             <button
               onClick={() => setStep(3)}
               disabled={!canGoStep3}
-              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+              className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
             >
               Dalej: treść maila
             </button>
@@ -327,36 +327,36 @@ const PromotionsPanel: React.FC = () => {
           {/* Formularz — lewa strona */}
           <div className="lg:col-span-3 space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Tytuł oferty (na PDF)</label>
+              <label className="block text-xs font-semibold text-ink font-light uppercase tracking-wide mb-1.5">Tytuł oferty (na PDF)</label>
               <input
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="np. Wiosenna promocja ram drewnianych"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                className="w-full border border-hairline rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ink focus:ring-1 focus:ring-ink"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Temat maila</label>
+              <label className="block text-xs font-semibold text-ink font-light uppercase tracking-wide mb-1.5">Temat maila</label>
               <input
                 type="text"
                 value={subject}
                 onChange={e => setSubject(e.target.value)}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100"
+                className="w-full border border-hairline rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ink focus:ring-1 focus:ring-ink"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Treść maila</label>
+              <label className="block text-xs font-semibold text-ink font-light uppercase tracking-wide mb-1.5">Treść maila</label>
               <textarea
                 rows={9}
                 value={content}
                 onChange={e => setContent(e.target.value)}
                 placeholder="Szanowni Państwo,&#10;&#10;Z przyjemnością informujemy o naszej aktualnej ofercie..."
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 resize-none font-sans"
+                className="w-full border border-hairline rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ink focus:ring-1 focus:ring-ink resize-none font-sans"
               />
-              <p className="text-xs text-slate-400 mt-1">Treść pojawi się zarówno w mailu jak i w PDF.</p>
+              <p className="text-xs text-ink font-light mt-1">Treść pojawi się zarówno w mailu jak i w PDF.</p>
             </div>
 
             {error && (
@@ -366,7 +366,7 @@ const PromotionsPanel: React.FC = () => {
             )}
 
             {result && (
-              <div className={`rounded-lg px-4 py-3 text-sm ${result.failed.length === 0 ? 'bg-emerald-50 border border-emerald-200 text-emerald-800' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+              <div className={`rounded-lg px-4 py-3 text-sm ${result.failed.length === 0 ? 'bg-block-mint border border-hairline text-ink' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
                 <p className="font-semibold">
                   Wysłano {result.sent} z {result.total} maili.
                 </p>
@@ -381,20 +381,20 @@ const PromotionsPanel: React.FC = () => {
             )}
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <button onClick={() => setStep(2)} className="px-5 py-2.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+              <button onClick={() => setStep(2)} className="px-5 py-2.5 border border-hairline text-ink text-sm font-medium rounded-lg hover:bg-surface-soft transition-colors">
                 Wstecz
               </button>
               <button
                 onClick={handlePreviewPdf}
                 disabled={previewing || !title.trim() || !content.trim()}
-                className="px-5 py-2.5 border border-blue-200 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="px-5 py-2.5 border border-hairline text-ink text-sm font-medium rounded-lg hover:bg-surface-soft transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {previewing ? 'Generuję...' : 'Podgląd PDF'}
               </button>
               <button
                 onClick={handleSend}
                 disabled={!canSend}
-                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
+                className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
               >
                 {sending
                   ? 'Wysyłam...'
@@ -405,51 +405,51 @@ const PromotionsPanel: React.FC = () => {
 
           {/* Podsumowanie — prawa strona */}
           <div className="lg:col-span-2">
-            <div className="bg-slate-50 rounded-xl border border-slate-200 p-5 sticky top-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">Podsumowanie kampanii</h3>
+            <div className="bg-surface-soft rounded-xl border border-hairline p-5 sticky top-4">
+              <h3 className="text-sm font-semibold text-ink mb-4">Podsumowanie kampanii</h3>
 
               <div className="space-y-4">
                 <div>
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Produkty ({chosenProducts.length})</p>
+                  <p className="text-xs font-semibold text-ink font-light uppercase tracking-wide mb-2">Produkty ({chosenProducts.length})</p>
                   <div className="space-y-1">
                     {chosenProducts.map(p => (
                       <div key={p.id} className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-white rounded border border-slate-200 overflow-hidden shrink-0">
+                        <div className="w-8 h-8 bg-canvas rounded border border-hairline overflow-hidden shrink-0">
                           {p.imageUrl
                             ? <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
-                            : <div className="w-full h-full bg-slate-100" />
+                            : <div className="w-full h-full bg-surface-soft" />
                           }
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-slate-700 truncate">{p.name}</p>
-                          {p.priceNetto > 0 && <p className="text-xs text-blue-600">{p.priceNetto.toFixed(2)} zł</p>}
+                          <p className="text-xs font-medium text-ink truncate">{p.name}</p>
+                          {p.priceNetto > 0 && <p className="text-xs text-ink">{p.priceNetto.toFixed(2)} zł</p>}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 pt-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Odbiorcy</p>
-                  <p className="text-sm text-slate-700"><span className="font-bold">{recipientsWithEmail.length}</span> firm z adresem email</p>
+                <div className="border-t border-hairline pt-4">
+                  <p className="text-xs font-semibold text-ink font-light uppercase tracking-wide mb-2">Odbiorcy</p>
+                  <p className="text-sm text-ink"><span className="font-bold">{recipientsWithEmail.length}</span> firm z adresem email</p>
                   {chosenClients.length !== recipientsWithEmail.length && (
                     <p className="text-xs text-amber-600 mt-0.5">{chosenClients.length - recipientsWithEmail.length} bez emaila</p>
                   )}
                 </div>
 
-                <div className="border-t border-slate-200 pt-4">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Co wyślemy</p>
-                  <ul className="space-y-1 text-xs text-slate-600">
+                <div className="border-t border-hairline pt-4">
+                  <p className="text-xs font-semibold text-ink font-light uppercase tracking-wide mb-2">Co wyślemy</p>
+                  <ul className="space-y-1 text-xs text-ink font-light">
                     <li className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      <span className="w-1.5 h-1.5 bg-block-lilac0 rounded-full"></span>
                       Mail HTML z tabelą produktów
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      <span className="w-1.5 h-1.5 bg-block-lilac0 rounded-full"></span>
                       PDF z logo, treścią i zdjęciami
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                      <span className="w-1.5 h-1.5 bg-block-lilac0 rounded-full"></span>
                       Wpis w historii każdego klienta
                     </li>
                   </ul>
