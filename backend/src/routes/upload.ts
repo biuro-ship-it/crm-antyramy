@@ -32,13 +32,21 @@ const storage = multer.diskStorage({
     cb(null, `produkt-${uniqueSuffix}${ext}`);
   },
 });
-
 const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  const allowed = [
+    'image/jpeg', 
+    'image/jpg', 
+    'image/png', 
+    'image/webp', 
+    'application/pdf', 
+    'application/msword', 
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  ];
+  
   if (allowed.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error('Dozwolone formaty: JPG, PNG, WebP'));
+    cb(new Error('Dozwolone formaty: JPG, PNG, WebP, PDF, DOCX'));
   }
 };
 

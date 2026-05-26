@@ -437,3 +437,75 @@ export const deleteNote = async (id: string): Promise<void> => {
   const response = await fetch(`${NOTES_URL}/${id}`, { method: 'DELETE', headers });
   if (!response.ok) throw new Error('Nie udało się usunąć notatki');
 };
+// ─── DOSTAWCY ─────────────────────────────────────────────────────────────────
+
+export interface SupplierFile {
+  id: string;
+  name: string;
+  url: string;
+  size?: string;
+  uploadedAt: string;
+}
+
+export interface Supplier {
+  id: string;
+  companyName: string;
+  category: string;
+  email: string;
+  phoneCompany: string;
+  phoneSales: string;
+  phoneOwner: string;
+  whatsapp?: string;
+  messenger?: string;
+  notes: string;
+  relationshipColor: string;
+  files: SupplierFile[];
+  lastContactAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type SupplierFormData = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'lastContactAt'>;
+
+const SUPPLIERS_URL = `${API_URL}/api/suppliers`;
+
+export const getSuppliers = async (): Promise<Supplier[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(SUPPLIERS_URL, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać dostawców');
+  return response.json();
+};
+
+export const createSupplier = async (data: SupplierFormData): Promise<Supplier> => {
+  const headers = await getHeaders();
+  const response = await fetch(SUPPLIERS_URL, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się dodać dostawcy');
+  return response.json();
+};
+
+export const updateSupplier = async (id: string, data: SupplierFormData): Promise<Supplier> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zaktualizować dostawcy');
+  return response.json();
+};
+
+export const deleteSupplier = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${id}`, { method: 'DELETE', headers });
+  if (!response.ok) throw new Error('Nie udało się usunąć dostawcy');
+};
+
+export const getSupplierInteractions = async (supplierId: string): Promise<Interaction[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/interactions`, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać historii dostawcy');
+  return response.json();
+};
+
+export const createSupplierInteraction = async (supplierId: string, data: InteractionFormData): Promise<Interaction> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/interactions`, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się dodać notatki');
+  return response.json();
+};
