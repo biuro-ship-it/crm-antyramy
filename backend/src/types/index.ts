@@ -86,3 +86,28 @@ export interface EmailTemplateFormData {
   subject: string;
   body: string;
 }
+export interface SupplierFile {
+  id: string;
+  name: string;
+  url: string;
+  size?: string;
+  uploadedAt: string;
+}
+
+export interface Supplier {
+  id?: string;
+  companyName: string;
+  category: string;
+  email: string;
+  phoneCompany: string;
+  phoneSales: string;
+  phoneOwner: string;
+  whatsapp?: string;
+  messenger?: string;
+  notes: string;
+  relationshipColor: string;
+  files: SupplierFile[];
+  lastContactAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
