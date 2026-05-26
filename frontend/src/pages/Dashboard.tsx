@@ -7,10 +7,12 @@ import ProductsPanel from '../components/ProductsPanel';
 import PromotionsPanel from '../components/PromotionsPanel';
 import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
 import NotesPanel from '../components/NotesPanel';
+import SuppliersPanel from '../components/SuppliersPanel'; // DODANE: Import Panelu Dostawców
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
-type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates' | 'notes';
+// DODANE: 'suppliers' do dostępnych zakładek
+type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers';
 
 interface DashboardProps {
   user: User;
@@ -23,6 +25,7 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'promotions', label: 'Promocje' },
   { id: 'email-templates', label: 'Szablony maili' },
   { id: 'notes', label: 'Notatki' },
+  { id: 'suppliers', label: 'Dostawcy' }, // DODANE: Zakładka w nawigacji
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
@@ -90,6 +93,19 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     if (!dateToUse) return false;
     return Math.floor((new Date().getTime() - new Date(dateToUse).getTime()) / 86400000) <= 30;
   }).length;
+
+  // Przekazujemy funkcję handleDeleteClient do ClientForm
+  const handleDeleteClient = async (id: string) => {
+    try {
+      await removeClient(id);
+      setShowForm(false);
+      setEditClient(null);
+      alert('Klient został pomyślnie usunięty.');
+    } catch (err) {
+      alert('Wystąpił błąd podczas usuwania klienta.');
+      console.error(err);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -206,6 +222,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           <EmailTemplatesPanel />
         ) : activeTab === 'notes' ? (
           <NotesPanel />
+        ) : activeTab === 'suppliers' ? ( // DODANE: Logika ładowania Panelu Dostawców
+          <SuppliersPanel />
         ) : (
           <>
             {error && <div className="alert-error mb-6">⚠️ {error}</div>}
@@ -214,12 +232,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               <p className="text-center text-body font-light py-10">Ładowanie danych z bazy...</p>
             ) : showForm ? (
               <div className="max-w-3xl mx-auto">
-                <ClientForm onSubmit={handleSubmit} onCancel={() => setShowForm(false)} initial={editClient} />
+                {/* Podpięcie funkcji usuwania, o której pisaliśmy wcześniej */}
+                <ClientForm 
+                  onSubmit={handleSubmit} 
+                  onCancel={() => setShowForm(false)} 
+                  initial={editClient} 
+                  onDelete={handleDeleteClient} 
+                />
               </div>
             ) : viewClient ? (
               <ClientCard client={viewClient} onClose={() => { setViewClient(null); loadTasks(); }} />
             ) : (
-              <ClientList clients={clients} onEdit={handleEditClick} onDelete={removeClient} onView={handleViewClick} />
+              <ClientList clients={clients} onEdit={handleEditClick} onDelete={handleDeleteClient} onView={handleViewClick} />
             )}
           </>
         )}

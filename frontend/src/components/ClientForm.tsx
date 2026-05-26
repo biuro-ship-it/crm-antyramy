@@ -5,9 +5,9 @@ interface ClientFormProps {
   initial?: Client | null;
   onSubmit: (data: ClientFormData) => Promise<void> | void;
   onCancel: () => void;
+  onDelete?: (id: string) => Promise<void> | void; // DODANE: obsługa usuwania
 }
 
-// Funkcja pomocnicza do precyzyjnego mapowania dwucyfrowych prefiksów PNA na Województwa
 const getVoivodeshipByZip = (zipCode: string): string => {
   const digits = zipCode.replace(/\D/g, '');
   if (digits.length < 2) return '';
@@ -15,7 +15,6 @@ const getVoivodeshipByZip = (zipCode: string): string => {
   const prefix = parseInt(digits.slice(0, 2), 10);
 
   if (prefix >= 0 && prefix <= 9) {
-    // Okręg 26 to Radom i okolice (woj. mazowieckie)
     if (prefix === 26) return 'Mazowieckie';
     return 'Mazowieckie';
   }
@@ -55,7 +54,7 @@ const emptyForm = (c?: Client | null): ClientFormData => ({
   relationshipColor: c?.relationshipColor || 'default',
 });
 
-const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) => {
+const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, onDelete }) => {
   const [formData, setFormData] = useState<ClientFormData>(emptyForm(initial));
   const [nipLoading, setNipLoading] = useState(false);
   const [nipError, setNipError] = useState('');
@@ -85,7 +84,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
       value = digits.length > 2 ? `${digits.slice(0, 2)}-${digits.slice(2)}` : digits;
     }
 
-    // Wyznaczenie województwa na podstawie pierwszych dwóch cyfr nowego kodu pocztowego
     let province = formData.address.province;
     if (name === 'zipCode') {
       province = getVoivodeshipByZip(value);
@@ -151,7 +149,6 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
           <input type="text" name="companyName" value={formData.companyName} onChange={handleTopChange} className="input-field bg-white" />
         </div>
         
-        {/* WYBÓR KOLORU KARTY */}
         <div className="md:col-span-2">
           <label className={labelClass}>Kolor etykiety na liście</label>
           <div className="flex gap-3 mt-3">
@@ -237,9 +234,26 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel }) 
         </div>
       </div>
 
-      <button type="button" onClick={() => onSubmit(formData)} className="btn-primary w-full">
-        {initial ? 'Zapisz zmiany' : 'Dodaj klienta'}
-      </button>
+      {/* SEKCCJA PRZYCISKÓW AKCJI (ZAKTUALIZOWANA O USUWANIE) */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button type="button" onClick={() => onSubmit(formData)} className="btn-primary flex-1">
+          {initial ? 'Zapisz zmiany' : 'Dodaj klienta'}
+        </button>
+        
+        {initial && onDelete && (
+          <button
+            type="button"
+            onClick={() => {
+              if (window.confirm(`Czy na pewno chcesz BEZPOWROTNIE usunąć firmę "${initial.companyName}" wraz z całą historią kontaktów?`)) {
+                onDelete(initial.id);
+              }
+            }}
+            className="px-5 py-2.5 text-body-sm font-bold text-red-600 bg-white hover:bg-red-50 rounded-xl transition-all border border-red-200 shadow-sm hover:shadow shrink-0"
+          >
+            Usuń klienta
+          </button>
+        )}
+      </div>
     </div>
   );
 };
