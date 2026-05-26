@@ -29,6 +29,21 @@ const SupplierSchema = z.object({
   notes: z.string().default(''),
   relationshipColor: z.string().default('default'),
   files: z.array(FileSchema).default([]),
+  address: z.object({
+    street: z.string().default(''),
+    zipCode: z.string().default(''),
+    city: z.string().default('')
+  }).default({}),
+  contactNames: z.object({
+    company: z.string().default(''),
+    sales: z.string().default(''),
+    owner: z.string().default('')
+  }).default({}),
+  agreements: z.object({
+    discount: z.string().default(''),
+    paymentTerm: z.string().default(''),
+    deliveryFreq: z.string().default('')
+  }).default({})
 });
 
 const InteractionSchema = z.object({

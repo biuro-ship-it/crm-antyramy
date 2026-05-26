@@ -86,12 +86,31 @@ export interface EmailTemplateFormData {
   subject: string;
   body: string;
 }
+
 export interface SupplierFile {
   id: string;
   name: string;
   url: string;
   size?: string;
   uploadedAt: string;
+}
+
+export interface SupplierAddress {
+  street: string;
+  zipCode: string;
+  city: string;
+}
+
+export interface SupplierContactNames {
+  company: string;
+  sales: string;
+  owner: string;
+}
+
+export interface SupplierAgreements {
+  discount: string;
+  paymentTerm: string;
+  deliveryFreq: string;
 }
 
 export interface Supplier {
@@ -110,4 +129,8 @@ export interface Supplier {
   lastContactAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  
+  address?: SupplierAddress;
+  contactNames?: SupplierContactNames;
+  agreements?: SupplierAgreements;
 }

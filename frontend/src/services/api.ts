@@ -22,7 +22,7 @@ export interface Client {
   lastContactAt: string | null;
   createdAt: string;
   updatedAt: string;
-  relationshipColor?: string; // DODANE: Typowanie koloru relacji
+  relationshipColor?: string;
 }
 
 export interface ClientFormData {
@@ -33,7 +33,7 @@ export interface ClientFormData {
   email: string;
   phone: string;
   address: Address;
-  relationshipColor?: string; // DODANE: Typowanie koloru relacji formularza
+  relationshipColor?: string;
 }
 
 export interface NipData {
@@ -168,10 +168,61 @@ export interface NoteFormData {
   attachments: NoteAttachment[];
 }
 
+export interface SupplierAddress {
+  street: string;
+  zipCode: string;
+  city: string;
+}
+
+export interface SupplierContactNames {
+  company: string;
+  sales: string;
+  owner: string;
+}
+
+export interface SupplierAgreements {
+  discount: string;
+  paymentTerm: string;
+  deliveryFreq: string;
+}
+
+export interface SupplierFile {
+  id: string;
+  name: string;
+  url: string;
+  size?: string;
+  uploadedAt: string;
+}
+
+export interface Supplier {
+  id: string;
+  companyName: string;
+  category: string;
+  email: string;
+  phoneCompany: string;
+  phoneSales: string;
+  phoneOwner: string;
+  whatsapp?: string;
+  messenger?: string;
+  notes: string;
+  relationshipColor: string;
+  files: SupplierFile[];
+  lastContactAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  
+  address?: SupplierAddress;
+  contactNames?: SupplierContactNames;
+  agreements?: SupplierAgreements;
+}
+
+export type SupplierFormData = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'lastContactAt'>;
+
 // ─── KONFIGURACJA API ────────────────────────────────────────────────────────
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 const CLIENTS_URL = `${API_URL}/api/clients`;
+const SUPPLIERS_URL = `${API_URL}/api/suppliers`;
 
 const getHeaders = async () => {
   const auth = getAuth();
@@ -211,8 +262,6 @@ export const deleteClient = async (id: string): Promise<void> => {
   if (!response.ok) throw new Error('Nie udało się usunąć klienta');
 };
 
-// ─── NIP (MF Whitelist API — wywołanie z przeglądarki, serwer mydevil blokuje ruch wychodzący) ───
-
 export const getNipData = async (nip: string): Promise<NipData> => {
   const nipClean = nip.replace(/[-\s]/g, '');
   if (!/^\d{10}$/.test(nipClean)) throw new Error('NIP musi mieć 10 cyfr');
@@ -236,8 +285,6 @@ export const getNipData = async (nip: string): Promise<NipData> => {
   };
 };
 
-// ─── INTERAKCJE ───────────────────────────────────────────────────────────────
-
 export const getClientInteractions = async (clientId: string): Promise<Interaction[]> => {
   const headers = await getHeaders();
   const response = await fetch(`${CLIENTS_URL}/${clientId}/interactions`, { headers });
@@ -259,13 +306,11 @@ export const updateClientInteraction = async (clientId: string, interactionId: s
   return response.json();
 };
 
-// ─── UPLOAD PLIKÓW / ZDJĘĆ ───────────────────────────────────────────────────
-
 export const uploadImage = async (file: File): Promise<string> => {
   const auth = getAuth();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
   const formData = new FormData();
-  formData.append('image', file); // backend multer oczekuje pola 'image'
+  formData.append('image', file);
   const response = await fetch(`${API_URL}/api/upload`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
@@ -275,8 +320,6 @@ export const uploadImage = async (file: File): Promise<string> => {
   const data = await response.json() as { imageUrl: string };
   return data.imageUrl;
 };
-
-// ─── PRODUKTY ─────────────────────────────────────────────────────────────────
 
 export const getProductsList = async (): Promise<Product[]> => {
   const headers = await getHeaders();
@@ -305,8 +348,6 @@ export const deleteProduct = async (id: string): Promise<void> => {
   if (!response.ok) throw new Error('Nie udało się usunąć produktu');
 };
 
-// ─── FOLLOW-UPS ───────────────────────────────────────────────────────────────
-
 const FOLLOWUPS_URL = `${API_URL}/api/followups`;
 
 export const getFollowUpSummary = async (): Promise<FollowUp[]> => {
@@ -328,8 +369,6 @@ export const updateFollowUpStatus = async (id: string, status: 'zrealizowane' | 
   const response = await fetch(`${FOLLOWUPS_URL}/${id}/status`, { method: 'PATCH', headers, body: JSON.stringify({ status }) });
   if (!response.ok) throw new Error('Błąd zmiany statusu zadania');
 };
-
-// ─── PROMOCJE ─────────────────────────────────────────────────────────────────
 
 export const sendPromotion = async (data: PromotionSendData): Promise<PromotionSendResult> => {
   const headers = await getHeaders();
@@ -363,8 +402,6 @@ export const previewPromotionPdf = async (
   window.open(url, '_blank');
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
-
-// ─── SZABLONY MAILI ───────────────────────────────────────────────────────────
 
 const TEMPLATES_URL = `${API_URL}/api/email-templates`;
 
@@ -407,8 +444,6 @@ export const sendEmailFromTemplate = async (
   }
 };
 
-// ─── NOTATKI ─────────────────────────────────────────────────────────────────
-
 const NOTES_URL = `${API_URL}/api/notes`;
 
 export const getNotes = async (): Promise<Note[]> => {
@@ -437,37 +472,8 @@ export const deleteNote = async (id: string): Promise<void> => {
   const response = await fetch(`${NOTES_URL}/${id}`, { method: 'DELETE', headers });
   if (!response.ok) throw new Error('Nie udało się usunąć notatki');
 };
-// ─── DOSTAWCY ─────────────────────────────────────────────────────────────────
 
-export interface SupplierFile {
-  id: string;
-  name: string;
-  url: string;
-  size?: string;
-  uploadedAt: string;
-}
-
-export interface Supplier {
-  id: string;
-  companyName: string;
-  category: string;
-  email: string;
-  phoneCompany: string;
-  phoneSales: string;
-  phoneOwner: string;
-  whatsapp?: string;
-  messenger?: string;
-  notes: string;
-  relationshipColor: string;
-  files: SupplierFile[];
-  lastContactAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type SupplierFormData = Omit<Supplier, 'id' | 'createdAt' | 'updatedAt' | 'lastContactAt'>;
-
-const SUPPLIERS_URL = `${API_URL}/api/suppliers`;
+// ─── DOSTAWCY (API) ─────────────────────────────────────────────────────────────────
 
 export const getSuppliers = async (): Promise<Supplier[]> => {
   const headers = await getHeaders();
