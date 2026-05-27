@@ -1,7 +1,10 @@
-import { PDFDocument, rgb, StandardFonts, PDFFont, PDFPage, PDFImage } from 'pdf-lib';
+import { PDFDocument, rgb, PDFFont, PDFPage } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+
+const FONTS_DIR = path.join(__dirname, '..', 'fonts');
 
 export interface ProductForPdf {
   name: string;
@@ -90,9 +93,12 @@ export const generatePromotionPdf = async (
   products: ProductForPdf[]
 ): Promise<Buffer> => {
   const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
 
-  const regularFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regularFontBytes = fs.readFileSync(path.join(FONTS_DIR, 'LiberationSans-Regular.ttf'));
+  const boldFontBytes = fs.readFileSync(path.join(FONTS_DIR, 'LiberationSans-Bold.ttf'));
+  const regularFont = await pdfDoc.embedFont(regularFontBytes);
+  const boldFont = await pdfDoc.embedFont(boldFontBytes);
 
   const PAGE_W = 595;
   const PAGE_H = 842;

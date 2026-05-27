@@ -4,7 +4,7 @@
   "description": "Backend CRM Antyramy — Express + Firebase Admin",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/copy-fonts.js",
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn src/index.ts",
     "test": "node --require ts-node/register --test src/services/gmail.test.ts"
