@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Client } from '../services/api';
 
 interface ClientListProps {
@@ -24,7 +24,6 @@ const typeBadge: Record<string, string> = {
   sklep: 'badge-lime',
 };
 
-// DODANE: Odwzorowanie kolorów na głównej liście
 const colorClasses: Record<string, string> = {
   default: 'bg-canvas',
   lilac: 'bg-block-lilac',
@@ -36,12 +35,21 @@ const colorClasses: Record<string, string> = {
 const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
   const [search, setSearch] = useState('');
   const [provinceFilter, setProvinceFilter] = useState('');
+  const [routeFilter, setRouteFilter] = useState('');
   const [sortBy, setSortBy] = useState('alpha');
   const [currentPage, setCurrentPage] = useState(1);
 
+  // Unikalne trasy z listy klientów (tylko niepuste)
+  const availableRoutes = useMemo(() => {
+    const routes = clients
+      .map(c => c.route?.trim())
+      .filter((r): r is string => !!r);
+    return Array.from(new Set(routes)).sort((a, b) => a.localeCompare(b, 'pl'));
+  }, [clients]);
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, provinceFilter, sortBy]);
+  }, [search, provinceFilter, routeFilter, sortBy]);
 
   let processed = clients.filter((c) => {
     const q = search.toLowerCase();
@@ -51,12 +59,21 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
       (c.email ?? '').toLowerCase().includes(q) ||
       (c.phone ?? '').toLowerCase().includes(q);
     const matchProvince = provinceFilter === '' ? true : c.address?.province === provinceFilter;
-    return matchSearch && matchProvince;
+    const matchRoute = routeFilter === '' ? true : (c.route?.trim() || '') === routeFilter;
+    return matchSearch && matchProvince && matchRoute;
   });
 
   processed.sort((a, b) => {
-    if (sortBy === 'alpha') return (a.companyName || '').localeCompare(b.companyName || '');
-    if (sortBy === 'type') return (a.type || '').localeCompare(b.type || '');
+    if (sortBy === 'alpha') return (a.companyName || '').localeCompare(b.companyName || '', 'pl');
+    if (sortBy === 'type') return (a.type || '').localeCompare(b.type || '', 'pl');
+    if (sortBy === 'route') {
+      const ra = a.route || '';
+      const rb = b.route || '';
+      if (ra === rb) return (a.companyName || '').localeCompare(b.companyName || '', 'pl');
+      if (!ra) return 1;
+      if (!rb) return -1;
+      return ra.localeCompare(rb, 'pl');
+    }
     if (sortBy === 'oldest') {
       const dateA = new Date(a.lastContactAt || a.createdAt).getTime();
       const dateB = new Date(b.lastContactAt || b.createdAt).getTime();
@@ -86,36 +103,117 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
 
   return (
     <div>
-      <div className="card-padded mb-6 flex flex-col md:flex-row gap-4">
-        <input
-          type="text"
-          placeholder="Szukaj (nazwa, osoba, e-mail, telefon)..."
-          className="input-field flex-1"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select className="select-field md:w-56" value={provinceFilter} onChange={(e) => setProvinceFilter(e.target.value)}>
-          <option value="">Wszystkie województwa</option>
-          {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
-        </select>
-        <select className="select-field md:w-56" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-          <option value="alpha">Alfabetycznie (A–Z)</option>
-          <option value="oldest">Od najstarszego kontaktu</option>
-          <option value="type">Według kategorii</option>
-        </select>
+      {/* FILTRY */}
+      <div className="card-padded mb-6 flex flex-col gap-3">
+        <div className="flex flex-col md:flex-row gap-3">
+          <input
+            type="text"
+            placeholder="Szukaj (nazwa, osoba, e-mail, telefon)..."
+            className="input-field flex-1"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <select className="select-field md:w-56" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <option value="alpha">Alfabetycznie (A–Z)</option>
+            <option value="route">Według trasy</option>
+            <option value="oldest">Od najstarszego kontaktu</option>
+            <option value="type">Według kategorii</option>
+          </select>
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-3 items-start md:items-center">
+          {/* FILTR TRAS — główny */}
+          <div className="flex-1">
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="eyebrow text-ink/50 shrink-0">Trasa:</span>
+              <button
+                type="button"
+                onClick={() => setRouteFilter('')}
+                className={`px-3 py-1.5 rounded-pill text-body-sm font-medium transition-colors border ${
+                  routeFilter === ''
+                    ? 'bg-primary text-on-primary border-primary'
+                    : 'bg-canvas text-ink border-hairline hover:bg-surface-soft'
+                }`}
+              >
+                Wszystkie
+                <span className="ml-1.5 text-caption font-mono opacity-60">({clients.length})</span>
+              </button>
+              {availableRoutes.map(route => {
+                const count = clients.filter(c => c.route?.trim() === route).length;
+                return (
+                  <button
+                    key={route}
+                    type="button"
+                    onClick={() => setRouteFilter(route === routeFilter ? '' : route)}
+                    className={`px-3 py-1.5 rounded-pill text-body-sm font-medium transition-colors border ${
+                      routeFilter === route
+                        ? 'bg-primary text-on-primary border-primary'
+                        : 'bg-canvas text-ink border-hairline hover:bg-surface-soft'
+                    }`}
+                  >
+                    {route}
+                    <span className="ml-1.5 text-caption font-mono opacity-60">({count})</span>
+                  </button>
+                );
+              })}
+              {availableRoutes.length === 0 && (
+                <span className="text-body-sm text-ink/40 font-light italic">
+                  Brak zdefiniowanych tras — przypisz trasę w edycji klienta
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* FILTR WOJEWÓDZTWA */}
+          <select
+            className="select-field md:w-56 shrink-0"
+            value={provinceFilter}
+            onChange={(e) => setProvinceFilter(e.target.value)}
+          >
+            <option value="">Wszystkie województwa</option>
+            {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+        </div>
+
+        {/* INFO O AKTYWNYCH FILTRACH */}
+        {(routeFilter || provinceFilter || search) && (
+          <div className="flex items-center gap-3 pt-1 border-t border-hairline-soft">
+            <span className="text-body-sm text-ink/50 font-light">
+              Wyniki: <strong className="text-ink">{processed.length}</strong> z {clients.length} klientów
+            </span>
+            <button
+              type="button"
+              onClick={() => { setSearch(''); setProvinceFilter(''); setRouteFilter(''); }}
+              className="text-body-sm text-ink/50 hover:text-ink underline"
+            >
+              Wyczyść filtry
+            </button>
+          </div>
+        )}
       </div>
 
+      {/* LISTA KLIENTÓW */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {paginated.map((client) => {
-          // Pobierz przypisany kolor
           const bgClass = colorClasses[client.relationshipColor || 'default'] || colorClasses.default;
-          
+
           return (
             <div key={client.id} className={`card-padded flex flex-col h-full group transition-colors shadow-sm hover:shadow-md ${bgClass}`}>
-              <div className="flex justify-between items-start mb-4">
-                <span className={`${typeBadge[client.type] || 'badge-mint'} ${client.relationshipColor !== 'default' ? 'shadow-sm' : ''}`}>
-                  {client.type}
-                </span>
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex flex-wrap gap-1.5 items-center">
+                  <span className={`${typeBadge[client.type] || 'badge-mint'} ${client.relationshipColor !== 'default' ? 'shadow-sm' : ''}`}>
+                    {client.type}
+                  </span>
+                  {client.route && (
+                    <span
+                      className="badge bg-block-navy text-inverse-ink cursor-pointer hover:opacity-80 transition-opacity"
+                      title={`Trasa: ${client.route}`}
+                      onClick={() => setRouteFilter(client.route === routeFilter ? '' : (client.route || ''))}
+                    >
+                      🚚 {client.route}
+                    </span>
+                  )}
+                </div>
                 <button type="button" onClick={() => onEdit(client)} className="btn-tertiary text-body-sm py-1 bg-white/40 hover:bg-white/80">
                   Edytuj
                 </button>

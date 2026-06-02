@@ -23,6 +23,7 @@ export interface Client {
   createdAt: string;
   updatedAt: string;
   relationshipColor?: string;
+  route?: string;
 }
 
 export interface ClientFormData {
@@ -34,6 +35,7 @@ export interface ClientFormData {
   phone: string;
   address: Address;
   relationshipColor?: string;
+  route?: string;
 }
 
 export interface NipData {

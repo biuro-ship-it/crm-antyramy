@@ -25,7 +25,8 @@ const ClientSchema = z.object({
   email: z.string().optional().default(''),
   phone: z.string().default(''),
   address: AddressSchema,
-  relationshipColor: z.string().optional().default('default'), // DODANE: Walidacja koloru
+  relationshipColor: z.string().optional().default('default'),
+  route: z.string().optional().default(''),
 });
 
 const InteractionSchema = z.object({
@@ -89,6 +90,16 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params;
   try {
+    // Firestore nie usuwa subkolekcji automatycznie — batch delete interakcji
+    const interactionsSnap = await db
+      .collection(COLLECTION).doc(id).collection('interactions').get();
+
+    if (!interactionsSnap.empty) {
+      const batch = db.batch();
+      interactionsSnap.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
     await db.collection(COLLECTION).doc(id).delete();
     res.status(204).send();
   } catch (err) {

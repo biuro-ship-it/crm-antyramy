@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useClients } from '../hooks/useClients';
 import ClientForm from '../components/ClientForm';
 import ClientList from '../components/ClientList';
@@ -94,7 +94,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     return Math.floor((new Date().getTime() - new Date(dateToUse).getTime()) / 86400000) <= 30;
   }).length;
 
-  // Przekazujemy funkcję handleDeleteClient do ClientForm
+  // Unikalne trasy dla autocomplete w formularzu
+  const existingRoutes = useMemo(() =>
+    Array.from(new Set(clients.map(c => c.route?.trim()).filter((r): r is string => !!r))).sort((a, b) => a.localeCompare(b, 'pl')),
+    [clients]
+  );
+
   const handleDeleteClient = async (id: string) => {
     try {
       await removeClient(id);
@@ -233,11 +238,12 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             ) : showForm ? (
               <div className="max-w-3xl mx-auto">
                 {/* Podpięcie funkcji usuwania, o której pisaliśmy wcześniej */}
-                <ClientForm 
-                  onSubmit={handleSubmit} 
-                  onCancel={() => setShowForm(false)} 
-                  initial={editClient} 
-                  onDelete={handleDeleteClient} 
+                <ClientForm
+                  onSubmit={handleSubmit}
+                  onCancel={() => setShowForm(false)}
+                  initial={editClient}
+                  onDelete={handleDeleteClient}
+                  existingRoutes={existingRoutes}
                 />
               </div>
             ) : viewClient ? (

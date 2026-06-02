@@ -5,7 +5,8 @@ interface ClientFormProps {
   initial?: Client | null;
   onSubmit: (data: ClientFormData) => Promise<void> | void;
   onCancel: () => void;
-  onDelete?: (id: string) => Promise<void> | void; // DODANE: obsługa usuwania
+  onDelete?: (id: string) => Promise<void> | void;
+  existingRoutes?: string[];
 }
 
 const getVoivodeshipByZip = (zipCode: string): string => {
@@ -52,9 +53,10 @@ const emptyForm = (c?: Client | null): ClientFormData => ({
     province: c?.address?.province || '',
   },
   relationshipColor: c?.relationshipColor || 'default',
+  route: c?.route || '',
 });
 
-const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, onDelete }) => {
+const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, onDelete, existingRoutes }) => {
   const [formData, setFormData] = useState<ClientFormData>(emptyForm(initial));
   const [nipLoading, setNipLoading] = useState(false);
   const [nipError, setNipError] = useState('');
@@ -205,6 +207,26 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
       <div className="mb-4">
         <label className={labelClass}>Telefon</label>
         <input type="tel" name="phone" value={formData.phone} onChange={handleTopChange} className="input-field bg-white" />
+      </div>
+
+      <div className="mb-4">
+        <label className={labelClass}>Trasa</label>
+        <input
+          type="text"
+          name="route"
+          value={formData.route || ''}
+          onChange={handleTopChange}
+          className="input-field bg-white"
+          placeholder="np. Rzeszów, Kraków, Tarnów–Nowy Sącz"
+          list="routes-datalist"
+          autoComplete="off"
+        />
+        {existingRoutes && existingRoutes.length > 0 && (
+          <datalist id="routes-datalist">
+            {existingRoutes.map(r => <option key={r} value={r} />)}
+          </datalist>
+        )}
+        <p className="text-caption text-ink/50 mt-1">Nazwa trasy handlowej — umożliwia filtrowanie klientów przed wyjazdem</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
