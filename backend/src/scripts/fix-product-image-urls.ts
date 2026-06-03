@@ -25,8 +25,14 @@ async function fixImageUrls() {
     return url.startsWith(OLD_BASE);
   });
 
+  console.log(`\nAktualne imageUrl w Firestore (${snapshot.size} produktów):`);
+  for (const doc of snapshot.docs) {
+    const { name, imageUrl } = doc.data();
+    console.log(`  [${doc.id}] "${name}" → imageUrl: ${JSON.stringify(imageUrl ?? null)}`);
+  }
+
   if (toFix.length === 0) {
-    console.log(`Sprawdzono ${snapshot.size} produktów — brak błędnych URL-i. Nic do poprawienia.`);
+    console.log('\nBrak błędnych URL-i (https://api.crm.antyramy.eu). Nic do poprawienia.');
     return;
   }
 

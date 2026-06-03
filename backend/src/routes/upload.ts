@@ -8,14 +8,10 @@ import { AuthenticatedRequest } from '../types';
 const router = Router();
 router.use(authenticate);
 
-// Na serwerze: public_nodejs/public/uploads/ (serwowane statycznie przez Passenger)
-// __dirname w produkcji = public_nodejs/dist/routes/
-// ../../public/uploads = public_nodejs/public/uploads ✓
-// Lokalnie (dev): backend/uploads/
-const isProduction = process.env.NODE_ENV === 'production';
-const UPLOAD_DIR = isProduction
-  ? path.join(__dirname, '../../public/uploads')
-  : path.join(__dirname, '../../uploads');
+// Zawsze public/uploads/ — zarówno lokalnie jak i na serwerze
+// __dirname w dev (ts-node): backend/src/routes/ → ../../public/uploads = backend/public/uploads/
+// __dirname na serwerze (compiled): public_nodejs/dist/routes/ → ../../public/uploads = public_nodejs/public/uploads/ ✓
+const UPLOAD_DIR = path.join(__dirname, '../../public/uploads');
 
 // Utwórz katalog jeśli nie istnieje
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -74,8 +70,8 @@ router.post('/', (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Zdjęcia serwowane przez Passenger z public_nodejs/public/uploads/
-    // URL: https://crm.antyramy.eu/uploads/nazwa.jpg
-    const baseUrl = process.env.API_URL || 'https://crm.antyramy.eu';
+    // URL wyprowadzony z request (działa zarówno lokalnie jak i na produkcji)
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
     const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
     res.json({ imageUrl });
