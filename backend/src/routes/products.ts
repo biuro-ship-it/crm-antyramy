@@ -9,9 +9,9 @@ router.use(authenticate);
 
 const ProductSchema = z.object({
   name: z.string().min(1, 'Nazwa produktu jest wymagana'),
-  code: z.string().min(1, 'Kod produktu jest wymagany'),
+  code: z.string().optional().default(''),
   priceNetto: z.number().min(0, 'Cena nie może być ujemna'),
-  imageUrl: z.string().url('Nieprawidłowy URL zdjęcia'),
+  imageUrl: z.string().optional().default(''),
 });
 
 router.get('/', async (_req: AuthenticatedRequest, res: Response) => {

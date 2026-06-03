@@ -74,8 +74,8 @@ router.post('/', (req: AuthenticatedRequest, res: Response) => {
     }
 
     // Zdjęcia serwowane przez Passenger z public_nodejs/public/uploads/
-    // URL: https://api.crm.antyramy.eu/uploads/nazwa.jpg
-    const baseUrl = process.env.API_URL || 'https://api.crm.antyramy.eu';
+    // URL: https://crm.antyramy.eu/uploads/nazwa.jpg
+    const baseUrl = process.env.API_URL || 'https://crm.antyramy.eu';
     const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
 
     res.json({ imageUrl });
