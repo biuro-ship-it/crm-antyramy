@@ -39,19 +39,19 @@ echo.
 
 echo [3/5] Upload backendu na serwer...
 ssh -i "%SSH_KEY%" %SSH_USER%@%SSH_HOST% "chmod -R u+w %REMOTE_ROOT%/dist_new 2>/dev/null; rm -rf %REMOTE_ROOT%/dist_new; mkdir -p %REMOTE_ROOT%/dist_new"
-scp -r -i "%SSH_KEY%" "%LOCAL_ROOT%\backend\dist\." %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/dist_new
+scp -q -r -i "%SSH_KEY%" "%LOCAL_ROOT%\backend\dist\." %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/dist_new
 if errorlevel 1 ( echo BLAD: SCP dist! & pause & exit /b 1 )
-scp -i "%SSH_KEY%" "%LOCAL_ROOT%\backend\package.json" %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/package.json
+scp -q -i "%SSH_KEY%" "%LOCAL_ROOT%\backend\package.json" %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/package.json
 if errorlevel 1 ( echo BLAD: SCP package.json! & pause & exit /b 1 )
 if exist "%LOCAL_ROOT%\backend\logo.png" (
-    scp -i "%SSH_KEY%" "%LOCAL_ROOT%\backend\logo.png" %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/logo.png
+    scp -q -i "%SSH_KEY%" "%LOCAL_ROOT%\backend\logo.png" %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/logo.png
 )
 echo  OK
 echo.
 
 echo [4/5] Upload frontendu na serwer...
 ssh -i "%SSH_KEY%" %SSH_USER%@%SSH_HOST% "chmod -R u+w %REMOTE_ROOT%/public_new 2>/dev/null; rm -rf %REMOTE_ROOT%/public_new; mkdir -p %REMOTE_ROOT%/public_new"
-scp -r -i "%SSH_KEY%" "%LOCAL_ROOT%\frontend\dist\." %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/public_new
+scp -q -r -i "%SSH_KEY%" "%LOCAL_ROOT%\frontend\dist\." %SSH_USER%@%SSH_HOST%:%REMOTE_ROOT%/public_new
 if errorlevel 1 (
     echo BLAD: SCP frontend dist! & pause & exit /b 1
 )
