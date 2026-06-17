@@ -54,7 +54,7 @@ jobs:
       # ── DEPLOY: frontend → public_nodejs/public ────────────────────────────────
       - name: Wgraj frontend (React build) na serwer
         run: |
-          rsync -avz --delete \
+          rsync -avz --delete --exclude='uploads/' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             frontend/dist/ \
             Pluszek@s61.mydevil.net:/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs/public/

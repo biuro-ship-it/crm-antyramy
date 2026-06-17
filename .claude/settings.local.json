@@ -18,7 +18,15 @@
       "Bash(node -e \"console.log\\(require\\('./node_modules/node-fetch/package.json'\\).version\\)\")",
       "Bash(node_modules/.bin/tsc)",
       "Bash(echo \"BUILD:$?\")",
-      "Bash(node -e \"console.log\\(typeof require\\('stream/web'\\).ReadableStream\\)\")"
+      "Bash(node -e \"console.log\\(typeof require\\('stream/web'\\).ReadableStream\\)\")",
+      "Bash(git config *)",
+      "Read(//c/Claude/APP//**)",
+      "Read(//c/Claude//**)",
+      "Bash(du -sh frontend/node_modules backend/node_modules)",
+      "Bash(du -sh frontend/dist backend/dist)",
+      "Bash(du -sh --exclude=node_modules --exclude=.git .)",
+      "Bash(du -sh .git)",
+      "PowerShell(robocopy \"D:\\\\claude\\\\apps\\\\app-crm-antyramy\" \"C:\\\\Claude\\\\APP\\\\CRM_ANTYRAMY\" /E /NFL /NDL /NJH /NP; if \\($LASTEXITCODE -lt 8\\) { Write-Host \"ROBOCOPY OK \\(exit $LASTEXITCODE\\)\" } else { Write-Host \"ROBOCOPY BLAD \\(exit $LASTEXITCODE\\)\" })"
     ]
   }
 }

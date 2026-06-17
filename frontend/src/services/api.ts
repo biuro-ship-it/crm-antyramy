@@ -517,3 +517,10 @@ export const createSupplierInteraction = async (supplierId: string, data: Intera
   if (!response.ok) throw new Error('Nie udało się dodać notatki');
   return response.json();
 };
+
+export const updateSupplierInteraction = async (supplierId: string, interactionId: string, data: InteractionFormData): Promise<Interaction> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/interactions/${interactionId}`, { method: 'PUT', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zaktualizować notatki');
+  return response.json();
+};

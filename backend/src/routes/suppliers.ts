@@ -129,4 +129,24 @@ router.post('/:id/interactions', async (req: AuthenticatedRequest, res: Response
   }
 });
 
+router.put('/:id/interactions/:interactionId', async (req: AuthenticatedRequest, res: Response) => {
+  const { id, interactionId } = req.params;
+  const parsed = InteractionSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+
+  try {
+    const updateData = {
+      ...parsed.data,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.user?.email || 'Nieznany',
+    };
+    const ref = db.collection(COLLECTION).doc(id).collection('interactions').doc(interactionId);
+    await ref.update(updateData);
+    const updated = await ref.get();
+    res.json({ id: interactionId, ...updated.data() });
+  } catch (err) {
+    res.status(500).json({ error: 'Błąd aktualizacji notatki' });
+  }
+});
+
 export default router;

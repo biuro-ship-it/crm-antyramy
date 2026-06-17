@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierInteractions, createSupplierInteraction, updateSupplier, uploadImage } from '../services/api';
+import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierInteractions, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage } from '../services/api';
 
 const colorClasses: Record<string, string> = {
   default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-pink', mint: 'bg-block-mint',
@@ -18,6 +18,9 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
   const [loading, setLoading] = useState(true);
   const [showAddNote, setShowAddNote] = useState(false);
   const [noteText, setNoteText] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -42,6 +45,35 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
     setInteractions([newInteraction, ...interactions]);
     setNoteText('');
     setShowAddNote(false);
+  };
+
+  const startEdit = (interaction: Interaction) => {
+    setEditingId(interaction.id);
+    setEditText(interaction.notes);
+    setShowAddNote(false);
+  };
+
+  const handleEditSave = async (e: React.FormEvent, interaction: Interaction) => {
+    e.preventDefault();
+    if (!editText.trim()) return;
+    setSavingEdit(true);
+    try {
+      const data: InteractionFormData = {
+        contactDate: interaction.contactDate,
+        channel: interaction.channel,
+        notes: editText,
+        tradeNotes: interaction.tradeNotes ?? '',
+        products: interaction.products ?? [],
+      };
+      const updated = await updateSupplierInteraction(supplier.id, interaction.id, data);
+      setInteractions(prev => prev.map(i => i.id === interaction.id ? updated : i));
+      setEditingId(null);
+      setEditText('');
+    } catch (err) {
+      alert('Nie udało się zapisać zmian w notatce.');
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -245,9 +277,40 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
                   <div className="bg-canvas p-5 rounded-lg border border-hairline shadow-sm hover:shadow transition-shadow">
                     <div className="flex justify-between items-center mb-2">
                       <span className="font-black text-body-sm text-ink">{interaction.contactDate}</span>
-                      <span className="text-xs text-ink/40">Zapis: {interaction.createdBy.split('@')[0]}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-ink/40">Zapis: {interaction.createdBy.split('@')[0]}</span>
+                        {editingId !== interaction.id && (
+                          <button
+                            type="button"
+                            onClick={() => startEdit(interaction)}
+                            className="text-xs font-bold text-ink hover:underline transition-colors flex items-center gap-1"
+                          >
+                            ✎ Edytuj
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-ink text-body-sm font-light leading-relaxed">{interaction.notes}</p>
+                    {editingId === interaction.id ? (
+                      <form onSubmit={e => handleEditSave(e, interaction)} className="animate-in fade-in duration-200">
+                        <textarea
+                          required
+                          rows={3}
+                          value={editText}
+                          onChange={e => setEditText(e.target.value)}
+                          className="w-full bg-canvas border border-hairline rounded-lg p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm font-light mb-3 resize-none"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button type="button" onClick={() => { setEditingId(null); setEditText(''); }} className="btn-secondary px-4 py-1.5 text-xs">
+                            Anuluj
+                          </button>
+                          <button type="submit" disabled={savingEdit} className="btn-primary px-4 py-1.5 text-xs disabled:opacity-60">
+                            {savingEdit ? 'Zapisuję...' : 'Zapisz zmiany'}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <p className="text-ink text-body-sm font-light leading-relaxed whitespace-pre-line">{interaction.notes}</p>
+                    )}
                   </div>
                 </div>
               </div>
