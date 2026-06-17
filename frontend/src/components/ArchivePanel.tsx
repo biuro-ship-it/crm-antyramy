@@ -14,10 +14,9 @@ const triggerDownload = (blob: Blob, filename: string) => {
 };
 
 const ITEMS = [
-  { icon: '🏢', label: 'Klienci + historia kontaktów' },
+  { icon: '🏢', label: 'Klienci + historia kontaktów (w tym wysłane promocje)' },
   { icon: '🚚', label: 'Dostawcy + historia kontaktów' },
   { icon: '📦', label: 'Produkty' },
-  { icon: '📢', label: 'Promocje' },
   { icon: '✉️', label: 'Szablony maili' },
   { icon: '📝', label: 'Notatki' },
   { icon: '⏰', label: 'Przypomnienia (follow-upy)' },

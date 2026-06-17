@@ -71,7 +71,9 @@ router.get('/zip', async (_req: AuthenticatedRequest, res: Response) => {
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="crm-antyramy-backup-${date}.zip"`);
 
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    // Niski poziom kompresji: zdjęcia (JPEG/PNG) są już skompresowane, więc level 9
+    // to zmarnowany CPU pod Passengerem. JSON i tak pakuje się dobrze na level 1.
+    const archive = archiver('zip', { zlib: { level: 1 } });
     archive.on('error', (err) => {
       console.error('[archive] błąd pakowania ZIP:', err);
       // Jeśli nagłówki już poszły, nie da się wysłać statusu — zrywamy połączenie.
