@@ -30,7 +30,11 @@
       "Bash(git check-ignore *)",
       "Bash(git rm *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Read(//c/Users/Krzysiek/.claude/skills/mydevil-errors/**)",
+      "Bash(ssh *)",
+      "Bash(node -e 'console.log\\('\\\\''archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/archiver/package.json'\\\\''\\).version\\); console.log\\('\\\\''@types/archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/@types/archiver/package.json'\\\\''\\).version\\)')"
     ]
   }
 }
