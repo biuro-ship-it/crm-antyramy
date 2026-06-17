@@ -26,7 +26,9 @@
       "Bash(du -sh frontend/dist backend/dist)",
       "Bash(du -sh --exclude=node_modules --exclude=.git .)",
       "Bash(du -sh .git)",
-      "PowerShell(robocopy \"D:\\\\claude\\\\apps\\\\app-crm-antyramy\" \"C:\\\\Claude\\\\APP\\\\CRM_ANTYRAMY\" /E /NFL /NDL /NJH /NP; if \\($LASTEXITCODE -lt 8\\) { Write-Host \"ROBOCOPY OK \\(exit $LASTEXITCODE\\)\" } else { Write-Host \"ROBOCOPY BLAD \\(exit $LASTEXITCODE\\)\" })"
+      "PowerShell(robocopy \"D:\\\\claude\\\\apps\\\\app-crm-antyramy\" \"C:\\\\Claude\\\\APP\\\\CRM_ANTYRAMY\" /E /NFL /NDL /NJH /NP; if \\($LASTEXITCODE -lt 8\\) { Write-Host \"ROBOCOPY OK \\(exit $LASTEXITCODE\\)\" } else { Write-Host \"ROBOCOPY BLAD \\(exit $LASTEXITCODE\\)\" })",
+      "Bash(git check-ignore *)",
+      "Bash(git rm *)"
     ]
   }
 }
