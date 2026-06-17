@@ -8,11 +8,12 @@ import PromotionsPanel from '../components/PromotionsPanel';
 import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
 import NotesPanel from '../components/NotesPanel';
 import SuppliersPanel from '../components/SuppliersPanel'; // DODANE: Import Panelu Dostawców
+import ArchivePanel from '../components/ArchivePanel';
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
 // DODANE: 'suppliers' do dostępnych zakładek
-type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers';
+type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers' | 'archive';
 
 interface DashboardProps {
   user: User;
@@ -26,6 +27,7 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'email-templates', label: 'Szablony maili' },
   { id: 'notes', label: 'Notatki' },
   { id: 'suppliers', label: 'Dostawcy' }, // DODANE: Zakładka w nawigacji
+  { id: 'archive', label: 'Archiwum' },
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
@@ -229,6 +231,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           <NotesPanel />
         ) : activeTab === 'suppliers' ? ( // DODANE: Logika ładowania Panelu Dostawców
           <SuppliersPanel />
+        ) : activeTab === 'archive' ? (
+          <ArchivePanel />
         ) : (
           <>
             {error && <div className="alert-error mb-6">⚠️ {error}</div>}

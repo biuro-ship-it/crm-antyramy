@@ -524,3 +524,14 @@ export const updateSupplierInteraction = async (supplierId: string, interactionI
   if (!response.ok) throw new Error('Nie udało się zaktualizować notatki');
   return response.json();
 };
+
+// ─── ARCHIWUM ────────────────────────────────────────────────────────────────
+
+// Pełna kopia: ZIP z dane.json (odtwarzalny zrzut Firestore) + folder zdjecia/.
+// Pobranie przez fetch + token (endpoint jest pod auth) → blob.
+export const downloadArchiveZip = async (): Promise<Blob> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/archive/zip`, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać archiwum z serwera');
+  return response.blob();
+};
