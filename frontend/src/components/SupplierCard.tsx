@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierInteractions, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage } from '../services/api';
+import SupplierMaterials from './SupplierMaterials';
 
 const colorClasses: Record<string, string> = {
   default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-pink', mint: 'bg-block-mint',
@@ -245,6 +246,9 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
           </div>
         </div>
       </div>
+
+      {/* 3.5 SUROWCE I ZAMÓWIENIA */}
+      <SupplierMaterials supplier={supplier} onSupplierUpdated={onSupplierUpdated} />
 
       {/* 4. OŚ CZASU (ROZMOWY I USTALENIA) */}
       <div className="mt-8">

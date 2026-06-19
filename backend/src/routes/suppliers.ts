@@ -17,6 +17,13 @@ const FileSchema = z.object({
   uploadedAt: z.string(),
 });
 
+const MaterialSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  unit: z.enum(['szt', 'm²', 'ark.', 'kpl']).default('szt'),
+  price: z.number().nonnegative().default(0),
+});
+
 const SupplierSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
   category: z.string().default('Inne'),
@@ -29,6 +36,7 @@ const SupplierSchema = z.object({
   notes: z.string().default(''),
   relationshipColor: z.string().default('default'),
   files: z.array(FileSchema).default([]),
+  materials: z.array(MaterialSchema).default([]),
   address: z.object({
     street: z.string().default(''),
     zipCode: z.string().default(''),

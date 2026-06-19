@@ -41,7 +41,8 @@
       "Bash(cmd //c deploy.bat)",
       "Bash(cmd *)",
       "Bash(curl -sk \"https://crm.antyramy.eu/?cb=$\\(date +%s\\)\")",
-      "Bash(curl -sk \"https://crm.antyramy.eu/health\")"
+      "Bash(curl -sk \"https://crm.antyramy.eu/health\")",
+      "Read(//c/Users/Krzysiek/.claude/skills/**)"
     ]
   }
 }

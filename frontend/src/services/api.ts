@@ -196,6 +196,13 @@ export interface SupplierFile {
   uploadedAt: string;
 }
 
+export interface SupplierMaterial {
+  id: string;
+  name: string;
+  unit: 'szt' | 'm²' | 'ark.' | 'kpl';
+  price: number; // cena netto za jednostkę
+}
+
 export interface Supplier {
   id: string;
   companyName: string;
@@ -209,10 +216,11 @@ export interface Supplier {
   notes: string;
   relationshipColor: string;
   files: SupplierFile[];
+  materials?: SupplierMaterial[];
   lastContactAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  
+
   address?: SupplierAddress;
   contactNames?: SupplierContactNames;
   agreements?: SupplierAgreements;
