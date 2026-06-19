@@ -119,12 +119,17 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
     }
     const lines = selected.map(m => `- ${m.name}: ${quantities[m.id]} ${m.unit}`);
     const notesPart = orderNotes.trim() ? `\n\nUwagi: ${orderNotes.trim()}` : '';
+    const signature =
+      `Pozdrawiam\n\n` +
+      `Krzysztof Godek\n` +
+      `Pluszek sp. z o.o. ul.Monopolowa 11 , 33-100 Tarnów\n` +
+      `NIP 993-068-10-97   tel. 500 601 601`;
     const body =
       `Dzień dobry,\n\n` +
       `proszę o realizację poniższego zamówienia:\n\n` +
       `${lines.join('\n')}` +
       `${notesPart}\n\n` +
-      `Pozdrawiam`;
+      signature;
     const subject = `Zamówienie — Antyramy (${todayPl()})`;
     window.location.href =
       `mailto:${supplier.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
