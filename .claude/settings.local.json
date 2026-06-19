@@ -37,7 +37,11 @@
       "Bash(node -e 'console.log\\('\\\\''archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/archiver/package.json'\\\\''\\).version\\); console.log\\('\\\\''@types/archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/@types/archiver/package.json'\\\\''\\).version\\)')",
       "Bash(xargs wc -l)",
       "Bash(find . -path ./node_modules -prune -o -iname '*archive*' -print)",
-      "Bash(find . -path ./node_modules -prune -o -iname '*backup*' -print)"
+      "Bash(find . -path ./node_modules -prune -o -iname '*backup*' -print)",
+      "Bash(cmd //c deploy.bat)",
+      "Bash(cmd *)",
+      "Bash(curl -sk \"https://crm.antyramy.eu/?cb=$\\(date +%s\\)\")",
+      "Bash(curl -sk \"https://crm.antyramy.eu/health\")"
     ]
   }
 }
