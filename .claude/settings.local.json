@@ -34,7 +34,10 @@
       "Bash(git push *)",
       "Read(//c/Users/Krzysiek/.claude/skills/mydevil-errors/**)",
       "Bash(ssh *)",
-      "Bash(node -e 'console.log\\('\\\\''archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/archiver/package.json'\\\\''\\).version\\); console.log\\('\\\\''@types/archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/@types/archiver/package.json'\\\\''\\).version\\)')"
+      "Bash(node -e 'console.log\\('\\\\''archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/archiver/package.json'\\\\''\\).version\\); console.log\\('\\\\''@types/archiver'\\\\'', require\\('\\\\''/c/Claude/APP/CRM_ANTYRAMY/backend/node_modules/@types/archiver/package.json'\\\\''\\).version\\)')",
+      "Bash(xargs wc -l)",
+      "Bash(find . -path ./node_modules -prune -o -iname '*archive*' -print)",
+      "Bash(find . -path ./node_modules -prune -o -iname '*backup*' -print)"
     ]
   }
 }

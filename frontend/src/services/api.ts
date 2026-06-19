@@ -535,3 +535,23 @@ export const downloadArchiveZip = async (): Promise<Blob> => {
   if (!response.ok) throw new Error('Nie udało się pobrać archiwum z serwera');
   return response.blob();
 };
+
+// Zagnieżdżony, odtwarzalny zrzut Firestore (ten sam kształt co dane.json w ZIP-ie):
+// kolekcja → { [docId]: { ...pola, _sub_interactions?: [...] } }. Klucz _meta to nie kolekcja.
+export interface ArchiveDump {
+  _meta?: { timestamp: string; version: number };
+  clients: Record<string, any>;
+  suppliers: Record<string, any>;
+  products: Record<string, any>;
+  followups: Record<string, any>;
+  notes: Record<string, any>;
+  emailTemplates: Record<string, any>;
+}
+
+// Pełne dane jako JSON (do przycisku „Pobierz JSON" i do budowy Excela na froncie).
+export const getArchiveData = async (): Promise<ArchiveDump> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/archive`, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać danych archiwum z serwera');
+  return response.json();
+};
