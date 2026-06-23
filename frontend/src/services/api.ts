@@ -92,6 +92,38 @@ export interface FollowUp {
   status: 'zaplanowane' | 'zrealizowane' | 'przesunięte';
   createdAt: string;
   completedAt?: string;
+  googleEventId?: string;
+  syncedAt?: string;
+  syncError?: string;
+}
+
+export type KanbanColumn = 'todo' | 'doing' | 'done';
+export type KanbanColor = 'default' | 'blue' | 'yellow' | 'red' | 'green';
+
+export interface KanbanTask {
+  id: string;
+  title: string;
+  description?: string;
+  column: KanbanColumn;
+  order: number;
+  clientId?: string;
+  clientName?: string;
+  color?: KanbanColor;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy?: string;
+}
+
+export interface KanbanTaskFormData {
+  title: string;
+  description?: string;
+  column: KanbanColumn;
+  order?: number;
+  clientId?: string;
+  clientName?: string;
+  color?: KanbanColor;
+  dueDate?: string;
 }
 
 export interface FollowUpFormData {
@@ -367,6 +399,14 @@ export const getFollowUpSummary = async (): Promise<FollowUp[]> => {
   return response.json();
 };
 
+// Follow-upy z przedziału dat (widok kalendarza) — wszystkie statusy
+export const getFollowUpsRange = async (from: string, to: string): Promise<FollowUp[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${FOLLOWUPS_URL}/range?from=${from}&to=${to}`, { headers });
+  if (!response.ok) throw new Error('Błąd pobierania zadań z kalendarza');
+  return response.json();
+};
+
 export const createFollowUp = async (clientId: string, data: FollowUpFormData): Promise<FollowUp> => {
   const headers = await getHeaders();
   const response = await fetch(`${FOLLOWUPS_URL}/client/${clientId}`, { method: 'POST', headers, body: JSON.stringify(data) });
@@ -562,4 +602,45 @@ export const getArchiveData = async (): Promise<ArchiveDump> => {
   const response = await fetch(`${API_URL}/api/archive`, { headers });
   if (!response.ok) throw new Error('Nie udało się pobrać danych archiwum z serwera');
   return response.json();
+};
+
+// ─── KANBAN (API) ─────────────────────────────────────────────────────────────
+
+const KANBAN_URL = `${API_URL}/api/kanban`;
+
+export const getKanbanTasks = async (): Promise<KanbanTask[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(KANBAN_URL, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać zadań');
+  return response.json();
+};
+
+export const createKanbanTask = async (data: KanbanTaskFormData): Promise<KanbanTask> => {
+  const headers = await getHeaders();
+  const response = await fetch(KANBAN_URL, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się dodać zadania');
+  return response.json();
+};
+
+export const updateKanbanTask = async (id: string, data: KanbanTaskFormData): Promise<KanbanTask> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${KANBAN_URL}/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
+  if (!response.ok) throw new Error('Nie udało się zaktualizować zadania');
+  return response.json();
+};
+
+export const moveKanbanTask = async (id: string, column: KanbanColumn, order: number): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${KANBAN_URL}/${id}/move`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ column, order }),
+  });
+  if (!response.ok) throw new Error('Nie udało się przenieść zadania');
+};
+
+export const deleteKanbanTask = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${KANBAN_URL}/${id}`, { method: 'DELETE', headers });
+  if (!response.ok) throw new Error('Nie udało się usunąć zadania');
 };

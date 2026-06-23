@@ -12,7 +12,10 @@ const path = require('path');
 const { exec } = require('child_process');
 
 const CREDENTIALS_PATH = path.join(__dirname, '..', 'gmail_credentials.json');
-const SCOPES = ['https://www.googleapis.com/auth/gmail.send'];
+const SCOPES = [
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/calendar.events', // DODANE: integracja z Google Calendar
+];
 const REDIRECT_PORT = 3456;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
 

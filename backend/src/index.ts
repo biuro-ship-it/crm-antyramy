@@ -19,6 +19,7 @@ import emailTemplatesRouter from './routes/emailTemplates';
 import noteRoutes from './routes/notes'; // DODANE: Poprawka błędu 'Cannot find name noteRoutes'
 import suppliersRouter from './routes/suppliers';
 import archiveRouter from './routes/archive';
+import kanbanRouter from './routes/kanban';
 const app = express();
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://crm.antyramy.eu';
@@ -80,6 +81,7 @@ app.use('/api/email-templates', emailTemplatesRouter);
 app.use('/api/notes', noteRoutes); // Zgłoszone wcześniej jako błąd przez brak importu
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/archive', archiveRouter);
+app.use('/api/kanban', kanbanRouter);
 
 // Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
 // (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)

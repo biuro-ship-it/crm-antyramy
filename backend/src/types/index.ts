@@ -59,6 +59,26 @@ export interface FollowUp {
   status: 'zaplanowane' | 'zrealizowane' | 'przesunięte';
   createdAt: string;
   completedAt?: string;
+  googleEventId?: string; // ID wydarzenia w Google Calendar (jeśli zsynchronizowano)
+  syncedAt?: string;      // Kiedy ostatnio udało się zsynchronizować z Google
+  syncError?: string;     // Komunikat błędu, jeśli sync z Google się nie powiódł
+}
+
+export type KanbanColumn = 'todo' | 'doing' | 'done';
+
+export interface KanbanTask {
+  id?: string;
+  title: string;
+  description?: string;
+  column: KanbanColumn;
+  order: number;          // pozycja w obrębie kolumny (rosnąco)
+  clientId?: string;
+  clientName?: string;
+  color?: 'default' | 'blue' | 'yellow' | 'red' | 'green';
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
 }
 
 export interface EmailTemplateVersion {

@@ -9,11 +9,13 @@ import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
 import NotesPanel from '../components/NotesPanel';
 import SuppliersPanel from '../components/SuppliersPanel'; // DODANE: Import Panelu Dostawców
 import ArchivePanel from '../components/ArchivePanel';
+import CalendarPanel from '../components/CalendarPanel';
+import KanbanPanel from '../components/KanbanPanel';
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
 // DODANE: 'suppliers' do dostępnych zakładek
-type ActiveTab = 'clients' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers' | 'archive';
+type ActiveTab = 'clients' | 'calendar' | 'kanban' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers' | 'archive';
 
 interface DashboardProps {
   user: User;
@@ -22,6 +24,8 @@ interface DashboardProps {
 
 const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'clients', label: 'Klienci' },
+  { id: 'calendar', label: 'Kalendarz' },
+  { id: 'kanban', label: 'Kanban' },
   { id: 'products', label: 'Produkty' },
   { id: 'promotions', label: 'Promocje' },
   { id: 'email-templates', label: 'Szablony maili' },
@@ -221,7 +225,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           </div>
         )}
 
-        {activeTab === 'products' ? (
+        {activeTab === 'calendar' ? (
+          <CalendarPanel />
+        ) : activeTab === 'kanban' ? (
+          <KanbanPanel />
+        ) : activeTab === 'products' ? (
           <ProductsPanel />
         ) : activeTab === 'promotions' ? (
           <PromotionsPanel />
