@@ -644,3 +644,28 @@ export const deleteKanbanTask = async (id: string): Promise<void> => {
   const response = await fetch(`${KANBAN_URL}/${id}`, { method: 'DELETE', headers });
   if (!response.ok) throw new Error('Nie udało się usunąć zadania');
 };
+
+// ─── SETTINGS ────────────────────────────────────────────────────────────────
+
+export interface ColorLabels {
+  clients: { default: string; lilac: string; cream: string; pink: string; mint: string };
+  notes:   { default: string; blue: string; yellow: string; red: string; green: string };
+}
+
+const SETTINGS_URL = `${API_URL}/api/settings`;
+
+export const getColorLabels = async (): Promise<ColorLabels> => {
+  const headers = await getHeaders();
+  const res = await fetch(`${SETTINGS_URL}/colorLabels`, { headers });
+  if (!res.ok) throw new Error('Błąd pobierania etykiet');
+  return res.json();
+};
+
+export const saveColorLabels = async (data: ColorLabels): Promise<ColorLabels> => {
+  const headers = await getHeaders();
+  const res = await fetch(`${SETTINGS_URL}/colorLabels`, {
+    method: 'PUT', headers, body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Błąd zapisu etykiet');
+  return res.json();
+};

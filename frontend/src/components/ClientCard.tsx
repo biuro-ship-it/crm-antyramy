@@ -481,6 +481,14 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
             <span>📞</span>
             <a href={`tel:${client.phone}`} className="hover:underline font-bold">{client.phone || 'Brak'}</a>
           </p>
+          {client.phone && (
+            <a
+              href={`tel:${client.phone}`}
+              className="btn-primary flex items-center justify-center gap-2 mb-2 text-sm"
+            >
+              📞 Zadzwoń
+            </a>
+          )}
           <p className="flex items-center gap-2 md:justify-end">
             <span>✉️</span>
             <a href={`mailto:${client.email}`} className="hover:underline font-bold">{client.email || 'Brak'}</a>

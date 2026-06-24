@@ -41,6 +41,7 @@ function SortableCard({ task, onEdit, onDelete }: CardProps) {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
+    touchAction: 'none',
   };
 
   const isOverdue = task.dueDate && task.column !== 'done' && new Date().toISOString().split('T')[0] > task.dueDate;
@@ -138,8 +139,8 @@ export default function KanbanPanel() {
   const draggingRef = useRef(false);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
   );
 
   const load = async () => {

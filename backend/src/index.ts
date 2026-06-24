@@ -20,6 +20,7 @@ import noteRoutes from './routes/notes'; // DODANE: Poprawka błędu 'Cannot fin
 import suppliersRouter from './routes/suppliers';
 import archiveRouter from './routes/archive';
 import kanbanRouter from './routes/kanban';
+import settingsRouter from './routes/settings';
 const app = express();
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://crm.antyramy.eu';
@@ -82,6 +83,7 @@ app.use('/api/notes', noteRoutes); // Zgłoszone wcześniej jako błąd przez br
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/archive', archiveRouter);
 app.use('/api/kanban', kanbanRouter);
+app.use('/api/settings', settingsRouter);
 
 // Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
 // (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)

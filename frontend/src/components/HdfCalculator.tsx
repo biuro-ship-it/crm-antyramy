@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Supplier, updateSupplier } from '../services/api';
 
 interface CalcRow {
   id: number;
@@ -10,6 +11,12 @@ interface CalcRow {
 interface Prices {
   pricePerM2: string;
   cutPerM: string;
+}
+
+interface SaveState {
+  rowId: number;
+  supplierId: string;
+  name: string;
 }
 
 const num = (v: string) => parseFloat(v.replace(',', '.')) || 0;
@@ -29,11 +36,15 @@ const emptyRow = (): CalcRow => ({ id: nextId++, width: '', height: '', qty: '1'
 
 interface Props {
   onClose: () => void;
+  suppliers: Supplier[];
+  onSupplierUpdated: (s: Supplier) => void;
 }
 
-export default function HdfCalculator({ onClose }: Props) {
+export default function HdfCalculator({ onClose, suppliers, onSupplierUpdated }: Props) {
   const [prices, setPrices] = useState<Prices>({ pricePerM2: '', cutPerM: '' });
   const [rows, setRows] = useState<CalcRow[]>([emptyRow()]);
+  const [saveState, setSaveState] = useState<SaveState | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const updateRow = (id: number, field: keyof Omit<CalcRow, 'id'>, value: string) => {
     setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
@@ -43,6 +54,48 @@ export default function HdfCalculator({ onClose }: Props) {
   const removeRow = (id: number) => setRows(prev => prev.filter(r => r.id !== id));
 
   const pricesSet = num(prices.pricePerM2) > 0 && num(prices.cutPerM) > 0;
+
+  const openSave = (row: CalcRow) => {
+    const w = num(row.width);
+    const h = num(row.height);
+    setSaveState({
+      rowId: row.id,
+      supplierId: suppliers[0]?.id ?? '',
+      name: w && h ? `HDF ${w}×${h} cm` : 'Formatka HDF',
+    });
+  };
+
+  const handleSave = async () => {
+    if (!saveState) return;
+    const supplier = suppliers.find(s => s.id === saveState.supplierId);
+    if (!supplier) return;
+
+    const row = rows.find(r => r.id === saveState.rowId);
+    if (!row) return;
+    const r = calcRow(row, prices);
+
+    const newMaterial = {
+      id: crypto.randomUUID(),
+      name: saveState.name.trim() || 'Formatka HDF',
+      unit: 'szt' as const,
+      price: parseFloat(r.unitCost.toFixed(4)),
+    };
+
+    const existingMaterials = supplier.materials ?? [];
+    try {
+      setSaving(true);
+      const updated = await updateSupplier(supplier.id, {
+        ...supplier,
+        materials: [...existingMaterials, newMaterial],
+      });
+      onSupplierUpdated(updated);
+      setSaveState(null);
+    } catch {
+      alert('Nie udało się zapisać surowca.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const totals = rows.reduce(
     (acc, row) => {
@@ -56,7 +109,7 @@ export default function HdfCalculator({ onClose }: Props) {
   return (
     <div
       className="fixed inset-0 z-50 bg-primary/40 backdrop-blur-sm flex justify-center items-center p-4"
-      onClick={onClose}
+      onClick={() => { if (!saveState) onClose(); }}
     >
       <div
         className="bg-canvas w-full max-w-2xl rounded-xl shadow-xl flex flex-col max-h-[90vh]"
@@ -67,7 +120,7 @@ export default function HdfCalculator({ onClose }: Props) {
           <div>
             <h2 className="text-lg font-semibold text-ink">Kalkulator HDF / Formatki</h2>
             <p className="text-xs text-ink opacity-60 mt-0.5">
-              Koszt = pole powierzchni × cena/m² + obwód × koszt cięcia/mb
+              Koszt = pole × cena/m² + obwód × koszt cięcia/mb
             </p>
           </div>
           <button onClick={onClose} className="text-ink font-bold text-xl leading-none">✕</button>
@@ -126,10 +179,9 @@ export default function HdfCalculator({ onClose }: Props) {
               </button>
             </div>
 
-            {/* Nagłówki kolumn */}
-            <div className="grid grid-cols-[1fr_1fr_80px_auto_auto] gap-2 px-1 mb-1">
-              {['Szer. (cm)', 'Wys. (cm)', 'Szt.', 'Koszt/szt.', ''].map(h => (
-                <div key={h} className="text-[10px] font-semibold uppercase text-ink opacity-50">{h}</div>
+            <div className="grid grid-cols-[1fr_1fr_70px_auto_auto] gap-2 px-1 mb-1">
+              {['Szer. (cm)', 'Wys. (cm)', 'Szt.', 'Koszt', ''].map((h, i) => (
+                <div key={i} className="text-[10px] font-semibold uppercase text-ink opacity-50">{h}</div>
               ))}
             </div>
 
@@ -137,62 +189,121 @@ export default function HdfCalculator({ onClose }: Props) {
               {rows.map(row => {
                 const valid = num(row.width) > 0 && num(row.height) > 0;
                 const r = valid ? calcRow(row, prices) : null;
+                const isSaving = saveState?.rowId === row.id;
+
                 return (
-                  <div key={row.id} className="grid grid-cols-[1fr_1fr_80px_auto_auto] gap-2 items-center">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="np. 30"
-                      value={row.width}
-                      onChange={e => updateRow(row.id, 'width', e.target.value)}
-                      className="border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-sm bg-canvas"
-                    />
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="np. 40"
-                      value={row.height}
-                      onChange={e => updateRow(row.id, 'height', e.target.value)}
-                      className="border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-sm bg-canvas"
-                    />
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder="1"
-                      value={row.qty}
-                      onChange={e => updateRow(row.id, 'qty', e.target.value)}
-                      className="border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-sm bg-canvas"
-                    />
-                    <div className="text-sm font-semibold text-ink min-w-[80px] text-right">
-                      {r && pricesSet ? (
-                        <span>
-                          {(r.totalCost).toFixed(2)}{' '}
-                          <span className="text-xs font-normal opacity-60">zł</span>
-                          {num(row.qty) > 1 && (
-                            <div className="text-[10px] text-ink opacity-50 font-normal">
-                              {r.unitCost.toFixed(2)} zł/szt.
-                            </div>
-                          )}
-                        </span>
-                      ) : valid ? (
-                        <span className="text-xs text-ink opacity-40">wpisz stawki</span>
-                      ) : (
-                        <span className="text-ink opacity-20">—</span>
-                      )}
+                  <div key={row.id} className="space-y-2">
+                    <div className="grid grid-cols-[1fr_1fr_70px_auto_auto] gap-2 items-center">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="np. 30"
+                        value={row.width}
+                        onChange={e => updateRow(row.id, 'width', e.target.value)}
+                        className="border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-sm bg-canvas"
+                      />
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="np. 40"
+                        value={row.height}
+                        onChange={e => updateRow(row.id, 'height', e.target.value)}
+                        className="border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-sm bg-canvas"
+                      />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="1"
+                        value={row.qty}
+                        onChange={e => updateRow(row.id, 'qty', e.target.value)}
+                        className="border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-sm bg-canvas"
+                      />
+                      <div className="text-sm font-semibold text-ink min-w-[90px] text-right">
+                        {r && pricesSet ? (
+                          <div>
+                            <span>{r.totalCost.toFixed(2)} <span className="text-xs font-normal opacity-60">zł</span></span>
+                            {num(row.qty) > 1 && (
+                              <div className="text-[10px] text-ink opacity-50 font-normal">
+                                {r.unitCost.toFixed(2)} zł/szt.
+                              </div>
+                            )}
+                          </div>
+                        ) : valid ? (
+                          <span className="text-xs text-ink opacity-40">wpisz stawki</span>
+                        ) : (
+                          <span className="text-ink opacity-20">—</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeRow(row.id)}
+                        disabled={rows.length === 1}
+                        className="text-ink opacity-30 hover:opacity-70 hover:text-red-500 transition disabled:opacity-10 text-lg leading-none px-1"
+                      >
+                        ×
+                      </button>
                     </div>
-                    <button
-                      onClick={() => removeRow(row.id)}
-                      disabled={rows.length === 1}
-                      className="text-ink opacity-30 hover:opacity-70 hover:text-red-500 transition disabled:opacity-10 text-lg leading-none px-1"
-                    >
-                      ×
-                    </button>
+
+                    {/* Przycisk / formularz zapisu do dostawcy */}
+                    {r && pricesSet && suppliers.length > 0 && (
+                      isSaving ? (
+                        <div className="ml-1 p-3 bg-block-mint border border-hairline rounded-xl space-y-2">
+                          <p className="text-xs font-semibold text-ink opacity-70">
+                            Zapisz do katalogu dostawcy ({r.unitCost.toFixed(2)} zł/szt.)
+                          </p>
+                          <div className="grid grid-cols-[1fr_1fr] gap-2">
+                            <div>
+                              <label className="block text-[10px] font-semibold text-ink opacity-60 mb-1">Dostawca</label>
+                              <select
+                                value={saveState.supplierId}
+                                onChange={e => setSaveState(s => s ? { ...s, supplierId: e.target.value } : s)}
+                                className="w-full border border-hairline rounded-lg px-2 py-1.5 text-sm bg-canvas outline-none focus:ring-2 focus:ring-ink"
+                              >
+                                {suppliers.map(s => (
+                                  <option key={s.id} value={s.id}>{s.companyName}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-semibold text-ink opacity-60 mb-1">Nazwa surowca</label>
+                              <input
+                                type="text"
+                                value={saveState.name}
+                                onChange={e => setSaveState(s => s ? { ...s, name: e.target.value } : s)}
+                                className="w-full border border-hairline rounded-lg px-2 py-1.5 text-sm bg-canvas outline-none focus:ring-2 focus:ring-ink"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => setSaveState(null)}
+                              className="btn-tertiary text-xs py-1 px-3"
+                            >
+                              Anuluj
+                            </button>
+                            <button
+                              onClick={handleSave}
+                              disabled={saving || !saveState.supplierId}
+                              className="btn-primary text-xs py-1 px-4 disabled:opacity-50"
+                            >
+                              {saving ? 'Zapisuję...' : '✓ Zapisz surowiec'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => openSave(row)}
+                          className="btn-secondary text-sm py-2 px-4 mt-1"
+                        >
+                          📦 Zapisz do katalogu dostawcy
+                        </button>
+                      )
+                    )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Szczegóły obliczeń dla pierwszej/ostatniej formatki z wartościami */}
+            {/* Rozkład kosztu */}
             {(() => {
               const firstValid = rows.find(r => num(r.width) > 0 && num(r.height) > 0);
               if (!firstValid || !pricesSet) return null;

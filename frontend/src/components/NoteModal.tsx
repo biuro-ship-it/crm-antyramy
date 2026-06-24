@@ -13,6 +13,11 @@ interface NoteModalProps {
   onSaved: () => void;
 }
 
+const SpeechRecognitionAPI =
+  typeof window !== 'undefined'
+    ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)
+    : null;
+
 export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
   const [title, setTitle] = useState(note?.title || '');
   const [color, setColor] = useState<NoteColor>(note?.color || 'default');
@@ -20,6 +25,32 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
   const [isUrgent, setIsUrgent] = useState(note?.isUrgent || false);
   const [attachments, setAttachments] = useState<NoteAttachment[]>(note?.attachments || []);
   const [uploading, setUploading] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = React.useRef<any>(null);
+
+  const startVoice = () => {
+    if (!SpeechRecognitionAPI) return;
+    const rec = new SpeechRecognitionAPI();
+    rec.lang = 'pl-PL';
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e: any) => {
+      const transcript = Array.from(e.results)
+        .map((r: any) => r[0].transcript)
+        .join(' ');
+      editor?.chain().focus().insertContent(' ' + transcript).run();
+    };
+    rec.onerror = () => { setListening(false); };
+    rec.onend = () => { setListening(false); };
+    rec.start();
+    recognitionRef.current = rec;
+    setListening(true);
+  };
+
+  const stopVoice = () => {
+    recognitionRef.current?.stop();
+    setListening(false);
+  };
 
   // Inicjalizacja bogatego edytora tekstu TipTap
   const editor = useEditor({
@@ -163,13 +194,30 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
 
           {/* Pasek narzędzi TipTap */}
           <div className="border border-hairline rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-ink">
-            <div className="bg-surface-soft p-2 border-b border-hairline flex flex-wrap gap-1 text-xs">
+            <div className="bg-surface-soft p-2 border-b border-hairline flex flex-wrap gap-1 text-xs items-center">
               <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={`px-2 py-1 rounded ${editor?.isActive('bold') ? 'bg-block-lilac font-bold' : 'hover:bg-surface-soft'}`}>B</button>
               <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={`px-2 py-1 rounded ${editor?.isActive('italic') ? 'bg-block-lilac italic' : 'hover:bg-surface-soft'}`}>I</button>
               <span className="text-slate-300 px-1">|</span>
               <button type="button" onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} className="px-2 py-1 rounded hover:bg-surface-soft bg-canvas border border-hairline">➕ Tabela 3x3</button>
               <button type="button" onClick={() => editor?.chain().focus().addColumnAfter().run()} className="px-2 py-1 rounded hover:bg-surface-soft text-ink font-light">Kolumna +</button>
               <button type="button" onClick={() => editor?.chain().focus().addRowAfter().run()} className="px-2 py-1 rounded hover:bg-surface-soft text-ink font-light">Wiersz +</button>
+              {SpeechRecognitionAPI && (
+                <>
+                  <span className="text-slate-300 px-1">|</span>
+                  <button
+                    type="button"
+                    onClick={listening ? stopVoice : startVoice}
+                    title={listening ? 'Zatrzymaj dyktowanie' : 'Dyktuj głosowo (pl)'}
+                    className={`px-2 py-1 rounded flex items-center gap-1 transition ${
+                      listening
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'hover:bg-surface-soft text-ink'
+                    }`}
+                  >
+                    {listening ? '⏹ Stop' : '🎤 Dyktuj'}
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Pole Edytora */}

@@ -282,7 +282,15 @@ export default function SuppliersPanel() {
         </>
       )}
 
-      {showCalc && <HdfCalculator onClose={() => setShowCalc(false)} />}
+      {showCalc && (
+        <HdfCalculator
+          onClose={() => setShowCalc(false)}
+          suppliers={suppliers}
+          onSupplierUpdated={updated =>
+            setSuppliers(prev => prev.map(s => s.id === updated.id ? updated : s))
+          }
+        />
+      )}
     </div>
   );
 }

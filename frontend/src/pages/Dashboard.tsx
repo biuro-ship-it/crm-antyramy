@@ -7,15 +7,17 @@ import ProductsPanel from '../components/ProductsPanel';
 import PromotionsPanel from '../components/PromotionsPanel';
 import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
 import NotesPanel from '../components/NotesPanel';
-import SuppliersPanel from '../components/SuppliersPanel'; // DODANE: Import Panelu Dostawców
+import SuppliersPanel from '../components/SuppliersPanel';
 import ArchivePanel from '../components/ArchivePanel';
 import CalendarPanel from '../components/CalendarPanel';
 import KanbanPanel from '../components/KanbanPanel';
+import MobileNav from '../components/MobileNav';
+import AdminPanel from '../components/AdminPanel';
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
 // DODANE: 'suppliers' do dostępnych zakładek
-type ActiveTab = 'clients' | 'calendar' | 'kanban' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers' | 'archive';
+type ActiveTab = 'clients' | 'calendar' | 'kanban' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers' | 'archive' | 'admin';
 
 interface DashboardProps {
   user: User;
@@ -32,12 +34,14 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'notes', label: 'Notatki' },
   { id: 'suppliers', label: 'Dostawcy' }, // DODANE: Zakładka w nawigacji
   { id: 'archive', label: 'Archiwum' },
+  { id: 'admin', label: 'Administracja' },
 ];
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const { clients, loading, error, fetchClients, createClient, updateClient, removeClient } = useClients();
   const [activeTab, setActiveTab] = useState<ActiveTab>('clients');
   const [showForm, setShowForm] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const [viewClient, setViewClient] = useState<Client | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -61,7 +65,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     setActiveTab(tab);
     setShowForm(false);
     setViewClient(null);
+    setDrawerOpen(false);
   };
+
 
   const handleAddClick = () => { setEditClient(null); setViewClient(null); setShowForm(true); };
   const handleEditClick = (client: Client) => { setEditClient(client); setViewClient(null); setShowForm(true); };
@@ -122,11 +128,16 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     <div className="min-h-screen bg-canvas">
       <nav className="sticky top-0 z-20 h-14 bg-canvas border-b border-hairline px-4 md:px-6 flex justify-between items-center gap-4">
         <div className="flex items-center gap-4 md:gap-8 min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => switchTab('clients')}
+            className="flex items-center gap-2 shrink-0 hover:opacity-70 transition-opacity"
+          >
             <img src="/icona.png" alt="CRM Antyramy" className="h-6 w-6" />
             <h1 className="text-body-sm font-semibold text-ink hidden sm:block">CRM Antyramy</h1>
-          </div>
-          <div className="flex items-center gap-1 bg-surface-soft rounded-pill p-1 overflow-x-auto max-w-[calc(100vw-8rem)] md:max-w-none">
+          </button>
+          {/* Tabs — tylko na desktop */}
+          <div className="hidden md:flex items-center gap-1 bg-surface-soft rounded-pill p-1">
             {TABS.map(tab => (
               <button
                 key={tab.id}
@@ -141,13 +152,59 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-body-sm font-light text-ink hidden lg:block max-w-[200px] truncate">{user?.email}</span>
-          <button type="button" onClick={onSignOut} className="btn-tertiary">
+          <button type="button" onClick={onSignOut} className="btn-tertiary hidden md:block">
             Wyloguj
+          </button>
+          {/* Hamburger — tylko mobile */}
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="md:hidden p-2 rounded-lg hover:bg-surface-soft transition text-ink text-xl leading-none"
+            aria-label="Menu"
+          >
+            ☰
           </button>
         </div>
       </nav>
 
-      <main className="max-w-content mx-auto p-6 md:px-8">
+      {/* Drawer — mobile */}
+      {drawerOpen && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-ink/30 backdrop-blur-sm"
+            onClick={() => setDrawerOpen(false)}
+          />
+          <div className="md:hidden fixed inset-y-0 right-0 z-50 w-72 bg-canvas shadow-2xl flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-hairline">
+              <span className="font-semibold text-ink">Menu</span>
+              <button onClick={() => setDrawerOpen(false)} className="text-ink text-xl leading-none p-1">✕</button>
+            </div>
+            <div className="flex flex-col p-3 gap-1 overflow-y-auto flex-1">
+              {TABS.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => switchTab(tab.id)}
+                  className={`text-left px-4 py-3 rounded-xl text-sm font-medium transition ${
+                    activeTab === tab.id
+                      ? 'bg-ink text-canvas'
+                      : 'text-ink hover:bg-surface-soft'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="p-4 border-t border-hairline">
+              <p className="text-xs text-ink opacity-50 mb-3 truncate">{user?.email}</p>
+              <button onClick={onSignOut} className="btn-secondary w-full text-sm">
+                Wyloguj
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      <main className="max-w-content mx-auto p-6 md:px-8 pb-32 md:pb-8">
         {activeTab === 'clients' && !viewClient && !showForm && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-section">
             <div className="color-block-lime flex items-center gap-4">
@@ -241,6 +298,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           <SuppliersPanel />
         ) : activeTab === 'archive' ? (
           <ArchivePanel />
+        ) : activeTab === 'admin' ? (
+          <AdminPanel />
         ) : (
           <>
             {error && <div className="alert-error mb-6">⚠️ {error}</div>}
@@ -266,6 +325,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           </>
         )}
       </main>
+
+      <MobileNav
+        activeTab={activeTab}
+        onTabChange={switchTab}
+      />
     </div>
   );
 };
