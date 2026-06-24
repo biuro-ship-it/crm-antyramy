@@ -1,9 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getColorLabels, saveColorLabels, ColorLabels,
   getClients, getFollowUpSummary, getKanbanTasks,
   Client, FollowUp, KanbanTask,
 } from '../services/api';
+import {
+  clientTotal, clientYearlyAvg, clientMonthlyAvg, clientMinOrder, clientMaxOrder, zl,
+} from '../utils/sales';
+
+type SalesSortKey = 'total' | 'yearlyAvg' | 'monthlyAvg' | 'minOrder' | 'maxOrder';
+
+const SALES_SORTS: { key: SalesSortKey; label: string; fn: (c: Client) => number }[] = [
+  { key: 'total',      label: 'Obrót (suma)',         fn: clientTotal },
+  { key: 'yearlyAvg',  label: 'Średnia roczna',       fn: clientYearlyAvg },
+  { key: 'monthlyAvg', label: 'Średnia miesięczna',   fn: clientMonthlyAvg },
+  { key: 'minOrder',   label: 'Najniższe zamówienie', fn: clientMinOrder },
+  { key: 'maxOrder',   label: 'Największe zamówienie', fn: clientMaxOrder },
+];
 
 const CLIENT_COLORS: { id: keyof ColorLabels['clients']; bg: string; name: string }[] = [
   { id: 'default', bg: 'bg-canvas border border-hairline', name: 'Biały' },
@@ -36,10 +49,14 @@ export default function AdminPanel() {
   const [tasks, setTasks] = useState<FollowUp[]>([]);
   const [kanban, setKanban] = useState<KanbanTask[]>([]);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [salesSort, setSalesSort] = useState<SalesSortKey>('total');
 
   useEffect(() => {
     getColorLabels()
-      .then(setLabels)
+      .then(data => setLabels(prev => ({
+        clients: { ...prev.clients, ...(data?.clients ?? {}) },
+        notes: { ...prev.notes, ...(data?.notes ?? {}) },
+      })))
       .catch(() => {})
       .finally(() => setLabelsLoading(false));
 
@@ -78,6 +95,15 @@ export default function AdminPanel() {
 
   const kanbanCols = { todo: 0, doing: 0, done: 0 };
   kanban.forEach(t => { kanbanCols[t.column] = (kanbanCols[t.column] || 0) + 1; });
+
+  // Klienci ze sprzedażą, posortowani wg wybranego kryterium (malejąco)
+  const salesClients = useMemo(() => {
+    const fn = SALES_SORTS.find(s => s.key === salesSort)!.fn;
+    return clients
+      .filter(c => clientTotal(c) > 0)
+      .map(c => ({ client: c, value: fn(c) }))
+      .sort((a, b) => b.value - a.value);
+  }, [clients, salesSort]);
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">
@@ -250,6 +276,59 @@ export default function AdminPanel() {
               </div>
             )}
           </>
+        )}
+      </section>
+
+      {/* ── SPRZEDAŻ / OBROTY ── */}
+      <section className="card-padded space-y-4">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <h2 className="section-title">Sprzedaż wg klientów</h2>
+          <select
+            value={salesSort}
+            onChange={e => setSalesSort(e.target.value as SalesSortKey)}
+            className="border border-hairline rounded-lg px-3 py-2 text-sm bg-canvas outline-none focus:ring-2 focus:ring-ink"
+          >
+            {SALES_SORTS.map(s => (
+              <option key={s.key} value={s.key}>Sortuj: {s.label}</option>
+            ))}
+          </select>
+        </div>
+
+        {statsLoading ? (
+          <p className="text-sm text-ink opacity-50">Ładowanie danych...</p>
+        ) : salesClients.length === 0 ? (
+          <p className="text-sm text-ink opacity-40 py-6 text-center">
+            Brak klientów z zarejestrowaną sprzedażą. Włącz sprzedaż w karcie klienta i dodaj zamówienia.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-ink opacity-50 border-b border-hairline">
+                  <th className="py-2 pr-2 font-semibold">#</th>
+                  <th className="py-2 pr-2 font-semibold">Klient</th>
+                  <th className="py-2 px-2 font-semibold text-right">Obrót</th>
+                  <th className="py-2 px-2 font-semibold text-right">Śr. rok</th>
+                  <th className="py-2 px-2 font-semibold text-right">Śr. mies.</th>
+                  <th className="py-2 px-2 font-semibold text-right">Min</th>
+                  <th className="py-2 pl-2 font-semibold text-right">Max</th>
+                </tr>
+              </thead>
+              <tbody>
+                {salesClients.map(({ client }, idx) => (
+                  <tr key={client.id} className="border-b border-hairline-soft">
+                    <td className="py-2 pr-2 text-ink opacity-40">{idx + 1}</td>
+                    <td className="py-2 pr-2 font-medium text-ink truncate max-w-[180px]">{client.companyName}</td>
+                    <td className="py-2 px-2 text-right font-semibold text-ink">{zl(clientTotal(client))}</td>
+                    <td className="py-2 px-2 text-right text-ink opacity-70">{zl(clientYearlyAvg(client))}</td>
+                    <td className="py-2 px-2 text-right text-ink opacity-70">{zl(clientMonthlyAvg(client))}</td>
+                    <td className="py-2 px-2 text-right text-ink opacity-70">{zl(clientMinOrder(client))}</td>
+                    <td className="py-2 pl-2 text-right text-ink opacity-70">{zl(clientMaxOrder(client))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

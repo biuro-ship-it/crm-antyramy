@@ -1,5 +1,12 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
-import { ClientFormData, Client, getNipData } from '../services/api';
+import { ClientFormData, Client, Order, getNipData } from '../services/api';
+import { clientTotal, zl } from '../utils/sales';
+
+const todayISO = () => new Date().toISOString().split('T')[0];
+const parseAmount = (v: string): number => {
+  const n = parseFloat(v.replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
 
 interface ClientFormProps {
   initial?: Client | null;
@@ -54,6 +61,8 @@ const emptyForm = (c?: Client | null): ClientFormData => ({
   },
   relationshipColor: c?.relationshipColor || 'default',
   route: c?.route || '',
+  salesEnabled: c?.salesEnabled ?? false,
+  orders: c?.orders ?? [],
 });
 
 const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, onDelete, existingRoutes }) => {
@@ -254,6 +263,107 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
           <label className={labelClass}>Województwo</label>
           <input type="text" name="province" value={formData.address.province} readOnly className="input-field bg-white/50" />
         </div>
+      </div>
+
+      {/* SEKCJA SPRZEDAŻY */}
+      <div className="mb-6 bg-white/60 rounded-xl p-4 border border-hairline shadow-sm">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <label className={labelClass}>💰 Sprzedaż</label>
+            <p className="text-caption text-ink/50">Rejestruj zamówienia z kwotami i datami — zasilają statystyki obrotu</p>
+          </div>
+          <div className="flex rounded-lg border border-hairline overflow-hidden shrink-0">
+            {[
+              { v: false, label: 'Nie' },
+              { v: true, label: 'Tak' },
+            ].map(opt => (
+              <button
+                key={String(opt.v)}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, salesEnabled: opt.v }))}
+                className={`px-5 py-2 text-body-sm font-medium transition ${
+                  !!formData.salesEnabled === opt.v ? 'bg-ink text-canvas' : 'bg-white text-ink hover:bg-surface-soft'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {formData.salesEnabled && (
+          <div className="mt-4 space-y-2">
+            {/* Nagłówki */}
+            <div className="grid grid-cols-[1fr_1fr_auto] gap-2 px-1">
+              <span className="eyebrow text-ink/50">Kwota (zł netto)</span>
+              <span className="eyebrow text-ink/50">Data</span>
+              <span className="w-8" />
+            </div>
+
+            {(formData.orders ?? []).map((order, idx) => (
+              <div key={order.id} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={order.amount ? String(order.amount) : ''}
+                  placeholder="np. 1500"
+                  onChange={e => {
+                    const amount = parseAmount(e.target.value);
+                    setFormData(prev => {
+                      const orders = [...(prev.orders ?? [])];
+                      orders[idx] = { ...orders[idx], amount };
+                      return { ...prev, orders };
+                    });
+                  }}
+                  className="input-field bg-white"
+                />
+                <input
+                  type="date"
+                  value={order.date}
+                  onChange={e => {
+                    const date = e.target.value;
+                    setFormData(prev => {
+                      const orders = [...(prev.orders ?? [])];
+                      orders[idx] = { ...orders[idx], date };
+                      return { ...prev, orders };
+                    });
+                  }}
+                  className="input-field bg-white"
+                />
+                <button
+                  type="button"
+                  onClick={() => setFormData(prev => ({
+                    ...prev,
+                    orders: (prev.orders ?? []).filter((_, i) => i !== idx),
+                  }))}
+                  className="w-8 h-8 text-red-500 hover:bg-red-50 rounded-lg font-bold shrink-0"
+                  title="Usuń zamówienie"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              onClick={() => {
+                const newOrder: Order = { id: crypto.randomUUID(), amount: 0, date: todayISO() };
+                setFormData(prev => ({ ...prev, orders: [...(prev.orders ?? []), newOrder] }));
+              }}
+              className="btn-secondary bg-white text-body-sm mt-1"
+            >
+              ＋ Dodaj zamówienie
+            </button>
+
+            {(formData.orders ?? []).length > 0 && (
+              <div className="flex justify-end pt-2 border-t border-hairline-soft mt-2">
+                <span className="text-body-sm font-semibold text-ink">
+                  Suma sprzedaży: {zl(clientTotal({ ...formData, orders: formData.orders } as unknown as Client))}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* SEKCCJA PRZYCISKÓW AKCJI (ZAKTUALIZOWANA O USUWANIE) */}

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Client } from '../services/api';
+import { clientTotal, clientYearTotal, clientMonthTotal, zl } from '../utils/sales';
 
 interface ClientListProps {
   clients: Client[];
@@ -84,6 +85,19 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
 
   const totalPages = Math.ceil(processed.length / PAGE_SIZE) || 1;
   const paginated = processed.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  // Sumy sprzedaży dla aktualnie przefiltrowanej listy
+  const salesSummary = useMemo(() => {
+    let all = 0, year = 0, month = 0;
+    for (const c of processed) {
+      all += clientTotal(c);
+      year += clientYearTotal(c);
+      month += clientMonthTotal(c);
+    }
+    return { all, year, month };
+  }, [processed]);
+
+  const hasSales = salesSummary.all > 0;
 
   const renderDaysCounter = (client: Client) => {
     const dateToUse = client.lastContactAt || client.createdAt;
@@ -192,6 +206,24 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
         )}
       </div>
 
+      {/* PODSUMOWANIE SPRZEDAŻY */}
+      {hasSales && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="color-block-lime flex flex-col py-4 px-5 rounded-xl">
+            <span className="eyebrow text-ink/60">Cała sprzedaż</span>
+            <span className="text-card-title mt-1">{zl(salesSummary.all)}</span>
+          </div>
+          <div className="color-block-lilac flex flex-col py-4 px-5 rounded-xl">
+            <span className="eyebrow text-ink/60">Ten rok ({new Date().getFullYear()})</span>
+            <span className="text-card-title mt-1">{zl(salesSummary.year)}</span>
+          </div>
+          <div className="color-block-cream flex flex-col py-4 px-5 rounded-xl">
+            <span className="eyebrow text-ink/60">Ten miesiąc</span>
+            <span className="text-card-title mt-1">{zl(salesSummary.month)}</span>
+          </div>
+        </div>
+      )}
+
       {/* LISTA KLIENTÓW */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         {paginated.map((client) => {
@@ -228,6 +260,14 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
               <div className="space-y-2 mb-6 flex-grow text-body-sm font-light">
                 <p>{client.address?.city || 'Brak miasta'}, {client.address?.province || '—'}</p>
                 <p>{client.phone || 'Brak telefonu'}</p>
+                {clientTotal(client) > 0 && (
+                  <p className="font-semibold text-ink pt-1">
+                    💰 {zl(clientTotal(client))}
+                    <span className="font-light text-ink/50 text-caption ml-2">
+                      (rok: {zl(clientYearTotal(client))})
+                    </span>
+                  </p>
+                )}
               </div>
 
               <button type="button" onClick={() => onView(client)} className={`btn-secondary w-full mt-auto ${client.relationshipColor && client.relationshipColor !== 'default' ? 'border-none shadow-sm' : ''}`}>

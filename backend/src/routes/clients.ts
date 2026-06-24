@@ -17,6 +17,12 @@ const AddressSchema = z.object({
   number: z.string().default(''),
 });
 
+const OrderSchema = z.object({
+  id: z.string(),
+  amount: z.number().nonnegative().default(0),
+  date: z.string().min(1), // YYYY-MM-DD
+});
+
 const ClientSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
   type: z.enum(['zakład', 'sklep', 'agencja', 'inne']),
@@ -27,6 +33,9 @@ const ClientSchema = z.object({
   address: AddressSchema,
   relationshipColor: z.string().optional().default('default'),
   route: z.string().optional().default(''),
+  // UWAGA: bez .default() PUT klienta wykasowałby te pola (parsed.data je wycina)
+  salesEnabled: z.boolean().optional().default(false),
+  orders: z.array(OrderSchema).optional().default([]),
 });
 
 const InteractionSchema = z.object({

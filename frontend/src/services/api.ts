@@ -10,6 +10,12 @@ export interface Address {
   number: string;
 }
 
+export interface Order {
+  id: string;
+  amount: number;   // kwota netto w zł
+  date: string;     // YYYY-MM-DD
+}
+
 export interface Client {
   id: string;
   companyName: string;
@@ -24,6 +30,8 @@ export interface Client {
   updatedAt: string;
   relationshipColor?: string;
   route?: string;
+  salesEnabled?: boolean;
+  orders?: Order[];
 }
 
 export interface ClientFormData {
@@ -36,6 +44,8 @@ export interface ClientFormData {
   address: Address;
   relationshipColor?: string;
   route?: string;
+  salesEnabled?: boolean;
+  orders?: Order[];
 }
 
 export interface NipData {
