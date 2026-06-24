@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Supplier, SupplierFormData, getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../services/api';
 import SupplierCard from './SupplierCard';
+import HdfCalculator from './HdfCalculator';
 
 const COLOR_CLASSES: Record<string, string> = {
   default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-pink', mint: 'bg-block-mint',
@@ -23,7 +24,8 @@ export default function SuppliersPanel() {
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [viewSupplier, setViewSupplier] = useState<Supplier | null>(null);
   const [search, setSearch] = useState('');
-  
+  const [showCalc, setShowCalc] = useState(false);
+
   // Stan formularza
   const [form, setForm] = useState<SupplierFormData>(emptyForm());
   const [customCategory, setCustomCategory] = useState('');
@@ -109,7 +111,12 @@ export default function SuppliersPanel() {
           <h2 className="page-title">Baza Dostawców</h2>
           <p className="text-body-sm font-light mt-2">Zarządzaj dostawcami surowców, cennikami i ofertami</p>
         </div>
-        {!showForm && <button onClick={() => openForm()} className="btn-primary">＋ Dodaj dostawcę</button>}
+        {!showForm && (
+          <div className="flex gap-2">
+            <button onClick={() => setShowCalc(true)} className="btn-secondary">🧮 Kalkulator</button>
+            <button onClick={() => openForm()} className="btn-primary">＋ Dodaj dostawcę</button>
+          </div>
+        )}
       </div>
 
       {showForm ? (
@@ -274,6 +281,8 @@ export default function SuppliersPanel() {
           )}
         </>
       )}
+
+      {showCalc && <HdfCalculator onClose={() => setShowCalc(false)} />}
     </div>
   );
 }

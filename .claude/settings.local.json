@@ -42,7 +42,8 @@
       "Bash(cmd *)",
       "Bash(curl -sk \"https://crm.antyramy.eu/?cb=$\\(date +%s\\)\")",
       "Bash(curl -sk \"https://crm.antyramy.eu/health\")",
-      "Read(//c/Users/Krzysiek/.claude/skills/**)"
+      "Read(//c/Users/Krzysiek/.claude/skills/**)",
+      "Bash(npx tsc *)"
     ]
   }
 }
