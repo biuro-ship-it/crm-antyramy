@@ -1,5 +1,10 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
-import { ClientFormData, Client, getNipData } from '../services/api';
+import { ClientFormData, Client, getNipData, getColorLabels, ColorLabels } from '../services/api';
+
+// Domyślne nazwy kolorów (gdy w Administracji nie ustawiono własnej etykiety)
+const COLOR_FALLBACK: Record<string, string> = {
+  default: 'Biały', lilac: 'Fioletowy', cream: 'Kremowy', pink: 'Różowy', mint: 'Miętowy',
+};
 
 interface ClientFormProps {
   initial?: Client | null;
@@ -63,12 +68,21 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
   const [nipLoading, setNipLoading] = useState(false);
   const [nipError, setNipError] = useState('');
   const [nipSuccess, setNipSuccess] = useState('');
+  const [colorLabels, setColorLabels] = useState<ColorLabels['clients'] | null>(null);
 
   useEffect(() => {
     setFormData(emptyForm(initial));
     setNipError('');
     setNipSuccess('');
   }, [initial]);
+
+  useEffect(() => {
+    getColorLabels().then(d => setColorLabels(d?.clients ?? null)).catch(() => {});
+  }, []);
+
+  // Etykieta koloru: własna z Administracji lub domyślna polska nazwa
+  const colorLabel = (id: string): string =>
+    (colorLabels?.[id as keyof ColorLabels['clients']]?.trim()) || COLOR_FALLBACK[id] || id;
 
   const handleTopChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -155,7 +169,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
         
         <div className="md:col-span-2">
           <label className={labelClass}>Kolor etykiety na liście</label>
-          <div className="flex gap-3 mt-3">
+          <div className="flex gap-3 mt-3 items-center">
             {[
               { id: 'default', bg: 'bg-white' },
               { id: 'lilac', bg: 'bg-block-lilac' },
@@ -166,6 +180,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
               <button
                 key={c.id}
                 type="button"
+                title={colorLabel(c.id)}
                 onClick={() => setFormData(prev => ({ ...prev, relationshipColor: c.id }))}
                 className={`w-8 h-8 rounded-full border border-hairline transition-transform shadow-sm ${c.bg} ${
                   formData.relationshipColor === c.id ? 'ring-2 ring-offset-2 ring-ink scale-110' : 'opacity-50 hover:opacity-100 hover:scale-105'
@@ -173,6 +188,9 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
               />
             ))}
           </div>
+          <p className="text-caption text-ink/60 mt-2">
+            Wybrany: <span className="font-semibold text-ink">{colorLabel(formData.relationshipColor || 'default')}</span>
+          </p>
         </div>
       </div>
 

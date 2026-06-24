@@ -5,7 +5,11 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-import { createNote, updateNote, uploadImage, Note, NoteColor, NoteAttachment } from '../services/api';
+import { createNote, updateNote, uploadImage, getColorLabels, Note, NoteColor, NoteAttachment, ColorLabels } from '../services/api';
+
+const NOTE_COLOR_FALLBACK: Record<NoteColor, string> = {
+  default: 'Biały', blue: 'Niebieski', yellow: 'Żółty', red: 'Czerwony', green: 'Zielony',
+};
 
 interface NoteModalProps {
   note: Note | null; // Jeśli przekazany - edycja, jeśli null - nowa
@@ -27,6 +31,14 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
   const [uploading, setUploading] = useState(false);
   const [listening, setListening] = useState(false);
   const recognitionRef = React.useRef<any>(null);
+  const [colorLabels, setColorLabels] = useState<ColorLabels['notes'] | null>(null);
+
+  useEffect(() => {
+    getColorLabels().then(d => setColorLabels(d?.notes ?? null)).catch(() => {});
+  }, []);
+
+  const colorLabel = (c: NoteColor): string =>
+    (colorLabels?.[c]?.trim()) || NOTE_COLOR_FALLBACK[c] || c;
 
   const startVoice = () => {
     if (!SpeechRecognitionAPI) return;
@@ -157,6 +169,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                   <button
                     key={c}
                     type="button"
+                    title={colorLabel(c)}
                     onClick={() => setColor(c)}
                     className={`w-7 h-7 rounded-full border-2 transition ${
                       c === 'default' ? 'bg-canvas border-hairline' :
@@ -167,6 +180,9 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                   />
                 ))}
               </div>
+              <p className="text-[11px] text-ink/60 mt-1">
+                Wybrany: <span className="font-semibold text-ink">{colorLabel(color)}</span>
+              </p>
             </div>
 
             {/* Flagi */}
