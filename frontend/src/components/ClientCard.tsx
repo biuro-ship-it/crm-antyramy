@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Client, Interaction, InteractionFormData, Product,
+  Client, Interaction, InteractionFormData, Product, Order,
   getClientInteractions, createClientInteraction, updateClientInteraction,
-  getProductsList, createFollowUp
+  getProductsList, createFollowUp, updateClient
 } from '../services/api';
+import { zl } from '../utils/sales';
 import EmailSendModal from './EmailSendModal';
 
 const colorClasses: Record<string, string> = {
@@ -167,6 +168,7 @@ Pozdrawiam serdecznie,`;
 interface ClientCardProps {
   client: Client;
   onClose: () => void;
+  onClientUpdated?: (c: Client) => void;
 }
 
 const CHANNEL_ICON: Record<string, string> = {
@@ -396,7 +398,13 @@ const InteractionForm: React.FC<InteractionFormProps> = ({
 };
 
 // ─── Główny komponent ──────────────────────────────────────────────────────
-const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
+const todaySaleISO = () => new Date().toISOString().split('T')[0];
+const parseAmount = (v: string): number => {
+  const n = parseFloat(v.replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? n : 0;
+};
+
+const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdated }) => {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -404,6 +412,66 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
   const [loading, setLoading] = useState(true);
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showEmailSendModal, setShowEmailSendModal] = useState(false);
+
+  // Sprzedaż (zamówienia) — osadzona tablica na dokumencie klienta
+  const [orders, setOrders] = useState<Order[]>(client.orders ?? []);
+  const [showSaleForm, setShowSaleForm] = useState(false);
+  const [saleAmount, setSaleAmount] = useState('');
+  const [saleDate, setSaleDate] = useState(todaySaleISO());
+  const [saleNote, setSaleNote] = useState('');
+  const [savingSale, setSavingSale] = useState(false);
+
+  const handleAddSale = async () => {
+    const amount = parseAmount(saleAmount);
+    if (amount <= 0) { alert('Podaj kwotę sprzedaży.'); return; }
+    if (!saleDate) { alert('Podaj datę.'); return; }
+    const newOrder: Order = {
+      id: crypto.randomUUID(),
+      amount,
+      date: saleDate,
+      note: saleNote.trim(),
+    };
+    const nextOrders = [...orders, newOrder];
+    try {
+      setSavingSale(true);
+      const updated = await updateClient(client.id, {
+        ...client,
+        salesEnabled: true,
+        orders: nextOrders,
+      });
+      setOrders(updated.orders ?? nextOrders);
+      onClientUpdated?.(updated);
+      setShowSaleForm(false);
+      setSaleAmount(''); setSaleDate(todaySaleISO()); setSaleNote('');
+    } catch {
+      alert('Nie udało się zapisać sprzedaży.');
+    } finally {
+      setSavingSale(false);
+    }
+  };
+
+  const handleDeleteSale = async (orderId: string) => {
+    if (!window.confirm('Usunąć ten wpis sprzedaży?')) return;
+    const nextOrders = orders.filter(o => o.id !== orderId);
+    try {
+      const updated = await updateClient(client.id, { ...client, orders: nextOrders });
+      setOrders(updated.orders ?? nextOrders);
+      onClientUpdated?.(updated);
+    } catch {
+      alert('Nie udało się usunąć wpisu.');
+    }
+  };
+
+  const ordersTotal = orders.reduce((s, o) => s + (o.amount || 0), 0);
+
+  // Wspólna oś czasu: notatki + sprzedaż, malejąco po dacie
+  type TimelineItem =
+    | { kind: 'interaction'; date: string; data: Interaction }
+    | { kind: 'sale'; date: string; data: Order };
+  const timeline: TimelineItem[] = [
+    ...interactions.map(i => ({ kind: 'interaction' as const, date: i.contactDate, data: i })),
+    ...orders.map(o => ({ kind: 'sale' as const, date: o.date, data: o })),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   useEffect(() => {
     const fetchData = async () => {
@@ -538,15 +606,75 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
       </div>
 
       <div className="mt-8">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold text-ink">Historia Kontaktów</h3>
-          <button
-            onClick={() => { setShowAddForm(v => !v); setEditingId(null); }}
-            className="btn-primary text-body-sm"
-          >
-            {showAddForm ? '✕ Anuluj' : '+ Dodaj notatkę z rozmowy'}
-          </button>
+        <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+          <div className="flex items-baseline gap-3 flex-wrap">
+            <h3 className="text-xl font-bold text-ink">Historia Kontaktów</h3>
+            {ordersTotal > 0 && (
+              <span className="badge badge-mint shadow-sm">💰 Sprzedaż łącznie: {zl(ordersTotal)}</span>
+            )}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => { setShowAddForm(v => !v); setEditingId(null); setShowSaleForm(false); }}
+              className="btn-primary text-body-sm"
+            >
+              {showAddForm ? '✕ Anuluj' : '+ Dodaj notatkę z rozmowy'}
+            </button>
+            <button
+              onClick={() => { setShowSaleForm(v => !v); setShowAddForm(false); setEditingId(null); }}
+              className="btn-secondary text-body-sm bg-white"
+            >
+              {showSaleForm ? '✕ Anuluj' : '💰 Dodaj sprzedaż'}
+            </button>
+          </div>
         </div>
+
+        {showSaleForm && (
+          <div className="color-block-mint mb-6 p-5 rounded-xl">
+            <h4 className="font-bold text-ink mb-4">💰 Nowa sprzedaż</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="eyebrow block mb-2">Kwota (zł netto)</label>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={saleAmount}
+                  onChange={e => setSaleAmount(e.target.value)}
+                  placeholder="np. 1500"
+                  className="input-field bg-white"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="eyebrow block mb-2">Data</label>
+                <input
+                  type="date"
+                  value={saleDate}
+                  onChange={e => setSaleDate(e.target.value)}
+                  className="input-field bg-white"
+                />
+              </div>
+              <div>
+                <label className="eyebrow block mb-2">Uwagi (opcjonalnie)</label>
+                <input
+                  type="text"
+                  value={saleNote}
+                  onChange={e => setSaleNote(e.target.value)}
+                  placeholder="np. zamówienie hurtowe"
+                  className="input-field bg-white"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button onClick={handleAddSale} disabled={savingSale} className="btn-primary text-body-sm disabled:opacity-50">
+                {savingSale ? 'Zapisywanie...' : 'Zapisz sprzedaż'}
+              </button>
+              <button onClick={() => setShowSaleForm(false)} className="btn-tertiary text-body-sm bg-white">
+                Anuluj
+              </button>
+            </div>
+          </div>
+        )}
 
         {showAddForm && (
           <InteractionForm
@@ -563,31 +691,55 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
 
         {loading ? (
           <p className="text-ink font-light text-center py-8">Ładowanie historii...</p>
-        ) : interactions.length === 0 ? (
+        ) : timeline.length === 0 ? (
           <div className="bg-white/40 rounded-lg p-8 text-center border border-hairline-soft border-dashed">
             <span className="text-4xl block mb-3">📭</span>
             <p className="text-ink font-light font-medium">Brak wpisów w historii.</p>
           </div>
         ) : (
           <div className="space-y-4 relative before:absolute before:inset-0 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-hairline before:to-transparent">
-            {interactions.map(interaction => (
-              <div key={interaction.id} className="relative flex items-start justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+            {timeline.map(item => item.kind === 'sale' ? (
+              <div key={`sale-${item.data.id}`} className="relative flex items-start justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
+                <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-canvas bg-block-mint text-ink shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 text-xl mt-1">
+                  💰
+                </div>
+                <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)]">
+                  <div className="bg-block-mint p-5 rounded-lg border border-hairline shadow-sm">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="font-black text-ink">{item.data.date}</span>
+                      <button
+                        onClick={() => handleDeleteSale(item.data.id)}
+                        className="text-xs font-bold text-red-600 hover:underline transition-colors"
+                      >
+                        Usuń
+                      </button>
+                    </div>
+                    <p className="text-2xl font-black text-ink">{zl(item.data.amount)}</p>
+                    {item.data.note && (
+                      <p className="text-ink font-light text-sm mt-2">📝 {item.data.note}</p>
+                    )}
+                    <span className="badge badge-cream text-[10px] mt-2 inline-block">Sprzedaż</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div key={item.data.id} className="relative flex items-start justify-between md:justify-normal md:odd:flex-row-reverse group is-active">
                 <div className="flex items-center justify-center w-10 h-10 rounded-full border-4 border-canvas bg-block-lilac text-ink shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10 text-xl mt-1">
-                  {CHANNEL_ICON[interaction.channel] ?? '📌'}
+                  {CHANNEL_ICON[item.data.channel] ?? '📌'}
                 </div>
 
                 <div className="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)]">
-                  {editingId === interaction.id ? (
+                  {editingId === item.data.id ? (
                     <InteractionForm
                       initialData={{
-                        contactDate: interaction.contactDate,
-                        channel: interaction.channel,
-                        notes: interaction.notes,
-                        tradeNotes: interaction.tradeNotes ?? '',
-                        products: interaction.products ?? []
+                        contactDate: item.data.contactDate,
+                        channel: item.data.channel,
+                        notes: item.data.notes,
+                        tradeNotes: item.data.tradeNotes ?? '',
+                        products: item.data.products ?? []
                       }}
                       products={products}
-                      onSave={(data) => handleEditSave(interaction.id, data)}
+                      onSave={(data) => handleEditSave(item.data.id, data)}
                       onCancel={() => setEditingId(null)}
                       saveLabel="Zapisz zmiany"
                       withFollowUp
@@ -597,30 +749,30 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose }) => {
                   ) : (
                     <div className="bg-canvas p-5 rounded-lg border border-hairline shadow-sm">
                       <div className="flex justify-between items-center mb-2">
-                        <span className="font-black text-ink">{interaction.contactDate}</span>
+                        <span className="font-black text-ink">{item.data.contactDate}</span>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-ink font-light">Przez: {interaction.createdBy.split('@')[0]}</span>
+                          <span className="text-xs text-ink font-light">Przez: {item.data.createdBy.split('@')[0]}</span>
                           <button
-                            onClick={() => { setEditingId(interaction.id); setShowAddForm(false); }}
+                            onClick={() => { setEditingId(item.data.id); setShowAddForm(false); }}
                             className="text-xs font-bold text-ink font-light hover:underline transition-colors flex items-center gap-1"
                           >
                             ✎ Edytuj
                           </button>
                         </div>
                       </div>
-                      <p className="text-ink font-light text-sm mb-3">{interaction.notes}</p>
+                      <p className="text-ink font-light text-sm mb-3">{item.data.notes}</p>
 
-                      {(interaction.tradeNotes || (interaction.products && interaction.products.length > 0)) && (
+                      {(item.data.tradeNotes || (item.data.products && item.data.products.length > 0)) && (
                         <div className="mt-4 pt-4 border-t border-hairline-soft text-xs">
-                          {interaction.tradeNotes && (
+                          {item.data.tradeNotes && (
                             <p className="mb-2">
-                              <span className="font-bold text-ink font-light">💰 Ustalenia:</span> {interaction.tradeNotes}
+                              <span className="font-bold text-ink font-light">💰 Ustalenia:</span> {item.data.tradeNotes}
                             </p>
                           )}
-                          {interaction.products && interaction.products.length > 0 && (
+                          {item.data.products && item.data.products.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
                               <span className="font-bold text-ink font-light mr-1 mt-1">📦 Produkty:</span>
-                              {interaction.products.map((p, i) => (
+                              {item.data.products.map((p, i) => (
                                 <span key={i} className="badge-mint">{p}</span>
                               ))}
                             </div>

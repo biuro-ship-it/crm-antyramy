@@ -21,6 +21,7 @@ const OrderSchema = z.object({
   id: z.string(),
   amount: z.number().nonnegative().default(0),
   date: z.string().min(1), // YYYY-MM-DD
+  note: z.string().optional().default(''),
 });
 
 const ClientSchema = z.object({

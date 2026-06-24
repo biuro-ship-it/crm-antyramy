@@ -14,6 +14,7 @@ export interface Order {
   id: string;
   amount: number;   // kwota netto w zł
   date: string;     // YYYY-MM-DD
+  note?: string;    // opcjonalne uwagi do zamówienia
 }
 
 export interface Client {

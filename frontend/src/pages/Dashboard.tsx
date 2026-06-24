@@ -318,7 +318,11 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
                 />
               </div>
             ) : viewClient ? (
-              <ClientCard client={viewClient} onClose={() => { setViewClient(null); loadTasks(); }} />
+              <ClientCard
+                client={viewClient}
+                onClose={() => { setViewClient(null); loadTasks(); fetchClients(); }}
+                onClientUpdated={(updated) => { setViewClient(updated); fetchClients(); }}
+              />
             ) : (
               <ClientList clients={clients} onEdit={handleEditClick} onDelete={handleDeleteClient} onView={handleViewClick} />
             )}
