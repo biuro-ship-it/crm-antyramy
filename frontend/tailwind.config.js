@@ -17,6 +17,7 @@ export default {
         'block-lilac': '#c5b0f4',
         'block-cream': '#f4ecd6',
         'block-pink': '#efd4d4',
+        'block-gray': '#d9d9d9',
         'block-mint': '#c8e6cd',
         'block-coral': '#f3c9b6',
         'block-navy': '#1f1d3d',

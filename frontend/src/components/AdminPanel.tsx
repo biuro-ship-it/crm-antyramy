@@ -22,7 +22,7 @@ const CLIENT_COLORS: { id: keyof ColorLabels['clients']; bg: string; name: strin
   { id: 'default', bg: 'bg-canvas border border-hairline', name: 'Biały' },
   { id: 'lilac',   bg: 'bg-block-lilac',                  name: 'Fioletowy' },
   { id: 'cream',   bg: 'bg-block-cream',                  name: 'Kremowy' },
-  { id: 'pink',    bg: 'bg-block-pink',                   name: 'Różowy' },
+  { id: 'pink',    bg: 'bg-block-gray',                   name: 'Szary' },
   { id: 'mint',    bg: 'bg-block-mint',                   name: 'Miętowy' },
 ];
 

@@ -3,7 +3,7 @@ import { ClientFormData, Client, getNipData, getColorLabels, ColorLabels } from 
 
 // Domyślne nazwy kolorów (gdy w Administracji nie ustawiono własnej etykiety)
 const COLOR_FALLBACK: Record<string, string> = {
-  default: 'Biały', lilac: 'Fioletowy', cream: 'Kremowy', pink: 'Różowy', mint: 'Miętowy',
+  default: 'Biały', lilac: 'Fioletowy', cream: 'Kremowy', pink: 'Szary', mint: 'Miętowy',
 };
 
 interface ClientFormProps {
@@ -142,7 +142,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
     <div className={`card-padded transition-colors ${
       formData.relationshipColor === 'lilac' ? 'bg-block-lilac' :
       formData.relationshipColor === 'cream' ? 'bg-block-cream' :
-      formData.relationshipColor === 'pink' ? 'bg-block-pink' :
+      formData.relationshipColor === 'pink' ? 'bg-block-gray' :
       formData.relationshipColor === 'mint' ? 'bg-block-mint' : 'bg-canvas'
     }`}>
       <div className="flex justify-between items-start mb-6">
@@ -174,7 +174,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
               { id: 'default', bg: 'bg-white' },
               { id: 'lilac', bg: 'bg-block-lilac' },
               { id: 'cream', bg: 'bg-block-cream' },
-              { id: 'pink', bg: 'bg-block-pink' },
+              { id: 'pink', bg: 'bg-block-gray' },
               { id: 'mint', bg: 'bg-block-mint' },
             ].map(c => (
               <button

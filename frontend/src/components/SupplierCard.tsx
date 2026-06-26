@@ -3,7 +3,7 @@ import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierIn
 import SupplierMaterials from './SupplierMaterials';
 
 const colorClasses: Record<string, string> = {
-  default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-pink', mint: 'bg-block-mint',
+  default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-gray', mint: 'bg-block-mint',
 };
 
 const CHANNEL_ICON: Record<string, string> = { telefon: '📞', mail: '✉️', spotkanie: '🤝', inne: '📌' };

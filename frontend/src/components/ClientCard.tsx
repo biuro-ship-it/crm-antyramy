@@ -2,16 +2,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Client, Interaction, InteractionFormData, Product, Order,
   getClientInteractions, createClientInteraction, updateClientInteraction,
-  getProductsList, createFollowUp, updateClient
+  getProductsList, createFollowUp, updateClient, getClients
 } from '../services/api';
-import { zl } from '../utils/sales';
+import { zl, clientYearTotal, clientMonthTotal } from '../utils/sales';
 import EmailSendModal from './EmailSendModal';
 
 const colorClasses: Record<string, string> = {
   default: 'bg-canvas',
   lilac: 'bg-block-lilac',
   cream: 'bg-block-cream',
-  pink: 'bg-block-pink',
+  pink: 'bg-block-gray',
   mint: 'bg-block-mint',
 };
 
@@ -464,6 +464,35 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
 
   const ordersTotal = orders.reduce((s, o) => s + (o.amount || 0), 0);
 
+  // Udział % w globalnym obrocie (rok / miesiąc). Sumy pozostałych klientów
+  // pobieramy raz; obrót bieżącego klienta liczymy z żywego `orders`, żeby
+  // udział reagował na dodanie/usunięcie sprzedaży bez przeładowania.
+  const [othersSales, setOthersSales] = useState<{ year: number; month: number } | null>(null);
+  useEffect(() => {
+    let active = true;
+    getClients()
+      .then(all => {
+        if (!active) return;
+        const others = all.filter(c => c.id !== client.id);
+        setOthersSales({
+          year: others.reduce((s, c) => s + clientYearTotal(c), 0),
+          month: others.reduce((s, c) => s + clientMonthTotal(c), 0),
+        });
+      })
+      .catch(() => active && setOthersSales({ year: 0, month: 0 }));
+    return () => { active = false; };
+  }, [client.id]);
+
+  const liveClient = { ...client, orders } as Client;
+  const myYear = clientYearTotal(liveClient);
+  const myMonth = clientMonthTotal(liveClient);
+  const globalYear = (othersSales?.year ?? 0) + myYear;
+  const globalMonth = (othersSales?.month ?? 0) + myMonth;
+  const shareYear = globalYear > 0 ? (myYear / globalYear) * 100 : 0;
+  const shareMonth = globalMonth > 0 ? (myMonth / globalMonth) * 100 : 0;
+  const pct = (n: number) =>
+    n.toLocaleString('pl-PL', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + '%';
+
   // Wspólna oś czasu: notatki + sprzedaż, malejąco po dacie
   type TimelineItem =
     | { kind: 'interaction'; date: string; data: Interaction }
@@ -542,6 +571,27 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
             <p className="text-ink font-light text-sm mt-1">
               NIP: <span className="text-ink font-light font-mono font-semibold">{client.nip}</span>
             </p>
+          )}
+          {ordersTotal > 0 && (
+            <div className="mt-3 bg-white/60 rounded-lg px-3 py-2 shadow-sm inline-block">
+              <p className="text-[11px] uppercase tracking-wide text-ink/60 font-semibold mb-1">
+                Udział w obrocie firmy
+              </p>
+              <div className="flex gap-4">
+                <div title={`${zl(myYear)} z ${zl(globalYear)}`}>
+                  <span className="text-xs text-ink/60">Rok&nbsp;</span>
+                  <span className="text-base font-black text-ink">
+                    {othersSales ? pct(shareYear) : '…'}
+                  </span>
+                </div>
+                <div className="border-l border-hairline pl-4" title={`${zl(myMonth)} z ${zl(globalMonth)}`}>
+                  <span className="text-xs text-ink/60">Mies.&nbsp;</span>
+                  <span className="text-base font-black text-ink">
+                    {othersSales ? pct(shareMonth) : '…'}
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
         <div className="text-sm text-ink font-light bg-white/60 p-4 rounded-lg md:text-right w-full md:w-auto shadow-sm">

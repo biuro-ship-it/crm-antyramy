@@ -4,7 +4,7 @@ import SupplierCard from './SupplierCard';
 import HdfCalculator from './HdfCalculator';
 
 const COLOR_CLASSES: Record<string, string> = {
-  default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-pink', mint: 'bg-block-mint',
+  default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-gray', mint: 'bg-block-mint',
 };
 
 // DODANE: 'Plexa' do domyślnych kategorii
@@ -232,7 +232,7 @@ export default function SuppliersPanel() {
                       key={colorId}
                       type="button"
                       onClick={() => setForm({...form, relationshipColor: colorId})}
-                      className={`w-8 h-8 rounded-full border border-hairline transition-transform shadow-sm ${colorId === 'default' ? 'bg-white' : `bg-block-${colorId}`} ${
+                      className={`w-8 h-8 rounded-full border border-hairline transition-transform shadow-sm ${colorId === 'default' ? 'bg-white' : COLOR_CLASSES[colorId]} ${
                         form.relationshipColor === colorId ? 'ring-2 ring-offset-2 ring-ink scale-110' : 'opacity-60 hover:opacity-100'
                       }`}
                     />

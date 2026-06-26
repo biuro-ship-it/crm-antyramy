@@ -29,7 +29,7 @@ const colorClasses: Record<string, string> = {
   default: 'bg-canvas',
   lilac: 'bg-block-lilac',
   cream: 'bg-block-cream',
-  pink: 'bg-block-pink',
+  pink: 'bg-block-gray',
   mint: 'bg-block-mint',
 };
 
