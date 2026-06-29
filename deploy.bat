@@ -4,7 +4,7 @@ title CRM Antyramy Deploy
 
 set SSH_USER=Pluszek
 set SSH_HOST=s61.mydevil.net
-set SSH_KEY=%USERPROFILE%\.ssh\id_rsa_pluszek
+set SSH_KEY=%USERPROFILE%\.ssh\id_ed25519
 set REMOTE_ROOT=/usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs
 set LOCAL_ROOT=C:\Claude\APP\CRM_ANTYRAMY
 

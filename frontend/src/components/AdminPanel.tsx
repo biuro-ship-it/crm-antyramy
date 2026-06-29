@@ -94,7 +94,23 @@ export default function AdminPanel() {
     acc[k] = (acc[k] || 0) + 1;
     return acc;
   }, {});
-  const topRoutes = Object.entries(routeCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+  const routeRevenue = clients.reduce<Record<string, number>>((acc, c) => {
+    const k = c.route?.trim() || '(brak trasy)';
+    acc[k] = (acc[k] || 0) + clientTotal(c);
+    return acc;
+  }, {});
+
+  const totalRevenue = clients.reduce((sum, c) => sum + clientTotal(c), 0);
+
+  const topRoutes = Object.entries(routeCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([route, count]) => ({
+      route,
+      count,
+      pct: totalRevenue > 0 ? Math.round(((routeRevenue[route] || 0) / totalRevenue) * 100) : 0,
+    }));
 
   const kanbanCols = { todo: 0, doing: 0, done: 0 };
   kanban.forEach(t => { kanbanCols[t.column] = (kanbanCols[t.column] || 0) + 1; });
@@ -270,10 +286,15 @@ export default function AdminPanel() {
                   Top 5 tras (liczba klientów)
                 </h3>
                 <div className="space-y-2">
-                  {topRoutes.map(([route, count]) => (
+                  {topRoutes.map(({ route, count, pct }) => (
                     <div key={route} className="flex items-center justify-between gap-2 p-2 bg-surface-soft rounded-lg">
                       <span className="text-sm text-ink truncate">{route}</span>
-                      <span className="badge badge-cream shrink-0">{count} klientów</span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {totalRevenue > 0 && (
+                          <span className="badge badge-mint">{pct}% obrotu</span>
+                        )}
+                        <span className="badge badge-cream">{count} klientów</span>
+                      </div>
                     </div>
                   ))}
                 </div>
