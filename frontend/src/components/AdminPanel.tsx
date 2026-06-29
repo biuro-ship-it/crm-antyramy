@@ -60,9 +60,12 @@ export default function AdminPanel() {
       .catch(() => {})
       .finally(() => setLabelsLoading(false));
 
-    Promise.all([getClients(), getFollowUpSummary(), getKanbanTasks()])
+    Promise.all([
+      getClients().catch((): Client[] => []),
+      getFollowUpSummary().catch((): FollowUp[] => []),
+      getKanbanTasks().catch((): KanbanTask[] => []),
+    ])
       .then(([c, f, k]) => { setClients(c); setTasks(f); setKanban(k); })
-      .catch(() => {})
       .finally(() => setStatsLoading(false));
   }, []);
 
@@ -252,6 +255,7 @@ export default function AdminPanel() {
                           style={{ width: `${pct}%` }}
                         />
                       </div>
+                      <span className="text-sm text-ink opacity-50 w-10 text-right">{pct}%</span>
                       <span className="text-sm font-semibold text-ink w-8 text-right">{count}</span>
                     </div>
                   );

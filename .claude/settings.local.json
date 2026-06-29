@@ -46,7 +46,8 @@
       "Bash(npx tsc *)",
       "Bash(VITE_API_URL=https://crm.antyramy.eu npm run build)",
       "Bash(npm run *)",
-      "Skill(claude-in-chrome)"
+      "Skill(claude-in-chrome)",
+      "Bash(unzip -l crm-antyramy-backup-2026-06-24.zip)"
     ]
   }
 }
