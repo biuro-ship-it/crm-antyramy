@@ -114,7 +114,7 @@ export default function NotesPanel() {
                 />
               </div>
 
-              <div className="flex justify-between items-center mt-4 pt-2 border-t border-black/5">
+              <div className="flex justify-between items-center mt-4 pt-2 border-t border-black/5 dark:border-white/10">
                 <span className="text-xs opacity-60">
                   📎 Pliki: {note.attachments?.length || 0}
                 </span>

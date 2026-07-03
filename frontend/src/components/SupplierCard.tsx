@@ -117,7 +117,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
 
   return (
     <div className={`card-padded transition-colors ${cardBg}`}>
-      <button onClick={onClose} className="mb-6 flex items-center gap-2 text-sm font-bold text-ink bg-white/40 px-3 py-1.5 rounded-lg hover:bg-white/80 w-max">
+      <button onClick={onClose} className="mb-6 flex items-center gap-2 text-sm font-bold text-ink bg-white/40 dark:bg-white/10 px-3 py-1.5 rounded-lg hover:bg-white/80 dark:hover:bg-white/20 w-max">
         ← Wróć do bazy dostawców
       </button>
 
@@ -141,7 +141,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
       {/* 2. ZAKTUALIZOWANE: PANALE UZGODNIEŃ I UWAG WYSTAWIĘ NA SAMĄ GÓRĘ */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
         {/* Panel stałych uzgodnień */}
-        <div className="bg-white/70 rounded-xl p-5 border border-hairline-soft shadow-sm">
+        <div className="bg-white/70 dark:bg-white/5 rounded-xl p-5 border border-hairline-soft shadow-sm">
           <h3 className="text-xs font-bold text-ink font-light uppercase tracking-wider mb-3">🤝 Stałe uzgodnienia</h3>
           <div className="space-y-2 text-body-sm font-light">
             <div className="flex justify-between border-b border-hairline-soft pb-1">
@@ -160,7 +160,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
         </div>
 
         {/* Panel ogólnych uwag */}
-        <div className="bg-white/70 rounded-xl p-5 border border-hairline-soft shadow-sm flex flex-col">
+        <div className="bg-white/70 dark:bg-white/5 rounded-xl p-5 border border-hairline-soft shadow-sm flex flex-col">
           <h3 className="text-xs font-bold text-ink font-light uppercase tracking-wider mb-2">📝 Ogólne uwagi / Informacje</h3>
           <p className="text-body-sm font-light text-ink whitespace-pre-line leading-relaxed flex-grow">
             {supplier.notes || <span className="italic opacity-40">Brak dodatkowych uwag o dostawcy.</span>}
@@ -173,7 +173,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
         <div className="lg:col-span-2 space-y-4">
           <h3 className="text-xs font-bold text-ink font-light uppercase tracking-wider">☎️ Dane telefoniczne i bezpośrednie czaty</h3>
           
-          <div className="flex flex-col gap-3 bg-white/50 p-4 rounded-xl border border-hairline-soft shadow-sm">
+          <div className="flex flex-col gap-3 bg-white/50 dark:bg-white/5 p-4 rounded-xl border border-hairline-soft shadow-sm">
             {supplier.phoneCompany && (
               <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-body-sm">
                 <span className="w-24 font-bold opacity-60">🏢 Centrala:</span>
@@ -215,7 +215,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
               </a>
             )}
             {supplier.email && (
-              <a href={`mailto:${supplier.email}`} className="flex items-center gap-2 bg-white text-ink px-4 py-2 rounded-lg font-bold text-xs border border-hairline hover:bg-surface-soft shadow-sm transition-colors">
+              <a href={`mailto:${supplier.email}`} className="flex items-center gap-2 bg-white dark:bg-surface-soft text-ink px-4 py-2 rounded-lg font-bold text-xs border border-hairline hover:bg-surface-soft shadow-sm transition-colors">
                 ✉️ Napisz E-mail
               </a>
             )}
@@ -223,10 +223,10 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
         </div>
 
         {/* SKRZYNKA NA PLIKI (CENNIKI) */}
-        <div className="bg-white/60 p-4 rounded-xl shadow-sm border border-hairline-soft h-max">
+        <div className="bg-white/60 dark:bg-white/10 p-4 rounded-xl shadow-sm border border-hairline-soft h-max">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xs font-bold text-ink font-light uppercase tracking-wider">📂 Oferty i Cenniki</h3>
-            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="text-[11px] font-bold bg-primary text-white px-2 py-1 rounded transition-opacity hover:opacity-90">
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="text-[11px] font-bold bg-primary text-on-primary px-2 py-1 rounded transition-opacity hover:opacity-90">
               {uploading ? 'Wgrywam...' : '+ Dodaj plik'}
             </button>
             <input type="file" className="hidden" ref={fileRef} onChange={handleFileUpload} />
@@ -237,7 +237,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
               <p className="text-xs text-ink/40 text-center py-4 italic">Brak załączonych plików.</p>
             ) : (
               supplier.files.map(file => (
-                <div key={file.id} className="flex justify-between items-center bg-white p-2 rounded border border-hairline text-xs shadow-sm">
+                <div key={file.id} className="flex justify-between items-center bg-white dark:bg-surface-soft p-2 rounded border border-hairline text-xs shadow-sm">
                   <a href={file.url} target="_blank" rel="noreferrer" className="font-medium hover:underline text-ink truncate mr-2" title={file.name}>📄 {file.name}</a>
                   <button type="button" onClick={() => handleDeleteFile(file.id)} className="text-red-500 font-bold hover:underline shrink-0 px-1">Usuń</button>
                 </div>
@@ -260,7 +260,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
         </div>
 
         {showAddNote && (
-          <form onSubmit={handleAddNote} className="bg-white/50 p-4 rounded-xl border border-hairline-soft mb-6 animate-in fade-in duration-200">
+          <form onSubmit={handleAddNote} className="bg-white/50 dark:bg-white/5 p-4 rounded-xl border border-hairline-soft mb-6 animate-in fade-in duration-200">
             <textarea required rows={3} placeholder="Wpisz krótki przebieg rozmowy, zgłoszone reklamacje, ustalenia z dostawcą..." value={noteText} onChange={e => setNoteText(e.target.value)} className="w-full bg-canvas border border-hairline rounded-lg p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm font-light mb-3 resize-none" />
             <button type="submit" className="btn-primary px-6 py-2 text-sm">Zapisz notatkę</button>
           </form>

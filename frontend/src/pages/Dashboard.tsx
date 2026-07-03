@@ -13,6 +13,8 @@ import CalendarPanel from '../components/CalendarPanel';
 import KanbanPanel from '../components/KanbanPanel';
 import MobileNav from '../components/MobileNav';
 import AdminPanel from '../components/AdminPanel';
+import ThemeToggle from '../components/ThemeToggle';
+import { useTheme } from '../hooks/useTheme';
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
@@ -39,6 +41,7 @@ const TABS: { id: ActiveTab; label: string }[] = [
 
 const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const { clients, loading, error, fetchClients, createClient, updateClient, removeClient } = useClients();
+  const { theme, toggle: toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<ActiveTab>('clients');
   const [showForm, setShowForm] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -152,6 +155,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-body-sm font-light text-ink hidden lg:block max-w-[200px] truncate">{user?.email}</span>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
           <button type="button" onClick={onSignOut} className="btn-tertiary hidden md:block">
             Wyloguj
           </button>
@@ -193,6 +197,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
                   {tab.label}
                 </button>
               ))}
+            </div>
+            <div className="p-3 border-t border-hairline">
+              <ThemeToggle theme={theme} onToggle={toggleTheme} variant="full" />
             </div>
             <div className="p-4 border-t border-hairline">
               <p className="text-xs text-ink opacity-50 mb-3 truncate">{user?.email}</p>

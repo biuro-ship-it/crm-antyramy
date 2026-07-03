@@ -140,7 +140,7 @@ export default function KanbanModal({ task, defaultColumn, clients, onClose, onS
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-white bg-primary hover:opacity-90 rounded-lg shadow disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-on-primary bg-primary hover:opacity-90 rounded-lg shadow disabled:opacity-50"
           >
             {saving ? 'Zapisywanie...' : 'Zapisz'}
           </button>

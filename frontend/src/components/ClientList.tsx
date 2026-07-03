@@ -238,7 +238,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
                   </span>
                   {client.route && (
                     <span
-                      className="badge bg-block-navy text-inverse-ink cursor-pointer hover:opacity-80 transition-opacity"
+                      className="badge bg-block-navy text-white cursor-pointer hover:opacity-80 transition-opacity"
                       title={`Trasa: ${client.route}`}
                       onClick={() => setRouteFilter(client.route === routeFilter ? '' : (client.route || ''))}
                     >
@@ -246,7 +246,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
                     </span>
                   )}
                 </div>
-                <button type="button" onClick={() => onEdit(client)} className="btn-tertiary text-body-sm py-1 bg-white/40 hover:bg-white/80">
+                <button type="button" onClick={() => onEdit(client)} className="btn-tertiary text-body-sm py-1 bg-white/40 hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/20">
                   Edytuj
                 </button>
               </div>

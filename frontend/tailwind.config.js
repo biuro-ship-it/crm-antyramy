@@ -1,28 +1,33 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
-        primary: '#000000',
-        'on-primary': '#ffffff',
-        ink: '#000000',
-        canvas: '#ffffff',
-        'inverse-canvas': '#000000',
-        'inverse-ink': '#ffffff',
-        'surface-soft': '#f7f7f5',
-        hairline: '#e6e6e6',
-        'hairline-soft': '#f1f1f1',
-        'block-lime': '#dceeb1',
-        'block-lilac': '#c5b0f4',
-        'block-cream': '#f4ecd6',
-        'block-pink': '#efd4d4',
-        'block-gray': '#d9d9d9',
-        'block-mint': '#c8e6cd',
-        'block-coral': '#f3c9b6',
-        'block-navy': '#1f1d3d',
-        'accent-magenta': '#ff3d8b',
-        success: '#1ea64a',
+        // Semantyczne tokeny oparte o zmienne CSS (kanały RGB) —
+        // wartości dla trybu jasnego/ciemnego definiuje src/index.css.
+        // Zapis rgb(var(--c-*) / <alpha-value>) zachowuje modyfikatory przezroczystości (np. bg-ink/30).
+        primary: 'rgb(var(--c-primary) / <alpha-value>)',
+        'on-primary': 'rgb(var(--c-on-primary) / <alpha-value>)',
+        ink: 'rgb(var(--c-ink) / <alpha-value>)',
+        canvas: 'rgb(var(--c-canvas) / <alpha-value>)',
+        'inverse-canvas': 'rgb(var(--c-inverse-canvas) / <alpha-value>)',
+        'inverse-ink': 'rgb(var(--c-inverse-ink) / <alpha-value>)',
+        'surface-soft': 'rgb(var(--c-surface-soft) / <alpha-value>)',
+        hairline: 'rgb(var(--c-hairline) / <alpha-value>)',
+        'hairline-soft': 'rgb(var(--c-hairline-soft) / <alpha-value>)',
+        'block-lime': 'rgb(var(--c-block-lime) / <alpha-value>)',
+        'block-lilac': 'rgb(var(--c-block-lilac) / <alpha-value>)',
+        'block-cream': 'rgb(var(--c-block-cream) / <alpha-value>)',
+        'block-pink': 'rgb(var(--c-block-pink) / <alpha-value>)',
+        'block-gray': 'rgb(var(--c-block-gray) / <alpha-value>)',
+        'block-mint': 'rgb(var(--c-block-mint) / <alpha-value>)',
+        'block-coral': 'rgb(var(--c-block-coral) / <alpha-value>)',
+        'block-navy': 'rgb(var(--c-block-navy) / <alpha-value>)',
+        'on-block': 'rgb(var(--c-on-block) / <alpha-value>)',
+        'accent-magenta': 'rgb(var(--c-accent-magenta) / <alpha-value>)',
+        success: 'rgb(var(--c-success) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'Helvetica', 'Arial', 'sans-serif'],

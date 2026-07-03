@@ -280,7 +280,7 @@ const ProductsPanel: React.FC = () => {
                           ✎ Edytuj
                         </button>
                         <button onClick={() => setDeleteConfirm(product.id)}
-                          className="px-3 border border-red-100 text-red-400 text-xs font-bold py-2 rounded-lg hover:bg-red-50 transition-colors">
+                          className="px-3 border border-red-100 dark:border-red-900/50 text-red-400 text-xs font-bold py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors">
                           🗑
                         </button>
                       </div>

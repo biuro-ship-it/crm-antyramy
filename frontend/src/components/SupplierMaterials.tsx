@@ -136,7 +136,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
   };
 
   return (
-    <div className="bg-white/70 rounded-xl p-5 border border-hairline-soft shadow-sm mb-6">
+    <div className="bg-white/70 dark:bg-white/5 rounded-xl p-5 border border-hairline-soft shadow-sm mb-6">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h3 className="text-xs font-bold text-ink font-light uppercase tracking-wider">📦 Surowce i zamówienia</h3>
         {saving && <span className="text-xs text-ink/40 italic">Zapisuję...</span>}
@@ -225,12 +225,12 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
           value={newDraft.name}
           onChange={e => setNewDraft({ ...newDraft, name: e.target.value })}
           placeholder="Nazwa nowego surowca"
-          className="flex-1 bg-white border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+          className="flex-1 bg-white dark:bg-surface-soft border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
         />
         <select
           value={newDraft.unit}
           onChange={e => setNewDraft({ ...newDraft, unit: e.target.value as SupplierMaterial['unit'] })}
-          className="bg-white border border-hairline rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+          className="bg-white dark:bg-surface-soft border border-hairline rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
         >
           {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
         </select>
@@ -239,7 +239,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
           onChange={e => setNewDraft({ ...newDraft, price: e.target.value })}
           inputMode="decimal"
           placeholder="Cena netto / jedn."
-          className="w-36 bg-white border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+          className="w-36 bg-white dark:bg-surface-soft border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
         />
         <button type="button" onClick={handleAdd} disabled={saving || !newDraft.name.trim()} className="btn-primary px-5 py-2 text-sm disabled:opacity-60">
           ＋ Dodaj surowiec

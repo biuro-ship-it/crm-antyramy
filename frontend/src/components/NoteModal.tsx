@@ -196,7 +196,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                 />
                 ⭐ Ważne
               </label>
-              <label className="flex items-center gap-2 cursor-pointer select-none font-medium text-sm text-red-700">
+              <label className="flex items-center gap-2 cursor-pointer select-none font-medium text-sm text-red-700 dark:text-red-400">
                 <input
                   type="checkbox"
                   checked={isUrgent}
@@ -213,20 +213,20 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
             <div className="bg-surface-soft p-2 border-b border-hairline flex flex-wrap gap-1 text-xs items-center">
               <button type="button" onClick={() => editor?.chain().focus().toggleBold().run()} className={`px-2 py-1 rounded ${editor?.isActive('bold') ? 'bg-block-lilac font-bold' : 'hover:bg-surface-soft'}`}>B</button>
               <button type="button" onClick={() => editor?.chain().focus().toggleItalic().run()} className={`px-2 py-1 rounded ${editor?.isActive('italic') ? 'bg-block-lilac italic' : 'hover:bg-surface-soft'}`}>I</button>
-              <span className="text-slate-300 px-1">|</span>
+              <span className="text-slate-300 dark:text-slate-600 px-1">|</span>
               <button type="button" onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} className="px-2 py-1 rounded hover:bg-surface-soft bg-canvas border border-hairline">➕ Tabela 3x3</button>
               <button type="button" onClick={() => editor?.chain().focus().addColumnAfter().run()} className="px-2 py-1 rounded hover:bg-surface-soft text-ink font-light">Kolumna +</button>
               <button type="button" onClick={() => editor?.chain().focus().addRowAfter().run()} className="px-2 py-1 rounded hover:bg-surface-soft text-ink font-light">Wiersz +</button>
               {SpeechRecognitionAPI && (
                 <>
-                  <span className="text-slate-300 px-1">|</span>
+                  <span className="text-slate-300 dark:text-slate-600 px-1">|</span>
                   <button
                     type="button"
                     onClick={listening ? stopVoice : startVoice}
                     title={listening ? 'Zatrzymaj dyktowanie' : 'Dyktuj głosowo (pl)'}
                     className={`px-2 py-1 rounded flex items-center gap-1 transition ${
                       listening
-                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 animate-pulse'
                         : 'hover:bg-surface-soft text-ink'
                     }`}
                   >
@@ -278,7 +278,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                     <button
                       type="button"
                       onClick={() => setAttachments(prev => prev.filter((_, i) => i !== idx))}
-                      className="text-xs text-red-500 hover:text-red-700 font-bold px-2"
+                      className="text-xs text-red-500 hover:text-red-700 dark:hover:text-red-300 font-bold px-2"
                     >
                       Usuń
                     </button>
@@ -301,7 +301,7 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
             </button>
             <button
               onClick={handleSubmit}
-              className="px-4 py-2 text-sm font-medium text-white bg-primary hover:opacity-90 rounded-lg shadow"
+              className="px-4 py-2 text-sm font-medium text-on-primary bg-primary hover:opacity-90 rounded-lg shadow"
             >
               Zapisz
             </button>

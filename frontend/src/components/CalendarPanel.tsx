@@ -37,7 +37,7 @@ const getStatusInfo = (f: FollowUp, todayISO: string): StatusInfo => {
     return { label: 'Przesunięte', chip: 'bg-block-cream text-ink', dot: 'bg-amber-400' };
   }
   if (f.dueDate < todayISO) {
-    return { label: 'Zaległe', chip: 'bg-red-50 text-red-700 border border-red-200', dot: 'bg-red-500' };
+    return { label: 'Zaległe', chip: 'bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/50', dot: 'bg-red-500' };
   }
   return { label: 'Do zrobienia', chip: 'bg-block-lilac text-ink', dot: 'bg-violet-500' };
 };
@@ -80,7 +80,7 @@ function DayView({
     <div className="max-w-2xl mx-auto rounded-2xl border border-hairline overflow-hidden shadow-sm bg-canvas">
 
       {/* Nagłówek dnia */}
-      <div className={`px-6 py-4 flex items-center justify-between border-b border-hairline ${isToday ? 'bg-violet-50' : 'bg-surface-soft'}`}>
+      <div className={`px-6 py-4 flex items-center justify-between border-b border-hairline ${isToday ? 'bg-violet-50 dark:bg-violet-950/30' : 'bg-surface-soft'}`}>
         <div>
           <div className="text-xs font-semibold uppercase tracking-wider text-ink opacity-40 mb-0.5">
             {isToday ? 'Dziś' : 'Wybrany dzień'}
@@ -154,12 +154,12 @@ function DayView({
             <div
               key={h}
               onClick={onAdd}
-              className="relative flex items-start group cursor-pointer hover:bg-violet-50/40 transition-colors"
+              className="relative flex items-start group cursor-pointer hover:bg-violet-50/40 dark:hover:bg-violet-950/20 transition-colors"
               style={{ minHeight: '52px' }}
             >
               {/* Etykieta godziny */}
               <div className="w-14 shrink-0 pt-2 pb-2 text-right pr-3">
-                <span className={`text-xs font-medium ${isNowHour ? 'text-violet-600 font-bold' : 'text-ink opacity-30'}`}>
+                <span className={`text-xs font-medium ${isNowHour ? 'text-violet-600 dark:text-violet-400 font-bold' : 'text-ink opacity-30'}`}>
                   {label}
                 </span>
               </div>
@@ -372,7 +372,7 @@ export default function CalendarPanel() {
                   onClick={() => openAdd(iso)}
                   className={`min-h-[110px] p-2 cursor-pointer transition-colors hover:bg-surface-soft ${
                     inMonth ? '' : 'bg-surface-soft opacity-40'
-                  } ${isToday ? 'bg-violet-50' : ''}`}
+                  } ${isToday ? 'bg-violet-50 dark:bg-violet-950/30' : ''}`}
                 >
                   {/* Numer dnia */}
                   <div className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-semibold mb-1.5 ${
@@ -401,7 +401,7 @@ export default function CalendarPanel() {
                     )}
                     {/* Zrealizowane — tylko liczba */}
                     {done.length > 0 && (
-                      <div className="text-[10px] text-emerald-600 opacity-70 pl-1">✓ {done.length} zrobione</div>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 opacity-70 pl-1">✓ {done.length} zrobione</div>
                     )}
                   </div>
                 </div>

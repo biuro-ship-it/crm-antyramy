@@ -2,6 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Tokeny motywu jako kanały RGB "R G B" (bez rgb()), aby działały modyfikatory
+  przezroczystości Tailwind (np. bg-ink/30). Wartości nadpisuje .dark na <html>.
+*/
+:root {
+  --c-primary: 0 0 0;
+  --c-on-primary: 255 255 255;
+  --c-ink: 0 0 0;
+  --c-canvas: 255 255 255;
+  --c-inverse-canvas: 0 0 0;
+  --c-inverse-ink: 255 255 255;
+  --c-surface-soft: 247 247 245;
+  --c-hairline: 230 230 230;
+  --c-hairline-soft: 241 241 241;
+  --c-block-lime: 220 238 177;
+  --c-block-lilac: 197 176 244;
+  --c-block-cream: 244 236 214;
+  --c-block-pink: 239 212 212;
+  --c-block-gray: 217 217 217;
+  --c-block-mint: 200 230 205;
+  --c-block-coral: 243 201 182;
+  --c-block-navy: 31 29 61;
+  --c-on-block: 0 0 0;           /* tekst na blokach dekoracyjnych (jasny tryb) */
+  --c-accent-magenta: 255 61 139;
+  --c-success: 30 166 74;
+  color-scheme: light;
+}
+
+html.dark {
+  --c-primary: 236 236 238;      /* jasny przycisk na ciemnym tle */
+  --c-on-primary: 20 20 24;
+  --c-ink: 236 236 238;          /* prawie-biały tekst, mniej „jarzenia” */
+  --c-canvas: 23 23 27;          /* grafit, nie czysta czerń */
+  --c-inverse-canvas: 236 236 238;
+  --c-inverse-ink: 20 20 24;
+  --c-surface-soft: 33 33 39;
+  --c-hairline: 51 51 59;
+  --c-hairline-soft: 38 38 45;
+  --c-block-lime: 52 64 28;
+  --c-block-lilac: 54 42 94;
+  --c-block-cream: 59 52 33;
+  --c-block-pink: 75 43 43;
+  --c-block-gray: 52 52 60;
+  --c-block-mint: 32 60 43;
+  --c-block-coral: 75 49 33;
+  --c-block-navy: 38 36 77;
+  --c-on-block: 236 236 238;     /* jasny tekst na wyciszonych blokach */
+  --c-accent-magenta: 255 92 158;
+  --c-success: 58 209 113;
+  color-scheme: dark;
+}
+
 @layer base {
   html {
     @apply font-sans text-ink bg-canvas antialiased;
@@ -10,6 +62,12 @@
 
   body {
     @apply min-h-screen bg-canvas text-ink;
+  }
+
+  /* Łagodne przejście przy zmianie motywu (bez animowania transformów) */
+  html.theme-anim,
+  html.theme-anim * {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
   }
 }
 
@@ -99,7 +157,8 @@
   }
 
   .color-block-navy {
-    @apply color-block bg-block-navy text-inverse-ink;
+    @apply color-block bg-block-navy;
+    color: rgb(236 236 238); /* navy jest ciemny w obu trybach — tekst zawsze jasny */
   }
 
   .alert-error {

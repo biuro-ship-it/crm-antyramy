@@ -61,7 +61,7 @@ function SortableCard({ task, onEdit, onDelete }: CardProps) {
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onDelete(task.id); }}
-          className="text-xs text-red-500 hover:text-red-700 font-bold shrink-0"
+          className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 font-bold shrink-0"
           title="Usuń"
         >
           ✕

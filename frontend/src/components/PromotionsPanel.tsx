@@ -189,7 +189,7 @@ const PromotionsPanel: React.FC = () => {
                       }
                       {selected && (
                         <div className="absolute top-2 right-2 w-6 h-6 bg-primary rounded-full flex items-center justify-center">
-                          <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 20 20" fill="currentColor">
+                          <svg className="w-3.5 h-3.5 text-on-primary" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
                         </div>
@@ -217,7 +217,7 @@ const PromotionsPanel: React.FC = () => {
             <button
               onClick={() => setStep(2)}
               disabled={!canGoStep2}
-              className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
+              className="px-6 py-2.5 bg-primary text-on-primary text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
             >
               Dalej: wybór odbiorców
             </button>
@@ -287,7 +287,7 @@ const PromotionsPanel: React.FC = () => {
                       </p>
                     </div>
                     {!hasEmail && (
-                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full shrink-0">brak e-mail</span>
+                      <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded-full shrink-0">brak e-mail</span>
                     )}
                   </label>
                 );
@@ -300,7 +300,7 @@ const PromotionsPanel: React.FC = () => {
               Wybrano <strong>{selectedClients.size}</strong> klientów,
               z czego <strong>{recipientsWithEmail.length}</strong> ma adres email (do nich trafi mail).
               {selectedClients.size !== recipientsWithEmail.length && (
-                <span className="text-amber-700"> {selectedClients.size - recipientsWithEmail.length} bez emaila zostanie pominięte.</span>
+                <span className="text-amber-700 dark:text-amber-400"> {selectedClients.size - recipientsWithEmail.length} bez emaila zostanie pominięte.</span>
               )}
             </div>
           )}
@@ -312,7 +312,7 @@ const PromotionsPanel: React.FC = () => {
             <button
               onClick={() => setStep(3)}
               disabled={!canGoStep3}
-              className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
+              className="px-6 py-2.5 bg-primary text-on-primary text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
             >
               Dalej: treść maila
             </button>
@@ -360,13 +360,13 @@ const PromotionsPanel: React.FC = () => {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-700 dark:text-red-300">
                 {error}
               </div>
             )}
 
             {result && (
-              <div className={`rounded-lg px-4 py-3 text-sm ${result.failed.length === 0 ? 'bg-block-mint border border-hairline text-ink' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+              <div className={`rounded-lg px-4 py-3 text-sm ${result.failed.length === 0 ? 'bg-block-mint border border-hairline text-ink' : 'bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300'}`}>
                 <p className="font-semibold">
                   Wysłano {result.sent} z {result.total} maili.
                 </p>
@@ -394,7 +394,7 @@ const PromotionsPanel: React.FC = () => {
               <button
                 onClick={handleSend}
                 disabled={!canSend}
-                className="px-6 py-2.5 bg-primary text-white text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
+                className="px-6 py-2.5 bg-primary text-on-primary text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
               >
                 {sending
                   ? 'Wysyłam...'
@@ -433,7 +433,7 @@ const PromotionsPanel: React.FC = () => {
                   <p className="text-xs font-semibold text-ink font-light uppercase tracking-wide mb-2">Odbiorcy</p>
                   <p className="text-sm text-ink"><span className="font-bold">{recipientsWithEmail.length}</span> firm z adresem email</p>
                   {chosenClients.length !== recipientsWithEmail.length && (
-                    <p className="text-xs text-amber-600 mt-0.5">{chosenClients.length - recipientsWithEmail.length} bez emaila</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{chosenClients.length - recipientsWithEmail.length} bez emaila</p>
                   )}
                 </div>
 

@@ -132,16 +132,16 @@ export default function SuppliersPanel() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="eyebrow block mb-2">Nazwa firmy</label>
-                <input required type="text" value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="input-field bg-white" />
+                <input required type="text" value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="input-field bg-white dark:bg-surface-soft" />
               </div>
               <div>
                 <label className="eyebrow block mb-2">Kategoria</label>
-                <select value={DEFAULT_CATEGORIES.includes(form.category) ? form.category : 'CUSTOM'} onChange={e => setForm({...form, category: e.target.value})} className="select-field bg-white">
+                <select value={DEFAULT_CATEGORIES.includes(form.category) ? form.category : 'CUSTOM'} onChange={e => setForm({...form, category: e.target.value})} className="select-field bg-white dark:bg-surface-soft">
                   {DEFAULT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   <option value="CUSTOM">+ Dodaj własną kategorię...</option>
                 </select>
                 {(form.category === 'CUSTOM' || (!DEFAULT_CATEGORIES.includes(form.category) && form.category !== '')) && (
-                  <input type="text" placeholder="Wpisz nazwę kategorii" required value={customCategory} onChange={e => setCustomCategory(e.target.value)} className="input-field bg-white mt-2" />
+                  <input type="text" placeholder="Wpisz nazwę kategorii" required value={customCategory} onChange={e => setCustomCategory(e.target.value)} className="input-field bg-white dark:bg-surface-soft mt-2" />
                 )}
               </div>
             </div>
@@ -150,34 +150,34 @@ export default function SuppliersPanel() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="eyebrow block mb-2">Kod pocztowy</label>
-                <input type="text" value={form.address?.zipCode} onChange={e => setForm({...form, address: {...form.address!, zipCode: e.target.value}})} className="input-field bg-white" placeholder="00-000" />
+                <input type="text" value={form.address?.zipCode} onChange={e => setForm({...form, address: {...form.address!, zipCode: e.target.value}})} className="input-field bg-white dark:bg-surface-soft" placeholder="00-000" />
               </div>
               <div>
                 <label className="eyebrow block mb-2">Miasto</label>
-                <input type="text" value={form.address?.city} onChange={e => setForm({...form, address: {...form.address!, city: e.target.value}})} className="input-field bg-white" />
+                <input type="text" value={form.address?.city} onChange={e => setForm({...form, address: {...form.address!, city: e.target.value}})} className="input-field bg-white dark:bg-surface-soft" />
               </div>
               <div>
                 <label className="eyebrow block mb-2">Ulica i numer</label>
-                <input type="text" value={form.address?.street} onChange={e => setForm({...form, address: {...form.address!, street: e.target.value}})} className="input-field bg-white" />
+                <input type="text" value={form.address?.street} onChange={e => setForm({...form, address: {...form.address!, street: e.target.value}})} className="input-field bg-white dark:bg-surface-soft" />
               </div>
             </div>
 
             {/* RZĄD 3: Numery Telefonów z Podziałem i Imionami */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-hairline-soft pt-4">
-              <div className="bg-white/40 p-4 rounded-xl border border-hairline shadow-sm">
+              <div className="bg-white/40 dark:bg-white/5 p-4 rounded-xl border border-hairline shadow-sm">
                 <label className="eyebrow block mb-2 text-ink/70">🏢 Tel. Firmowy (Biuro)</label>
-                <input type="text" placeholder="Dział / Obsługa (opcjonalnie)" value={form.contactNames?.company} onChange={e => setForm({...form, contactNames: {...form.contactNames!, company: e.target.value}})} className="input-field bg-white text-body-sm mb-2" />
-                <input type="text" placeholder="Numer telefonu" value={form.phoneCompany} onChange={e => setForm({...form, phoneCompany: e.target.value})} className="input-field bg-white text-body-sm" />
+                <input type="text" placeholder="Dział / Obsługa (opcjonalnie)" value={form.contactNames?.company} onChange={e => setForm({...form, contactNames: {...form.contactNames!, company: e.target.value}})} className="input-field bg-white dark:bg-surface-soft text-body-sm mb-2" />
+                <input type="text" placeholder="Numer telefonu" value={form.phoneCompany} onChange={e => setForm({...form, phoneCompany: e.target.value})} className="input-field bg-white dark:bg-surface-soft text-body-sm" />
               </div>
-              <div className="bg-white/40 p-4 rounded-xl border border-hairline shadow-sm">
+              <div className="bg-white/40 dark:bg-white/5 p-4 rounded-xl border border-hairline shadow-sm">
                 <label className="eyebrow block mb-2 text-ink/70">👨‍💼 Tel. Handlowiec / Opiekun</label>
-                <input type="text" placeholder="Imię i nazwisko handlowca" value={form.contactNames?.sales} onChange={e => setForm({...form, contactNames: {...form.contactNames!, sales: e.target.value}})} className="input-field bg-white text-body-sm mb-2" />
-                <input type="text" placeholder="Numer telefonu" value={form.phoneSales} onChange={e => setForm({...form, phoneSales: e.target.value})} className="input-field bg-white text-body-sm" />
+                <input type="text" placeholder="Imię i nazwisko handlowca" value={form.contactNames?.sales} onChange={e => setForm({...form, contactNames: {...form.contactNames!, sales: e.target.value}})} className="input-field bg-white dark:bg-surface-soft text-body-sm mb-2" />
+                <input type="text" placeholder="Numer telefonu" value={form.phoneSales} onChange={e => setForm({...form, phoneSales: e.target.value})} className="input-field bg-white dark:bg-surface-soft text-body-sm" />
               </div>
-              <div className="bg-white/40 p-4 rounded-xl border border-hairline shadow-sm">
+              <div className="bg-white/40 dark:bg-white/5 p-4 rounded-xl border border-hairline shadow-sm">
                 <label className="eyebrow block mb-2 text-ink/70">👑 Tel. Właściciel / Szef</label>
-                <input type="text" placeholder="Imię i nazwisko szefa" value={form.contactNames?.owner} onChange={e => setForm({...form, contactNames: {...form.contactNames!, owner: e.target.value}})} className="input-field bg-white text-body-sm mb-2" />
-                <input type="text" placeholder="Numer telefonu" value={form.phoneOwner} onChange={e => setForm({...form, phoneOwner: e.target.value})} className="input-field bg-white text-body-sm" />
+                <input type="text" placeholder="Imię i nazwisko szefa" value={form.contactNames?.owner} onChange={e => setForm({...form, contactNames: {...form.contactNames!, owner: e.target.value}})} className="input-field bg-white dark:bg-surface-soft text-body-sm mb-2" />
+                <input type="text" placeholder="Numer telefonu" value={form.phoneOwner} onChange={e => setForm({...form, phoneOwner: e.target.value})} className="input-field bg-white dark:bg-surface-soft text-body-sm" />
               </div>
             </div>
 
@@ -185,33 +185,33 @@ export default function SuppliersPanel() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="eyebrow block mb-2">✉️ E-mail do zamówień</label>
-                <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-field bg-white" placeholder="zamowienia@..." />
+                <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})} className="input-field bg-white dark:bg-surface-soft" placeholder="zamowienia@..." />
               </div>
               <div>
                 <label className="eyebrow block mb-2 text-success">WhatsApp (Numer)</label>
-                <input type="text" placeholder="np. 48123456789" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} className="input-field bg-white" />
+                <input type="text" placeholder="np. 48123456789" value={form.whatsapp} onChange={e => setForm({...form, whatsapp: e.target.value})} className="input-field bg-white dark:bg-surface-soft" />
               </div>
               <div>
                 <label className="eyebrow block mb-2 text-[#0084FF]">Messenger (ID / Link)</label>
-                <input type="text" placeholder="np. nazwa.profilu" value={form.messenger} onChange={e => setForm({...form, messenger: e.target.value})} className="input-field bg-white" />
+                <input type="text" placeholder="np. nazwa.profilu" value={form.messenger} onChange={e => setForm({...form, messenger: e.target.value})} className="input-field bg-white dark:bg-surface-soft" />
               </div>
             </div>
 
             {/* RZĄD 5: UZGODNIENIA HANDLOWE */}
-            <div className="bg-white/50 p-5 rounded-xl border border-hairline shadow-sm">
+            <div className="bg-white/50 dark:bg-white/5 p-5 rounded-xl border border-hairline shadow-sm">
               <h4 className="font-semibold text-body-sm mb-3 text-ink">🤝 Stałe uzgodnienia logistyczno-handlowe</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="eyebrow block mb-2">Poziom Rabatu</label>
-                  <input type="text" placeholder="np. 15% na profile, 5% szkło" value={form.agreements?.discount} onChange={e => setForm({...form, agreements: {...form.agreements!, discount: e.target.value}})} className="input-field bg-white text-body-sm" />
+                  <input type="text" placeholder="np. 15% na profile, 5% szkło" value={form.agreements?.discount} onChange={e => setForm({...form, agreements: {...form.agreements!, discount: e.target.value}})} className="input-field bg-white dark:bg-surface-soft text-body-sm" />
                 </div>
                 <div>
                   <label className="eyebrow block mb-2">Termin Płatności</label>
-                  <input type="text" placeholder="np. przelew 14 dni, pobranie" value={form.agreements?.paymentTerm} onChange={e => setForm({...form, agreements: {...form.agreements!, paymentTerm: e.target.value}})} className="input-field bg-white text-body-sm" />
+                  <input type="text" placeholder="np. przelew 14 dni, pobranie" value={form.agreements?.paymentTerm} onChange={e => setForm({...form, agreements: {...form.agreements!, paymentTerm: e.target.value}})} className="input-field bg-white dark:bg-surface-soft text-body-sm" />
                 </div>
                 <div>
                   <label className="eyebrow block mb-2">Częstotliwość Dostaw</label>
-                  <input type="text" placeholder="np. każdy wtorek rano, kurier" value={form.agreements?.deliveryFreq} onChange={e => setForm({...form, agreements: {...form.agreements!, deliveryFreq: e.target.value}})} className="input-field bg-white text-body-sm" />
+                  <input type="text" placeholder="np. każdy wtorek rano, kurier" value={form.agreements?.deliveryFreq} onChange={e => setForm({...form, agreements: {...form.agreements!, deliveryFreq: e.target.value}})} className="input-field bg-white dark:bg-surface-soft text-body-sm" />
                 </div>
               </div>
             </div>
@@ -219,7 +219,7 @@ export default function SuppliersPanel() {
             {/* RZĄD 6: UWAGI / NOTATKI */}
             <div>
               <label className="eyebrow block mb-2">📝 Ogólne uwagi / Dodatkowe warunki handlowe</label>
-              <textarea rows={3} placeholder="Wszelkie inne ważne adnotacje, np. darmowe minimum logistyczne od 2000zł netto..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full bg-white border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm font-light resize-none" />
+              <textarea rows={3} placeholder="Wszelkie inne ważne adnotacje, np. darmowe minimum logistyczne od 2000zł netto..." value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} className="w-full bg-white dark:bg-surface-soft border border-hairline rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm font-light resize-none" />
             </div>
 
             {/* RZĄD 7: Kolorystyka i wysyłka */}
@@ -232,7 +232,7 @@ export default function SuppliersPanel() {
                       key={colorId}
                       type="button"
                       onClick={() => setForm({...form, relationshipColor: colorId})}
-                      className={`w-8 h-8 rounded-full border border-hairline transition-transform shadow-sm ${colorId === 'default' ? 'bg-white' : COLOR_CLASSES[colorId]} ${
+                      className={`w-8 h-8 rounded-full border border-hairline transition-transform shadow-sm ${colorId === 'default' ? 'bg-canvas' : COLOR_CLASSES[colorId]} ${
                         form.relationshipColor === colorId ? 'ring-2 ring-offset-2 ring-ink scale-110' : 'opacity-60 hover:opacity-100'
                       }`}
                     />
@@ -257,7 +257,7 @@ export default function SuppliersPanel() {
                 <div key={s.id} className={`card-padded flex flex-col h-full shadow-sm hover:shadow-md transition-shadow ${COLOR_CLASSES[s.relationshipColor || 'default']}`}>
                   <div className="flex justify-between items-start mb-3">
                     <span className="badge badge-lilac text-xs font-bold px-2 py-0.5">{s.category}</span>
-                    <button type="button" onClick={() => openForm(s)} className="btn-tertiary bg-white/40 text-xs py-1 hover:bg-white/80">Edytuj</button>
+                    <button type="button" onClick={() => openForm(s)} className="btn-tertiary bg-white/40 dark:bg-white/10 text-xs py-1 hover:bg-white/80 dark:hover:bg-white/20">Edytuj</button>
                   </div>
                   <h3 className="text-card-title mb-4 truncate" title={s.companyName}>{s.companyName}</h3>
                   <div className="text-body-sm font-light space-y-1.5 mb-4 flex-grow">
@@ -266,9 +266,9 @@ export default function SuppliersPanel() {
                     {s.email && <p className="truncate">✉️ {s.email}</p>}
                     {s.files?.length > 0 && <p className="text-xs text-ink/60 pt-1 font-medium">📎 Załączono cenniki: {s.files.length}</p>}
                   </div>
-                  <div className="flex gap-2 mt-auto border-t border-black/5 pt-4">
-                    <button type="button" onClick={() => setViewSupplier(s)} className="btn-secondary w-full text-xs bg-white border-none shadow-sm">Otwórz kartę</button>
-                    <button type="button" onClick={() => handleDelete(s.id)} className="px-3 text-red-500 hover:bg-red-50 rounded-lg text-xs font-bold bg-white/40">Usuń</button>
+                  <div className="flex gap-2 mt-auto border-t border-black/5 dark:border-white/10 pt-4">
+                    <button type="button" onClick={() => setViewSupplier(s)} className="btn-secondary w-full text-xs bg-white dark:bg-surface-soft border-none shadow-sm">Otwórz kartę</button>
+                    <button type="button" onClick={() => handleDelete(s.id)} className="px-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg text-xs font-bold bg-white/40 dark:bg-white/10">Usuń</button>
                   </div>
                 </div>
               ))}

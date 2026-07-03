@@ -11,7 +11,7 @@ interface EmailSendModalProps {
 
 const CATEGORY_BADGE: Record<string, string> = {
   'oferta': 'badge-lilac',
-  'follow-up': 'bg-amber-100 text-amber-700',
+  'follow-up': 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
   'podziękowanie': 'badge-mint',
   'inne': 'bg-surface-soft text-ink font-light',
 };
@@ -74,14 +74,14 @@ const EmailSendModal: React.FC<EmailSendModalProps> = ({ client, onClose }) => {
               <p className="text-lg font-bold text-ink">Mail wysłany</p>
               <p className="text-sm text-ink font-light mt-1">Wiadomość do <span className="font-semibold">{client.email}</span> została wysłana.</p>
               <button onClick={onClose}
-                className="mt-6 bg-primary hover:bg-primary text-white font-bold px-6 py-2.5 rounded-xl transition-colors">
+                className="mt-6 bg-primary hover:bg-primary text-on-primary font-bold px-6 py-2.5 rounded-xl transition-colors">
                 Zamknij
               </button>
             </div>
           ) : (
             <>
               {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl mb-4">⚠️ {error}</div>
+                <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 text-sm p-3 rounded-xl mb-4">⚠️ {error}</div>
               )}
 
               {/* Wybór szablonu */}

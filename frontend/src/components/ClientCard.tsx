@@ -310,7 +310,7 @@ const InteractionForm: React.FC<InteractionFormProps> = ({
               title={listening ? 'Zatrzymaj nagrywanie' : 'Dyktuj głosem'}
               className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
                 listening
-                  ? 'bg-red-100 text-red-600 animate-pulse'
+                  ? 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 animate-pulse'
                   : 'bg-surface-soft text-ink font-light hover:bg-block-lilac hover:underline'
               }`}
             >
@@ -321,7 +321,7 @@ const InteractionForm: React.FC<InteractionFormProps> = ({
         </div>
         <textarea required rows={3}
           className={`w-full bg-canvas border rounded-xl p-3 outline-none focus:ring-2 focus:ring-ink resize-none transition-colors ${
-            listening ? 'border-red-300 bg-red-50' : 'border-hairline'
+            listening ? 'border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40' : 'border-hairline'
           }`}
           placeholder="O czym rozmawialiście?"
           value={data.notes}
@@ -548,7 +548,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
 
   return (
     <div className={`card-padded transition-colors ${cardBgClass}`}>
-      <button onClick={onClose} className="mb-6 flex items-center gap-2 text-sm font-bold text-ink font-light hover:underline transition-colors bg-white/40 px-3 py-1.5 rounded-lg hover:bg-white/80 w-max">
+      <button onClick={onClose} className="mb-6 flex items-center gap-2 text-sm font-bold text-ink font-light hover:underline transition-colors bg-white/40 dark:bg-white/10 px-3 py-1.5 rounded-lg hover:bg-white/80 dark:hover:bg-white/20 w-max">
         <span>←</span> Wróć do listy klientów
       </button>
 
@@ -573,7 +573,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
             </p>
           )}
           {ordersTotal > 0 && (
-            <div className="mt-3 bg-white/60 rounded-lg px-3 py-2 shadow-sm inline-block">
+            <div className="mt-3 bg-white/60 dark:bg-white/10 rounded-lg px-3 py-2 shadow-sm inline-block">
               <p className="text-[11px] uppercase tracking-wide text-ink/60 font-semibold mb-1">
                 Udział w obrocie firmy
               </p>
@@ -594,7 +594,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
             </div>
           )}
         </div>
-        <div className="text-sm text-ink font-light bg-white/60 p-4 rounded-lg md:text-right w-full md:w-auto shadow-sm">
+        <div className="text-sm text-ink font-light bg-white/60 dark:bg-white/10 p-4 rounded-lg md:text-right w-full md:w-auto shadow-sm">
           <p className="flex items-center gap-2 md:justify-end mb-1">
             <span>📞</span>
             <a href={`tel:${client.phone}`} className="hover:underline font-bold">{client.phone || 'Brak'}</a>
@@ -632,14 +632,14 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
               <button
                 type="button"
                 onClick={() => setShowEmailModal(true)}
-                className="btn-secondary w-full text-body-sm bg-white"
+                className="btn-secondary w-full text-body-sm bg-white dark:bg-surface-soft"
               >
                 <span className="text-base">📦</span> Wyślij ofertę produktów
               </button>
               <button
                 type="button"
                 onClick={handleGenerateEmail}
-                className="btn-secondary w-full text-body-sm bg-white"
+                className="btn-secondary w-full text-body-sm bg-white dark:bg-surface-soft"
               >
                 <span className="text-base">📝</span> Generuj maila z ofertą
               </button>
@@ -672,7 +672,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
             </button>
             <button
               onClick={() => { setShowSaleForm(v => !v); setShowAddForm(false); setEditingId(null); }}
-              className="btn-secondary text-body-sm bg-white"
+              className="btn-secondary text-body-sm bg-white dark:bg-surface-soft"
             >
               {showSaleForm ? '✕ Anuluj' : '💰 Dodaj sprzedaż'}
             </button>
@@ -691,7 +691,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                   value={saleAmount}
                   onChange={e => setSaleAmount(e.target.value)}
                   placeholder="np. 1500"
-                  className="input-field bg-white"
+                  className="input-field bg-white dark:bg-surface-soft"
                   autoFocus
                 />
               </div>
@@ -701,7 +701,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                   type="date"
                   value={saleDate}
                   onChange={e => setSaleDate(e.target.value)}
-                  className="input-field bg-white"
+                  className="input-field bg-white dark:bg-surface-soft"
                 />
               </div>
               <div>
@@ -711,7 +711,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                   value={saleNote}
                   onChange={e => setSaleNote(e.target.value)}
                   placeholder="np. zamówienie hurtowe"
-                  className="input-field bg-white"
+                  className="input-field bg-white dark:bg-surface-soft"
                 />
               </div>
             </div>
@@ -719,7 +719,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
               <button onClick={handleAddSale} disabled={savingSale} className="btn-primary text-body-sm disabled:opacity-50">
                 {savingSale ? 'Zapisywanie...' : 'Zapisz sprzedaż'}
               </button>
-              <button onClick={() => setShowSaleForm(false)} className="btn-tertiary text-body-sm bg-white">
+              <button onClick={() => setShowSaleForm(false)} className="btn-tertiary text-body-sm bg-white dark:bg-surface-soft">
                 Anuluj
               </button>
             </div>
@@ -742,7 +742,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
         {loading ? (
           <p className="text-ink font-light text-center py-8">Ładowanie historii...</p>
         ) : timeline.length === 0 ? (
-          <div className="bg-white/40 rounded-lg p-8 text-center border border-hairline-soft border-dashed">
+          <div className="bg-white/40 dark:bg-white/5 rounded-lg p-8 text-center border border-hairline-soft border-dashed">
             <span className="text-4xl block mb-3">📭</span>
             <p className="text-ink font-light font-medium">Brak wpisów w historii.</p>
           </div>
@@ -759,7 +759,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                       <span className="font-black text-ink">{item.data.date}</span>
                       <button
                         onClick={() => handleDeleteSale(item.data.id)}
-                        className="text-xs font-bold text-red-600 hover:underline transition-colors"
+                        className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline transition-colors"
                       >
                         Usuń
                       </button>

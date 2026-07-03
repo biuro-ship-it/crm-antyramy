@@ -197,21 +197,21 @@ const ArchivePanel: React.FC = () => {
   return (
     <div className="animate-in fade-in duration-300">
       <div className="mb-6">
-        <h2 className="text-2xl font-extrabold text-slate-900">Archiwum danych</h2>
-        <p className="text-slate-500 text-sm mt-1">
+        <h2 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100">Archiwum danych</h2>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
           Pobierz kompletną kopię bazy na swój komputer — jako zabezpieczenie.
         </p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-4">⚠️ {error}</div>
+        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 p-4 rounded-xl mb-4">⚠️ {error}</div>
       )}
 
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl">
-        <p className="text-sm font-bold text-slate-700 mb-3">Kopia obejmuje:</p>
+      <div className="bg-white dark:bg-surface-soft rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm p-6 max-w-2xl">
+        <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3">Kopia obejmuje:</p>
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-6">
           {ITEMS.map(it => (
-            <li key={it.label} className="flex items-center gap-2 text-sm text-slate-600">
+            <li key={it.label} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
               <span className="text-base">{it.icon}</span> {it.label}
             </li>
           ))}
@@ -220,7 +220,7 @@ const ArchivePanel: React.FC = () => {
         <button
           onClick={handleZip}
           disabled={loading !== null}
-          className="w-full bg-slate-900 hover:bg-blue-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors"
+          className="w-full bg-slate-900 dark:bg-slate-700 hover:bg-blue-600 dark:hover:bg-blue-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors"
         >
           {loading === 'zip' ? '⏳ Przygotowuję archiwum...' : '⬇️ Pobierz pełną kopię (ZIP: dane + zdjęcia)'}
         </button>
@@ -229,7 +229,7 @@ const ArchivePanel: React.FC = () => {
           <button
             onClick={handleJson}
             disabled={loading !== null}
-            className="flex-1 bg-white hover:bg-slate-50 border border-slate-300 disabled:opacity-60 text-slate-800 font-bold py-3 rounded-xl transition-colors"
+            className="flex-1 bg-white dark:bg-surface-soft hover:bg-slate-50 dark:hover:bg-white/10 border border-slate-300 dark:border-white/10 disabled:opacity-60 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-xl transition-colors"
           >
             {loading === 'json' ? '⏳ Przygotowuję...' : '🧩 Pobierz dane (JSON)'}
           </button>
@@ -242,7 +242,7 @@ const ArchivePanel: React.FC = () => {
           </button>
         </div>
 
-        <p className="text-xs text-slate-400 mt-4 leading-relaxed">
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-4 leading-relaxed">
           <strong>ZIP</strong> to pełna kopia: <code>dane.json</code> (odtwarzalny zrzut bazy) + folder{' '}
           <code>zdjecia/</code> ze zdjęciami. <strong>JSON</strong> to same dane (bez zdjęć) w tym samym,
           odtwarzalnym kształcie. <strong>Excel</strong> to czytelne tabele do przeglądania. Pliki zapisują

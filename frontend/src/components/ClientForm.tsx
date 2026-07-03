@@ -155,7 +155,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
         <div className="md:col-span-1">
           <label className={labelClass}>Typ</label>
-          <select name="type" value={formData.type} onChange={handleTopChange} className="select-field bg-white">
+          <select name="type" value={formData.type} onChange={handleTopChange} className="select-field bg-white dark:bg-surface-soft">
             <option value="zakład">Zakład</option>
             <option value="sklep">Sklep</option>
             <option value="agencja">Agencja</option>
@@ -164,14 +164,14 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Nazwa firmy</label>
-          <input type="text" name="companyName" value={formData.companyName} onChange={handleTopChange} className="input-field bg-white" />
+          <input type="text" name="companyName" value={formData.companyName} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft" />
         </div>
         
         <div className="md:col-span-2">
           <label className={labelClass}>Kolor etykiety na liście</label>
           <div className="flex gap-3 mt-3 items-center">
             {[
-              { id: 'default', bg: 'bg-white' },
+              { id: 'default', bg: 'bg-canvas' },
               { id: 'lilac', bg: 'bg-block-lilac' },
               { id: 'cream', bg: 'bg-block-cream' },
               { id: 'pink', bg: 'bg-block-gray' },
@@ -202,11 +202,11 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
             name="nip"
             value={formData.nip}
             onChange={handleTopChange}
-            className="input-field flex-1 bg-white"
+            className="input-field flex-1 bg-white dark:bg-surface-soft"
             placeholder="np. 123-456-78-90"
             maxLength={13}
           />
-          <button type="button" onClick={handleNipLookup} disabled={nipLoading} className="btn-secondary shrink-0 bg-white">
+          <button type="button" onClick={handleNipLookup} disabled={nipLoading} className="btn-secondary shrink-0 bg-white dark:bg-surface-soft">
             {nipLoading ? '…' : 'Pobierz dane'}
           </button>
         </div>
@@ -216,17 +216,17 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
 
       <div className="mb-4">
         <label className={labelClass}>Osoba kontaktowa</label>
-        <input type="text" name="contactPerson" value={formData.contactPerson} onChange={handleTopChange} className="input-field bg-white" />
+        <input type="text" name="contactPerson" value={formData.contactPerson} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft" />
       </div>
 
       <div className="mb-4">
         <label className={labelClass}>E-mail</label>
-        <input type="email" name="email" value={formData.email} onChange={handleTopChange} className="input-field bg-white" />
+        <input type="email" name="email" value={formData.email} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft" />
       </div>
 
       <div className="mb-4">
         <label className={labelClass}>Telefon</label>
-        <input type="tel" name="phone" value={formData.phone} onChange={handleTopChange} className="input-field bg-white" />
+        <input type="tel" name="phone" value={formData.phone} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft" />
       </div>
 
       <div className="mb-4">
@@ -236,7 +236,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
           name="route"
           value={formData.route || ''}
           onChange={handleTopChange}
-          className="input-field bg-white"
+          className="input-field bg-white dark:bg-surface-soft"
           placeholder="np. Rzeszów, Kraków, Tarnów–Nowy Sącz"
           list="routes-datalist"
           autoComplete="off"
@@ -252,27 +252,27 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
         <div className="md:col-span-3">
           <label className={labelClass}>Ulica</label>
-          <input type="text" name="street" value={formData.address.street} onChange={handleAddressChange} className="input-field bg-white" />
+          <input type="text" name="street" value={formData.address.street} onChange={handleAddressChange} className="input-field bg-white dark:bg-surface-soft" />
         </div>
         <div>
           <label className={labelClass}>Numer</label>
-          <input type="text" name="number" value={formData.address.number} onChange={handleAddressChange} className="input-field bg-white" placeholder="12A" />
+          <input type="text" name="number" value={formData.address.number} onChange={handleAddressChange} className="input-field bg-white dark:bg-surface-soft" placeholder="12A" />
         </div>
       </div>
 
       <div className="mb-4">
         <label className={labelClass}>Miasto</label>
-        <input type="text" name="city" value={formData.address.city} onChange={handleAddressChange} className="input-field bg-white" />
+        <input type="text" name="city" value={formData.address.city} onChange={handleAddressChange} className="input-field bg-white dark:bg-surface-soft" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div>
           <label className={labelClass}>Kod pocztowy</label>
-          <input type="text" name="zipCode" value={formData.address.zipCode} onChange={handleAddressChange} className="input-field bg-white" placeholder="00-000" />
+          <input type="text" name="zipCode" value={formData.address.zipCode} onChange={handleAddressChange} className="input-field bg-white dark:bg-surface-soft" placeholder="00-000" />
         </div>
         <div className="md:col-span-2">
           <label className={labelClass}>Województwo</label>
-          <input type="text" name="province" value={formData.address.province} readOnly className="input-field bg-white/50" />
+          <input type="text" name="province" value={formData.address.province} readOnly className="input-field bg-white/50 dark:bg-white/5" />
         </div>
       </div>
 
@@ -290,7 +290,7 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
                 onDelete(initial.id);
               }
             }}
-            className="px-5 py-2.5 text-body-sm font-bold text-red-600 bg-white hover:bg-red-50 rounded-xl transition-all border border-red-200 shadow-sm hover:shadow shrink-0"
+            className="px-5 py-2.5 text-body-sm font-bold text-red-600 dark:text-red-400 bg-white dark:bg-surface-soft hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-all border border-red-200 dark:border-red-900/50 shadow-sm hover:shadow shrink-0"
           >
             Usuń klienta
           </button>

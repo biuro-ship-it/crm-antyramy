@@ -103,7 +103,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({ initial, onSave, onCancel, 
           Anuluj
         </button>
         <button type="submit" disabled={saving}
-          className="px-6 py-2.5 bg-primary hover:bg-primary text-white font-bold rounded-xl transition-colors disabled:opacity-60">
+          className="px-6 py-2.5 bg-primary hover:bg-primary text-on-primary font-bold rounded-xl transition-colors disabled:opacity-60">
           {saving ? 'Zapisuję...' : saveLabel}
         </button>
       </div>
@@ -174,7 +174,7 @@ const EmailTemplatesPanel: React.FC = () => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-xl mb-4">⚠️ {error}</div>
+        <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300 p-4 rounded-xl mb-4">⚠️ {error}</div>
       )}
 
       {/* Formularz dodawania */}
@@ -247,7 +247,7 @@ const EmailTemplatesPanel: React.FC = () => {
                           </button>
                           <button
                             onClick={() => setDeleteConfirm(template.id)}
-                            className="border border-red-100 text-red-400 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors"
+                            className="border border-red-100 dark:border-red-900/50 text-red-400 text-xs font-bold px-3 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors"
                           >
                             🗑
                           </button>
