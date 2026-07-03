@@ -30,6 +30,21 @@ export interface Client {
   vatStatus?: string;   // Status VAT z Białej listy MF
   regon?: string;
   bankAccount?: string; // Rachunek z Białej listy MF
+  fakturowniaInvoices?: FakturowniaInvoiceSnapshot[];
+  fakturowniaSyncedAt?: string;
+}
+
+export interface FakturowniaInvoiceSnapshot {
+  id: number;
+  number: string;
+  issueDate: string;
+  sellDate: string;
+  paymentTo: string;
+  priceNet: number;
+  priceGross: number;
+  currency: string;
+  status: string;
+  kind: string;
 }
 
 export interface Interaction {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Client, Interaction, InteractionFormData, Product, Order,
+  Client, Interaction, InteractionFormData, Product, Order, FakturowniaInvoice,
   getClientInteractions, createClientInteraction, updateClientInteraction,
-  getProductsList, createFollowUp, updateClient, getClients
+  getProductsList, createFollowUp, updateClient, getClients,
+  fakturowniaLookup, openFakturowniaPdf
 } from '../services/api';
 import { zl, clientYearTotal, clientMonthTotal } from '../utils/sales';
 import EmailSendModal from './EmailSendModal';
@@ -14,6 +15,15 @@ const colorClasses: Record<string, string> = {
   pink: 'bg-block-gray',
   mint: 'bg-block-mint',
 };
+
+// Czytelne etykiety statusu faktury z Fakturowni
+const fkStatusLabel = (s: string): string => ({
+  paid: 'Zapłacona',
+  partial: 'Częściowo',
+  sent: 'Wysłana',
+  issued: 'Wystawiona',
+  rejected: 'Odrzucona',
+}[s] || (s || '—'));
 
 interface ProductEmailModalProps {
   client: Client;
@@ -413,6 +423,44 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [showEmailSendModal, setShowEmailSendModal] = useState(false);
 
+  // Faktury z Fakturowni (migawka zapisana na kliencie)
+  const [fkInvoices, setFkInvoices] = useState<FakturowniaInvoice[]>(client.fakturowniaInvoices ?? []);
+  const [fkSyncedAt, setFkSyncedAt] = useState<string>(client.fakturowniaSyncedAt || '');
+  const [fkLoading, setFkLoading] = useState(false);
+  const [fkError, setFkError] = useState('');
+
+  const handleFakturowniaSync = async () => {
+    const nip = (client.nip || '').replace(/[-\s]/g, '');
+    if (nip.length !== 10) { setFkError('Klient nie ma poprawnego NIP (wymagane 10 cyfr).'); return; }
+    setFkLoading(true); setFkError('');
+    try {
+      const { client: fk, invoices } = await fakturowniaLookup(nip);
+      const now = new Date().toISOString();
+      // Uzupełniamy tylko brakujące dane kontaktowe — nie nadpisujemy istniejących
+      const updated = await updateClient(client.id, {
+        ...client,
+        email: client.email || fk.email || '',
+        phone: client.phone || fk.phone || '',
+        contactPerson: client.contactPerson || fk.person || '',
+        bankAccount: client.bankAccount || fk.bankAccount || '',
+        fakturowniaInvoices: invoices,
+        fakturowniaSyncedAt: now,
+      });
+      setFkInvoices(updated.fakturowniaInvoices ?? invoices);
+      setFkSyncedAt(updated.fakturowniaSyncedAt || now);
+      onClientUpdated?.(updated);
+    } catch (e) {
+      setFkError(e instanceof Error ? e.message : 'Błąd synchronizacji z Fakturownią');
+    } finally {
+      setFkLoading(false);
+    }
+  };
+
+  const handleOpenPdf = async (id: number) => {
+    try { await openFakturowniaPdf(id); }
+    catch { alert('Nie udało się otworzyć PDF faktury.'); }
+  };
+
   // Sprzedaż (zamówienia) — osadzona tablica na dokumencie klienta
   const [orders, setOrders] = useState<Order[]>(client.orders ?? []);
   const [showSaleForm, setShowSaleForm] = useState(false);
@@ -670,6 +718,61 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
             </div>
           )}
         </div>
+      </div>
+
+      {/* FAKTURY Z FAKTUROWNI (tylko odczyt) */}
+      <div className="mt-8">
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+          <h3 className="text-xl font-bold text-ink">Faktury (Fakturownia)</h3>
+          <div className="flex items-center gap-3 flex-wrap">
+            {fkSyncedAt && (
+              <span className="text-caption text-ink/50">
+                zsync.: {new Date(fkSyncedAt).toLocaleString('pl-PL')}
+              </span>
+            )}
+            <button type="button" onClick={handleFakturowniaSync} disabled={fkLoading} className="btn-secondary text-body-sm">
+              {fkLoading ? 'Synchronizuję…' : (fkSyncedAt ? '↻ Odśwież' : '⬇ Pobierz z Fakturowni')}
+            </button>
+          </div>
+        </div>
+        {fkError && <div className="alert-error mb-4">⚠️ {fkError}</div>}
+        {fkInvoices.length === 0 ? (
+          <div className="card-soft text-ink/60">
+            Brak pobranych faktur. Kliknij „Pobierz z Fakturowni" (wymaga NIP na karcie). Przy okazji uzupełnimy brakujące dane kontaktowe (e-mail, telefon, osoba, konto).
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-body-sm">
+              <thead>
+                <tr className="text-left text-ink/50 border-b border-hairline">
+                  <th className="py-2 pr-3 font-medium">Numer</th>
+                  <th className="py-2 pr-3 font-medium">Data</th>
+                  <th className="py-2 pr-3 font-medium text-right">Brutto</th>
+                  <th className="py-2 pr-3 font-medium">Status</th>
+                  <th className="py-2 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {fkInvoices.map(inv => (
+                  <tr key={inv.id} className="border-b border-hairline-soft">
+                    <td className="py-2 pr-3 font-medium">{inv.number}</td>
+                    <td className="py-2 pr-3 text-ink/70 whitespace-nowrap">{inv.issueDate}</td>
+                    <td className="py-2 pr-3 text-right font-mono whitespace-nowrap">{inv.priceGross.toFixed(2)} {inv.currency}</td>
+                    <td className="py-2 pr-3">
+                      <span className={`badge ${inv.status === 'paid' ? 'badge-mint' : 'badge-cream'}`}>{fkStatusLabel(inv.status)}</span>
+                    </td>
+                    <td className="py-2 text-right">
+                      <button type="button" onClick={() => handleOpenPdf(inv.id)} className="btn-tertiary text-body-sm">PDF</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-caption text-ink/50 mt-2">
+              Faktur: {fkInvoices.length} · suma brutto: {zl(fkInvoices.reduce((s, i) => s + i.priceGross, 0))}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="mt-8">

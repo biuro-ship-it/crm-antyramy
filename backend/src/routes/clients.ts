@@ -41,6 +41,20 @@ const ClientSchema = z.object({
   vatStatus: z.string().optional().default(''),
   regon: z.string().optional().default(''),
   bankAccount: z.string().optional().default(''),
+  // Migawka faktur pobranych z Fakturowni (tylko odczyt z zewnątrz)
+  fakturowniaInvoices: z.array(z.object({
+    id: z.number(),
+    number: z.string().default(''),
+    issueDate: z.string().default(''),
+    sellDate: z.string().default(''),
+    paymentTo: z.string().default(''),
+    priceNet: z.number().default(0),
+    priceGross: z.number().default(0),
+    currency: z.string().default('PLN'),
+    status: z.string().default(''),
+    kind: z.string().default(''),
+  })).optional().default([]),
+  fakturowniaSyncedAt: z.string().optional().default(''),
 });
 
 const InteractionSchema = z.object({

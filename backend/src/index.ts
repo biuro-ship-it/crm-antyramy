@@ -21,6 +21,7 @@ import suppliersRouter from './routes/suppliers';
 import archiveRouter from './routes/archive';
 import kanbanRouter from './routes/kanban';
 import settingsRouter from './routes/settings';
+import fakturowniaRouter from './routes/fakturownia';
 const app = express();
 const PORT = process.env.PORT || 4000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'https://crm.antyramy.eu';
@@ -84,6 +85,7 @@ app.use('/api/suppliers', suppliersRouter);
 app.use('/api/archive', archiveRouter);
 app.use('/api/kanban', kanbanRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/fakturownia', fakturowniaRouter);
 
 // Obsługa SPA — wszystkie nieznane ścieżki zwracają index.html
 // (działa tylko lokalnie; na serwerze Passenger obsługuje to statycznie)

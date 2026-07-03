@@ -37,6 +37,40 @@ export interface Client {
   vatStatus?: string;   // 'Czynny' | 'Zwolniony' | 'Niezarejestrowany'
   regon?: string;
   bankAccount?: string; // rachunek zgłoszony do białej listy
+  // Migawka faktur pobranych z Fakturowni
+  fakturowniaInvoices?: FakturowniaInvoice[];
+  fakturowniaSyncedAt?: string;
+}
+
+export interface FakturowniaInvoice {
+  id: number;
+  number: string;
+  issueDate: string;
+  sellDate: string;
+  paymentTo: string;
+  priceNet: number;
+  priceGross: number;
+  currency: string;
+  status: string;
+  kind: string;
+}
+
+export interface FakturowniaClientInfo {
+  id: number;
+  name: string;
+  taxNo: string;
+  email: string;
+  phone: string;
+  person: string;
+  street: string;
+  city: string;
+  postCode: string;
+  bankAccount: string;
+}
+
+export interface FakturowniaLookup {
+  client: FakturowniaClientInfo;
+  invoices: FakturowniaInvoice[];
 }
 
 export interface ClientFormData {
@@ -54,6 +88,8 @@ export interface ClientFormData {
   vatStatus?: string;
   regon?: string;
   bankAccount?: string;
+  fakturowniaInvoices?: FakturowniaInvoice[];
+  fakturowniaSyncedAt?: string;
 }
 
 export interface NipData {
@@ -405,6 +441,31 @@ export const getNipData = async (nip: string): Promise<NipData> => {
     address,
     parsedAddress: parseNipAddress(address),
   };
+};
+
+// ─── FAKTUROWNIA (tylko odczyt, przez backend) ───────────────────────────────
+
+/** Pobiera z Fakturowni dane klienta i jego faktury po NIP. */
+export const fakturowniaLookup = async (nip: string): Promise<FakturowniaLookup> => {
+  const nipClean = nip.replace(/[-\s]/g, '');
+  if (!/^\d{10}$/.test(nipClean)) throw new Error('NIP musi mieć 10 cyfr');
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/fakturownia/lookup/${nipClean}`, { headers });
+  if (response.status === 404) throw new Error('Nie znaleziono klienta o tym NIP w Fakturowni');
+  if (response.status === 503) throw new Error('Integracja z Fakturownią nie jest skonfigurowana');
+  if (!response.ok) throw new Error('Błąd komunikacji z Fakturownią');
+  return response.json();
+};
+
+/** Otwiera PDF faktury w nowej karcie (token zostaje po stronie backendu). */
+export const openFakturowniaPdf = async (invoiceId: number): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/fakturownia/invoice/${invoiceId}/pdf`, { headers });
+  if (!response.ok) throw new Error('Nie udało się pobrać PDF faktury');
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
 export const getClientInteractions = async (clientId: string): Promise<Interaction[]> => {
