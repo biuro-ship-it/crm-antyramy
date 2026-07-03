@@ -37,6 +37,10 @@ const ClientSchema = z.object({
   // UWAGA: bez .default() PUT klienta wykasowałby te pola (parsed.data je wycina)
   salesEnabled: z.boolean().optional().default(false),
   orders: z.array(OrderSchema).optional().default([]),
+  // Dane z Białej listy VAT (Ministerstwo Finansów) — pobierane po NIP
+  vatStatus: z.string().optional().default(''),
+  regon: z.string().optional().default(''),
+  bankAccount: z.string().optional().default(''),
 });
 
 const InteractionSchema = z.object({

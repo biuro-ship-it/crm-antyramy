@@ -33,6 +33,10 @@ export interface Client {
   route?: string;
   salesEnabled?: boolean;
   orders?: Order[];
+  // Dane z Białej listy VAT (Ministerstwo Finansów)
+  vatStatus?: string;   // 'Czynny' | 'Zwolniony' | 'Niezarejestrowany'
+  regon?: string;
+  bankAccount?: string; // rachunek zgłoszony do białej listy
 }
 
 export interface ClientFormData {
@@ -47,13 +51,21 @@ export interface ClientFormData {
   route?: string;
   salesEnabled?: boolean;
   orders?: Order[];
+  vatStatus?: string;
+  regon?: string;
+  bankAccount?: string;
 }
 
 export interface NipData {
   nip: string;
   companyName: string;
   regon: string;
-  address: string;
+  vatStatus: string;          // Czynny / Zwolniony / Niezarejestrowany
+  managingPerson: string;     // z pola representatives MF (może być puste)
+  bankAccount: string;        // pierwszy rachunek z białej listy
+  bankAccounts: string[];     // wszystkie zgłoszone rachunki
+  address: string;            // surowy adres (working/residence)
+  parsedAddress: Address;     // rozbity na ulicę/nr/kod/miasto (province puste)
 }
 
 export interface Interaction {
@@ -315,6 +327,38 @@ export const deleteClient = async (id: string): Promise<void> => {
   if (!response.ok) throw new Error('Nie udało się usunąć klienta');
 };
 
+// Rozbija adres z Białej listy MF ("ULICA 74, 03-301 WARSZAWA") na pola.
+// Województwa MF nie podaje — zostaje puste.
+export const parseNipAddress = (raw: string): Address => {
+  const empty: Address = { province: '', zipCode: '', city: '', street: '', number: '' };
+  if (!raw) return empty;
+
+  const parts = raw.split(',').map(p => p.trim()).filter(Boolean);
+  // Ostatni fragment zwykle zawiera kod pocztowy i miasto: "03-301 WARSZAWA"
+  let zipCode = '', city = '';
+  const cityPart = parts.length > 1 ? parts[parts.length - 1] : '';
+  const zipMatch = cityPart.match(/(\d{2}-\d{3})\s+(.+)/);
+  if (zipMatch) {
+    zipCode = zipMatch[1];
+    city = zipMatch[2].trim();
+  } else if (parts.length === 1) {
+    // Brak przecinka — spróbuj wyłuskać kod z całości
+    const m = raw.match(/(\d{2}-\d{3})\s+([^\d,]+)/);
+    if (m) { zipCode = m[1]; city = m[2].trim(); }
+  }
+
+  // Fragment z ulicą i numerem: wszystko przed częścią z kodem
+  const streetPart = parts.length > 1 ? parts.slice(0, parts.length - 1).join(', ') : raw.replace(/\d{2}-\d{3}.*/, '').trim();
+  let street = streetPart, number = '';
+  // Numer to końcowy token typu "74", "12A", "12/3", "12A/3"
+  const numMatch = streetPart.match(/^(.*?)[\s]+(\d+[A-Za-z]?(?:\/\d+[A-Za-z]?)?)\s*$/);
+  if (numMatch) {
+    street = numMatch[1].trim();
+    number = numMatch[2].trim();
+  }
+  return { province: '', zipCode, city, street, number };
+};
+
 export const getNipData = async (nip: string): Promise<NipData> => {
   const nipClean = nip.replace(/[-\s]/g, '');
   if (!/^\d{10}$/.test(nipClean)) throw new Error('NIP musi mieć 10 cyfr');
@@ -326,15 +370,40 @@ export const getNipData = async (nip: string): Promise<NipData> => {
   if (response.status === 404) throw new Error('Nie znaleziono firmy o podanym NIP w rejestrze VAT');
   if (!response.ok) throw new Error('Błąd połączenia z bazą Ministerstwa Finansów');
   const data = await response.json() as {
-    result?: { subject?: { name?: string; regon?: string; workingAddress?: string; residenceAddress?: string } }
+    result?: {
+      subject?: {
+        name?: string;
+        regon?: string;
+        statusVat?: string;
+        workingAddress?: string;
+        residenceAddress?: string;
+        accountNumbers?: string[];
+        representatives?: { companyName?: string; firstName?: string; lastName?: string }[];
+      };
+    };
   };
   const subject = data?.result?.subject;
   if (!subject) throw new Error('Nie znaleziono firmy o podanym NIP');
+
+  // Pierwsza osoba reprezentująca (MF podaje pełne dane, gdy je ma — często puste u spółek)
+  const rep = subject.representatives?.[0];
+  const managingPerson = rep
+    ? [rep.firstName, rep.lastName].filter(Boolean).join(' ').trim() || (rep.companyName || '')
+    : '';
+
+  const address = subject.workingAddress || subject.residenceAddress || '';
+  const bankAccounts = subject.accountNumbers || [];
+
   return {
     nip: nipClean,
     companyName: subject.name || '',
     regon: subject.regon || '',
-    address: subject.workingAddress || subject.residenceAddress || '',
+    vatStatus: subject.statusVat || '',
+    managingPerson,
+    bankAccount: bankAccounts[0] || '',
+    bankAccounts,
+    address,
+    parsedAddress: parseNipAddress(address),
   };
 };
 

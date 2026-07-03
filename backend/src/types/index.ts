@@ -27,6 +27,9 @@ export interface Client {
   createdAt: string;
   updatedAt: string;
   relationshipColor?: string; // DODANE: Kolor relacji klienta
+  vatStatus?: string;   // Status VAT z Białej listy MF
+  regon?: string;
+  bankAccount?: string; // Rachunek z Białej listy MF
 }
 
 export interface Interaction {

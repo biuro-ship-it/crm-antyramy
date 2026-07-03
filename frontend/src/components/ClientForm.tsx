@@ -61,6 +61,9 @@ const emptyForm = (c?: Client | null): ClientFormData => ({
   route: c?.route || '',
   salesEnabled: c?.salesEnabled ?? false,
   orders: c?.orders ?? [],
+  vatStatus: c?.vatStatus || '',
+  regon: c?.regon || '',
+  bankAccount: c?.bankAccount || '',
 });
 
 const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, onDelete, existingRoutes }) => {
@@ -124,11 +127,28 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
     setNipSuccess('');
     try {
       const data = await getNipData(nipClean);
-      setFormData(prev => ({
-        ...prev,
-        companyName: data.companyName || prev.companyName,
-      }));
-      setNipSuccess(`Pobrano dane: ${data.companyName}`);
+      setFormData(prev => {
+        const pa = data.parsedAddress;
+        const province = pa.zipCode ? getVoivodeshipByZip(pa.zipCode) : prev.address.province;
+        return {
+          ...prev,
+          companyName: data.companyName || prev.companyName,
+          // Osobę uzupełniamy tylko gdy MF ją zwrócił i pole jest puste (nie nadpisujemy ręcznych danych)
+          contactPerson: (!prev.contactPerson && data.managingPerson) ? data.managingPerson : prev.contactPerson,
+          vatStatus: data.vatStatus || prev.vatStatus,
+          regon: data.regon || prev.regon,
+          bankAccount: data.bankAccount || prev.bankAccount,
+          address: {
+            street: pa.street || prev.address.street,
+            number: pa.number || prev.address.number,
+            city: pa.city || prev.address.city,
+            zipCode: pa.zipCode || prev.address.zipCode,
+            province: province || prev.address.province,
+          },
+        };
+      });
+      const vatNote = data.vatStatus ? ` · VAT: ${data.vatStatus}` : '';
+      setNipSuccess(`Pobrano: ${data.companyName}${vatNote}`);
     } catch (err) {
       setNipError(err instanceof Error ? err.message : 'Błąd pobierania danych');
     } finally {
@@ -212,6 +232,22 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
         </div>
         {nipError && <p className="text-body-sm mt-2">{nipError}</p>}
         {nipSuccess && <p className="text-body-sm font-medium mt-2 text-success">✓ {nipSuccess}</p>}
+        {(formData.vatStatus || formData.regon) && (
+          <div className="flex flex-wrap items-center gap-2 mt-3">
+            {formData.vatStatus && (
+              <span className={`badge ${
+                formData.vatStatus === 'Czynny' ? 'badge-mint'
+                : formData.vatStatus === 'Zwolniony' ? 'badge-cream'
+                : 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
+              }`}>
+                VAT: {formData.vatStatus}
+              </span>
+            )}
+            {formData.regon && (
+              <span className="badge bg-surface-soft text-ink">REGON: {formData.regon}</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mb-4">
@@ -227,6 +263,11 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
       <div className="mb-4">
         <label className={labelClass}>Telefon</label>
         <input type="tel" name="phone" value={formData.phone} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft" />
+      </div>
+
+      <div className="mb-4">
+        <label className={labelClass}>Nr rachunku bankowego</label>
+        <input type="text" name="bankAccount" value={formData.bankAccount || ''} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft font-mono text-body-sm" placeholder="Pobierany z Białej listy VAT" />
       </div>
 
       <div className="mb-4">

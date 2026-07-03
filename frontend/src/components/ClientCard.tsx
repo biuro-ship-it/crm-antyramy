@@ -627,6 +627,23 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
           ) : (
             <p className="mt-2 text-xs text-ink font-light md:text-right">📍 Brak adresu</p>
           )}
+          {(client.nip || client.vatStatus || client.regon || client.bankAccount) && (
+            <div className="mt-3 pt-3 border-t border-hairline-soft text-xs md:text-right space-y-1">
+              {client.nip && <p><span className="text-ink/50">NIP:</span> <span className="font-mono">{client.nip}</span></p>}
+              {client.vatStatus && (
+                <p className="flex items-center gap-1.5 md:justify-end">
+                  <span className="text-ink/50">VAT:</span>
+                  <span className={`badge ${
+                    client.vatStatus === 'Czynny' ? 'badge-mint'
+                    : client.vatStatus === 'Zwolniony' ? 'badge-cream'
+                    : 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
+                  }`}>{client.vatStatus}</span>
+                </p>
+              )}
+              {client.regon && <p><span className="text-ink/50">REGON:</span> <span className="font-mono">{client.regon}</span></p>}
+              {client.bankAccount && <p className="break-all"><span className="text-ink/50">Konto:</span> <span className="font-mono">{client.bankAccount}</span></p>}
+            </div>
+          )}
           {client.email && (
             <div className="mt-4 flex flex-col gap-2">
               <button
