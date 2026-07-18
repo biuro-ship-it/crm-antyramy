@@ -815,11 +815,10 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
               const isPdf = /\.pdf$/i.test(file.name);
               return (
                 <div key={file.id} className="flex items-center justify-between gap-3 bg-canvas border border-hairline rounded-xl p-3">
-                  <a
-                    href={file.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 min-w-0 hover:underline"
+                  <button
+                    type="button"
+                    onClick={() => window.open(file.url, '_blank', 'noopener,noreferrer')}
+                    className="flex items-center gap-2 min-w-0 hover:underline text-left"
                     title={file.name}
                   >
                     <span className="text-xl shrink-0">{isPdf ? '📄' : '🖼'}</span>
@@ -827,7 +826,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                       <span className="block font-bold text-sm text-ink truncate">{file.name}</span>
                       <span className="block text-xs text-ink/50">{file.size ? `${file.size} · ` : ''}{file.uploadedAt}</span>
                     </span>
-                  </a>
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDeleteFile(file.id)}
