@@ -24,6 +24,14 @@ const OrderSchema = z.object({
   note: z.string().optional().default(''),
 });
 
+const ClientFileSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  url: z.string(),
+  size: z.string().optional().default(''),
+  uploadedAt: z.string(),
+});
+
 const ClientSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
   type: z.enum(['zakład', 'sklep', 'agencja', 'inne']),
@@ -55,6 +63,8 @@ const ClientSchema = z.object({
     kind: z.string().default(''),
   })).optional().default([]),
   fakturowniaSyncedAt: z.string().optional().default(''),
+  // Załączone dokumenty klienta (bez .default() PUT by je wykasował)
+  files: z.array(ClientFileSchema).optional().default([]),
 });
 
 const InteractionSchema = z.object({

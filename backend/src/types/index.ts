@@ -32,6 +32,15 @@ export interface Client {
   bankAccount?: string; // Rachunek z Białej listy MF
   fakturowniaInvoices?: FakturowniaInvoiceSnapshot[];
   fakturowniaSyncedAt?: string;
+  files?: ClientFile[]; // Załączone dokumenty (skany, PDF-y, DOCX)
+}
+
+export interface ClientFile {
+  id: string;
+  name: string;
+  url: string;
+  size?: string;
+  uploadedAt: string;
 }
 
 export interface FakturowniaInvoiceSnapshot {

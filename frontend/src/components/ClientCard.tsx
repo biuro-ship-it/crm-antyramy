@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  Client, Interaction, InteractionFormData, Product, Order, FakturowniaInvoice,
+  Client, ClientFile, Interaction, InteractionFormData, Product, Order, FakturowniaInvoice,
   getClientInteractions, createClientInteraction, updateClientInteraction,
   getProductsList, createFollowUp, updateClient, getClients,
-  fakturowniaLookup, openFakturowniaPdf
+  fakturowniaLookup, openFakturowniaPdf, uploadFile
 } from '../services/api';
 import { zl, clientYearTotal, clientMonthTotal } from '../utils/sales';
 import EmailSendModal from './EmailSendModal';
@@ -429,6 +429,58 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
   const [fkLoading, setFkLoading] = useState(false);
   const [fkError, setFkError] = useState('');
 
+  // Dokumenty / załączniki klienta
+  const [files, setFiles] = useState<ClientFile[]>(client.files ?? []);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { setFiles(client.files ?? []); }, [client.id]);
+
+  // Zapis listy plików — PUT nadpisuje całego klienta, więc dokładamy żywy
+  // stan (orders + migawka faktur), aby nie cofnąć wcześniejszych zmian.
+  const persistFiles = async (nextFiles: ClientFile[]) => {
+    const updated = await updateClient(client.id, {
+      ...client,
+      orders,
+      fakturowniaInvoices: fkInvoices,
+      fakturowniaSyncedAt: fkSyncedAt,
+      files: nextFiles,
+    });
+    setFiles(updated.files ?? nextFiles);
+    onClientUpdated?.(updated);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = ''; // pozwól wgrać ten sam plik ponownie
+    if (!file) return;
+    setUploadingFile(true);
+    try {
+      const url = await uploadFile(file);
+      const newFile: ClientFile = {
+        id: crypto.randomUUID(),
+        name: file.name,
+        url,
+        size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+        uploadedAt: new Date().toISOString().split('T')[0],
+      };
+      await persistFiles([...files, newFile]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Nie udało się wgrać pliku.');
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDeleteFile = async (fileId: string) => {
+    if (!window.confirm('Usunąć ten dokument?')) return;
+    try {
+      await persistFiles(files.filter(f => f.id !== fileId));
+    } catch {
+      alert('Nie udało się usunąć dokumentu.');
+    }
+  };
+
   const handleFakturowniaSync = async () => {
     const nip = (client.nip || '').replace(/[-\s]/g, '');
     if (nip.length !== 10) { setFkError('Klient nie ma poprawnego NIP (wymagane 10 cyfr).'); return; }
@@ -436,6 +488,16 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
     try {
       const { client: fk, invoices } = await fakturowniaLookup(nip);
       const now = new Date().toISOString();
+      // Faktury zasilają sprzedaż klienta wartością NETTO — tak jak ręcznie dodane wpisy.
+      // Wpisy z faktur tagujemy id "fv-<id>", by przy odświeżeniu je podmienić, a ręczne zostawić.
+      const manualOrders = (client.orders ?? []).filter(o => !String(o.id).startsWith('fv-'));
+      const invoiceOrders: Order[] = invoices.map(inv => ({
+        id: `fv-${inv.id}`,
+        amount: inv.priceNet,
+        date: inv.sellDate || inv.issueDate,
+        note: `Faktura ${inv.number}`,
+      }));
+      const nextOrders = [...manualOrders, ...invoiceOrders];
       // Uzupełniamy tylko brakujące dane kontaktowe — nie nadpisujemy istniejących
       const updated = await updateClient(client.id, {
         ...client,
@@ -443,9 +505,12 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
         phone: client.phone || fk.phone || '',
         contactPerson: client.contactPerson || fk.person || '',
         bankAccount: client.bankAccount || fk.bankAccount || '',
+        salesEnabled: true,
+        orders: nextOrders,
         fakturowniaInvoices: invoices,
         fakturowniaSyncedAt: now,
       });
+      setOrders(updated.orders ?? nextOrders);
       setFkInvoices(updated.fakturowniaInvoices ?? invoices);
       setFkSyncedAt(updated.fakturowniaSyncedAt || now);
       onClientUpdated?.(updated);
@@ -720,6 +785,63 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
         </div>
       </div>
 
+      {/* DOKUMENTY / ZAŁĄCZNIKI */}
+      <div className="mt-8">
+        <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
+          <h3 className="text-xl font-bold text-ink">📎 Dokumenty i załączniki</h3>
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploadingFile}
+            className="btn-secondary text-body-sm"
+          >
+            {uploadingFile ? 'Wgrywam…' : '+ Dodaj dokument'}
+          </button>
+          <input
+            type="file"
+            className="hidden"
+            ref={fileRef}
+            accept="image/jpeg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleFileUpload}
+          />
+        </div>
+        {files.length === 0 ? (
+          <div className="card-soft text-ink/60">
+            Brak dokumentów. Dodaj skan (PDF, zdjęcie lub DOCX), np. wpis do ewidencji — max 5 MB.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {files.map(file => {
+              const isPdf = /\.pdf$/i.test(file.name);
+              return (
+                <div key={file.id} className="flex items-center justify-between gap-3 bg-canvas border border-hairline rounded-xl p-3">
+                  <a
+                    href={file.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-2 min-w-0 hover:underline"
+                    title={file.name}
+                  >
+                    <span className="text-xl shrink-0">{isPdf ? '📄' : '🖼'}</span>
+                    <span className="min-w-0">
+                      <span className="block font-bold text-sm text-ink truncate">{file.name}</span>
+                      <span className="block text-xs text-ink/50">{file.size ? `${file.size} · ` : ''}{file.uploadedAt}</span>
+                    </span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteFile(file.id)}
+                    className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline shrink-0"
+                  >
+                    Usuń
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* FAKTURY Z FAKTUROWNI (tylko odczyt) */}
       <div className="mt-8">
         <div className="flex justify-between items-center mb-4 flex-wrap gap-3">
@@ -747,7 +869,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                 <tr className="text-left text-ink/50 border-b border-hairline">
                   <th className="py-2 pr-3 font-medium">Numer</th>
                   <th className="py-2 pr-3 font-medium">Data</th>
-                  <th className="py-2 pr-3 font-medium text-right">Brutto</th>
+                  <th className="py-2 pr-3 font-medium text-right">Netto</th>
                   <th className="py-2 pr-3 font-medium">Status</th>
                   <th className="py-2 font-medium"></th>
                 </tr>
@@ -757,7 +879,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                   <tr key={inv.id} className="border-b border-hairline-soft">
                     <td className="py-2 pr-3 font-medium">{inv.number}</td>
                     <td className="py-2 pr-3 text-ink/70 whitespace-nowrap">{inv.issueDate}</td>
-                    <td className="py-2 pr-3 text-right font-mono whitespace-nowrap">{inv.priceGross.toFixed(2)} {inv.currency}</td>
+                    <td className="py-2 pr-3 text-right font-mono whitespace-nowrap">{inv.priceNet.toFixed(2)} {inv.currency}</td>
                     <td className="py-2 pr-3">
                       <span className={`badge ${inv.status === 'paid' ? 'badge-mint' : 'badge-cream'}`}>{fkStatusLabel(inv.status)}</span>
                     </td>
@@ -769,7 +891,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
               </tbody>
             </table>
             <p className="text-caption text-ink/50 mt-2">
-              Faktur: {fkInvoices.length} · suma brutto: {zl(fkInvoices.reduce((s, i) => s + i.priceGross, 0))}
+              Faktur: {fkInvoices.length} · suma netto: {zl(fkInvoices.reduce((s, i) => s + i.priceNet, 0))} · wartości ujęte w sprzedaży klienta
             </p>
           </div>
         )}

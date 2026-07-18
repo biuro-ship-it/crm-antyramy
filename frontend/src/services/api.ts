@@ -40,6 +40,15 @@ export interface Client {
   // Migawka faktur pobranych z Fakturowni
   fakturowniaInvoices?: FakturowniaInvoice[];
   fakturowniaSyncedAt?: string;
+  files?: ClientFile[];
+}
+
+export interface ClientFile {
+  id: string;
+  name: string;
+  url: string;
+  size?: string;
+  uploadedAt: string;
 }
 
 export interface FakturowniaInvoice {
@@ -90,6 +99,7 @@ export interface ClientFormData {
   bankAccount?: string;
   fakturowniaInvoices?: FakturowniaInvoice[];
   fakturowniaSyncedAt?: string;
+  files?: ClientFile[];
 }
 
 export interface NipData {
@@ -503,6 +513,9 @@ export const uploadImage = async (file: File): Promise<string> => {
   const data = await response.json() as { imageUrl: string };
   return data.imageUrl;
 };
+
+// Upload dokumentu klienta (PDF / obraz / DOCX) — ten sam endpoint co uploadImage.
+export const uploadFile = uploadImage;
 
 export const getProductsList = async (): Promise<Product[]> => {
   const headers = await getHeaders();
