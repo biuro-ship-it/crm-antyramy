@@ -248,7 +248,11 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
       </div>
 
       {/* 3.5 SUROWCE I ZAMÓWIENIA */}
-      <SupplierMaterials supplier={supplier} onSupplierUpdated={onSupplierUpdated} />
+      <SupplierMaterials
+        supplier={supplier}
+        onSupplierUpdated={onSupplierUpdated}
+        onOrderLogged={interaction => setInteractions(prev => [interaction, ...prev])}
+      />
 
       {/* 4. OŚ CZASU (ROZMOWY I USTALENIA) */}
       <div className="mt-8">

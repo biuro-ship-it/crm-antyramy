@@ -1,9 +1,14 @@
 import React, { useState } from 'react';
-import { Supplier, SupplierMaterial, updateSupplier } from '../services/api';
+import {
+  Supplier, SupplierMaterial, Interaction, InteractionFormData,
+  updateSupplier, createSupplierInteraction,
+} from '../services/api';
 
 interface SupplierMaterialsProps {
   supplier: Supplier;
   onSupplierUpdated: (s: Supplier) => void;
+  // Wysłane zamówienie trafia do historii kontaktów — karta dopisuje je do osi czasu.
+  onOrderLogged?: (interaction: Interaction) => void;
 }
 
 const UNITS: SupplierMaterial['unit'][] = ['szt', 'm²', 'ark.', 'kpl'];
@@ -23,10 +28,15 @@ const todayPl = () => {
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
 };
 
+const todayISO = () => new Date().toISOString().split('T')[0];
+
 type Draft = { name: string; unit: SupplierMaterial['unit']; price: string };
 const emptyDraft: Draft = { name: '', unit: 'szt', price: '' };
 
-export default function SupplierMaterials({ supplier, onSupplierUpdated }: SupplierMaterialsProps) {
+// Podgląd zamówienia przed wysyłką — treść maila można jeszcze poprawić.
+type OrderPreview = { subject: string; body: string; lines: string[]; total: number };
+
+export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrderLogged }: SupplierMaterialsProps) {
   const materials: SupplierMaterial[] = supplier.materials ?? [];
 
   const [saving, setSaving] = useState(false);
@@ -40,6 +50,11 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
   // Zamówienie: ilości per surowiec + uwagi.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [orderNotes, setOrderNotes] = useState('');
+
+  // Podgląd + zapis w historii kontaktów.
+  const [preview, setPreview] = useState<OrderPreview | null>(null);
+  const [sending, setSending] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
 
   // Zapis katalogu surowców przez istniejące PUT /api/suppliers/:id (wzorzec files[]).
   const persist = async (next: SupplierMaterial[]) => {
@@ -108,15 +123,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
   };
 
   // Mail NIE zawiera cen — tylko nazwy, ilości i jednostki.
-  const handleSendOrder = () => {
-    if (!supplier.email) {
-      alert('Ten dostawca nie ma zapisanego adresu e-mail.');
-      return;
-    }
-    if (selected.length === 0) {
-      alert('Wpisz ilość przy co najmniej jednym surowcu.');
-      return;
-    }
+  const buildPreview = (): OrderPreview => {
     const lines = selected.map(m => `- ${m.name}: ${quantities[m.id]} ${m.unit}`);
     const notesPart = orderNotes.trim() ? `\n\nUwagi: ${orderNotes.trim()}` : '';
     const signature =
@@ -130,9 +137,64 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
       `${lines.join('\n')}` +
       `${notesPart}\n\n` +
       signature;
-    const subject = `Zamówienie — Antyramy (${todayPl()})`;
+    return { subject: `Zamówienie — Antyramy (${todayPl()})`, body, lines, total: orderTotal };
+  };
+
+  const handleOpenPreview = () => {
+    if (!supplier.email) {
+      alert('Ten dostawca nie ma zapisanego adresu e-mail.');
+      return;
+    }
+    if (selected.length === 0) {
+      alert('Wpisz ilość przy co najmniej jednym surowcu.');
+      return;
+    }
+    setLogError(null);
+    setPreview(buildPreview());
+  };
+
+  // Wpis w historii = pełny podgląd zamówienia: pozycje, wartość i treść maila.
+  const buildHistoryNote = (p: OrderPreview): string =>
+    `📦 ZAMÓWIENIE wysłane mailem\n` +
+    `Do: ${supplier.email}\n` +
+    `Temat: ${p.subject}\n\n` +
+    `Pozycje:\n${p.lines.join('\n')}\n\n` +
+    `Wartość wg cennika: ${zl(p.total)} zł netto (wyliczona w CRM — w mailu cen nie ma)\n\n` +
+    `— treść wysłanej wiadomości —\n${p.body}`;
+
+  const finishSend = (p: OrderPreview) => {
+    setPreview(null);
+    setLogError(null);
+    handleClear();
     window.location.href =
-      `mailto:${supplier.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      `mailto:${supplier.email}?subject=${encodeURIComponent(p.subject)}&body=${encodeURIComponent(p.body)}`;
+  };
+
+  const handleConfirmSend = async () => {
+    if (!preview) return;
+    setSending(true);
+    setLogError(null);
+    try {
+      const data: InteractionFormData = {
+        contactDate: todayISO(),
+        channel: 'mail',
+        notes: buildHistoryNote(preview),
+        tradeNotes: `Zamówienie: ${preview.lines.length} poz., ${zl(preview.total)} zł netto`,
+        products: [],
+      };
+      const interaction = await createSupplierInteraction(supplier.id, data);
+      onOrderLogged?.(interaction);
+      finishSend(preview);
+    } catch {
+      setLogError('Nie udało się zapisać zamówienia w historii kontaktów.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Awaryjnie: gdy zapis do historii padnie, mail i tak da się wysłać.
+  const handleSendWithoutLog = () => {
+    if (preview) finishSend(preview);
   };
 
   return (
@@ -265,10 +327,62 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated }: Suppl
           </p>
           <div className="flex gap-2">
             <button type="button" onClick={handleClear} className="btn-secondary px-4 py-2 text-sm">Wyczyść</button>
-            <button type="button" onClick={handleSendOrder} className="btn-primary px-5 py-2 text-sm">✉️ Wyślij zamówienie mailem</button>
+            <button type="button" onClick={handleOpenPreview} className="btn-primary px-5 py-2 text-sm">✉️ Wyślij zamówienie mailem</button>
           </div>
         </div>
       </div>
+
+      {/* PODGLĄD ZAMÓWIENIA PRZED WYSYŁKĄ */}
+      {preview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center px-6 py-4 border-b border-hairline-soft">
+              <h3 className="text-lg font-bold text-ink">📦 Podgląd zamówienia</h3>
+              <button type="button" onClick={() => { setPreview(null); setLogError(null); }} className="text-ink font-light text-2xl leading-none">✕</button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              {logError && (
+                <div className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3 mb-4">⚠️ {logError}</div>
+              )}
+
+              <p className="text-xs font-bold text-ink/60 uppercase">Do: {supplier.email}</p>
+              <p className="text-xs font-bold text-ink/60 uppercase mb-3">Temat: {preview.subject}</p>
+              <p className="text-xs text-ink/50 mb-3">
+                Pozycji: {preview.lines.length} · wartość wg cennika {zl(preview.total)} zł netto
+                <span className="text-ink/40 ml-1">(ceny trafiają tylko do historii, nie do maila)</span>
+              </p>
+
+              <label className="block text-xs font-bold text-ink/60 uppercase tracking-wider mb-1">Treść maila — możesz ją jeszcze poprawić</label>
+              <textarea
+                rows={14}
+                value={preview.body}
+                onChange={e => setPreview({ ...preview, body: e.target.value })}
+                className="w-full bg-canvas border border-hairline rounded-xl p-4 text-sm text-ink outline-none focus:ring-2 focus:ring-ink resize-none font-mono leading-relaxed"
+              />
+              <p className="text-xs text-ink/40 mt-2">
+                Po wysłaniu zamówienie zapisze się w historii kontaktów dostawcy razem z całą tą treścią.
+              </p>
+            </div>
+
+            <div className="px-6 py-4 border-t border-hairline-soft flex flex-wrap justify-between items-center gap-2">
+              <button type="button" onClick={() => { setPreview(null); setLogError(null); }} className="btn-secondary px-4 py-2 text-sm">
+                ← Wróć do edycji
+              </button>
+              <div className="flex gap-2">
+                {logError && (
+                  <button type="button" onClick={handleSendWithoutLog} className="btn-secondary px-4 py-2 text-sm">
+                    Wyślij bez zapisu
+                  </button>
+                )}
+                <button type="button" onClick={handleConfirmSend} disabled={sending} className="btn-primary px-5 py-2 text-sm disabled:opacity-60">
+                  {sending ? 'Zapisuję...' : '✉️ Wyślij i zapisz w historii'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
