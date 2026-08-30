@@ -1,12 +1,32 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Client } from '../services/api';
 import { clientTotal, clientYearTotal, clientMonthTotal, zl } from '../utils/sales';
+
+// Stan widoku listy (filtry + strona) mieszka w Dashboardzie, bo ClientList jest
+// odmontowywany na czas karty klienta — trzymany lokalnie resetowalby sie do strony 1.
+export interface ClientListView {
+  search: string;
+  provinceFilter: string;
+  routeFilter: string;
+  sortBy: string;
+  currentPage: number;
+}
+
+export const emptyClientListView = (): ClientListView => ({
+  search: '',
+  provinceFilter: '',
+  routeFilter: '',
+  sortBy: 'alpha',
+  currentPage: 1,
+});
 
 interface ClientListProps {
   clients: Client[];
   onEdit: (client: Client) => void;
   onDelete?: (id: string) => void;
   onView: (client: Client) => void;
+  view: ClientListView;
+  onViewChange: (next: ClientListView) => void;
 }
 
 const PROVINCES = [
@@ -33,12 +53,13 @@ const colorClasses: Record<string, string> = {
   mint: 'bg-block-mint',
 };
 
-const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
-  const [search, setSearch] = useState('');
-  const [provinceFilter, setProvinceFilter] = useState('');
-  const [routeFilter, setRouteFilter] = useState('');
-  const [sortBy, setSortBy] = useState('alpha');
-  const [currentPage, setCurrentPage] = useState(1);
+const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, onViewChange }) => {
+  const { search, provinceFilter, routeFilter, sortBy, currentPage } = view;
+
+  // Zmiana filtra/sortowania cofa na pierwszą stronę; samo przewijanie stron jej nie rusza.
+  const setFilters = (patch: Partial<ClientListView>) =>
+    onViewChange({ ...view, ...patch, currentPage: 1 });
+  const goToPage = (page: number) => onViewChange({ ...view, currentPage: page });
 
   // Unikalne trasy z listy klientów (tylko niepuste)
   const availableRoutes = useMemo(() => {
@@ -47,10 +68,6 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
       .filter((r): r is string => !!r);
     return Array.from(new Set(routes)).sort((a, b) => a.localeCompare(b, 'pl'));
   }, [clients]);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, provinceFilter, routeFilter, sortBy]);
 
   let processed = clients.filter((c) => {
     const q = search.toLowerCase();
@@ -84,7 +101,10 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
   });
 
   const totalPages = Math.ceil(processed.length / PAGE_SIZE) || 1;
-  const paginated = processed.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  // Gdy lista sie skurczy (usuniety klient, wezszy filtr), zapamietana strona moze
+  // wypasc poza zakres — pokazujemy wtedy ostatnia istniejaca zamiast pustki.
+  const page = Math.min(Math.max(currentPage, 1), totalPages);
+  const paginated = processed.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Sumy sprzedaży dla aktualnie przefiltrowanej listy
   const salesSummary = useMemo(() => {
@@ -125,9 +145,9 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
             placeholder="Szukaj (nazwa, osoba, e-mail, telefon)..."
             className="input-field flex-1"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilters({ search: e.target.value })}
           />
-          <select className="select-field md:w-56" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+          <select className="select-field md:w-56" value={sortBy} onChange={(e) => setFilters({ sortBy: e.target.value })}>
             <option value="alpha">Alfabetycznie (A–Z)</option>
             <option value="route">Według trasy</option>
             <option value="oldest">Od najstarszego kontaktu</option>
@@ -142,7 +162,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
               <span className="eyebrow text-ink/50 shrink-0">Trasa:</span>
               <button
                 type="button"
-                onClick={() => setRouteFilter('')}
+                onClick={() => setFilters({ routeFilter: '' })}
                 className={`px-3 py-1.5 rounded-pill text-body-sm font-medium transition-colors border ${
                   routeFilter === ''
                     ? 'bg-primary text-on-primary border-primary'
@@ -158,7 +178,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
                   <button
                     key={route}
                     type="button"
-                    onClick={() => setRouteFilter(route === routeFilter ? '' : route)}
+                    onClick={() => setFilters({ routeFilter: route === routeFilter ? '' : route })}
                     className={`px-3 py-1.5 rounded-pill text-body-sm font-medium transition-colors border ${
                       routeFilter === route
                         ? 'bg-primary text-on-primary border-primary'
@@ -182,7 +202,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
           <select
             className="select-field md:w-56 shrink-0"
             value={provinceFilter}
-            onChange={(e) => setProvinceFilter(e.target.value)}
+            onChange={(e) => setFilters({ provinceFilter: e.target.value })}
           >
             <option value="">Wszystkie województwa</option>
             {PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
@@ -197,7 +217,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
             </span>
             <button
               type="button"
-              onClick={() => { setSearch(''); setProvinceFilter(''); setRouteFilter(''); }}
+              onClick={() => setFilters({ search: '', provinceFilter: '', routeFilter: '' })}
               className="text-body-sm text-ink/50 hover:text-ink underline"
             >
               Wyczyść filtry
@@ -240,7 +260,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
                     <span
                       className="badge bg-block-navy text-white cursor-pointer hover:opacity-80 transition-opacity"
                       title={`Trasa: ${client.route}`}
-                      onClick={() => setRouteFilter(client.route === routeFilter ? '' : (client.route || ''))}
+                      onClick={() => setFilters({ routeFilter: client.route === routeFilter ? '' : (client.route || '') })}
                     >
                       🚚 {client.route}
                     </span>
@@ -287,19 +307,19 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView }) => {
         <div className="flex justify-center items-center gap-4 card px-6 py-3 w-max mx-auto">
           <button
             type="button"
-            disabled={currentPage === 1}
-            onClick={() => setCurrentPage(prev => prev - 1)}
+            disabled={page === 1}
+            onClick={() => goToPage(page - 1)}
             className="btn-tertiary disabled:opacity-30"
           >
             ← Poprzednia
           </button>
           <span className="text-body-sm font-medium px-3 py-1 bg-surface-soft rounded-md">
-            Strona {currentPage} z {totalPages}
+            Strona {page} z {totalPages}
           </span>
           <button
             type="button"
-            disabled={currentPage === totalPages}
-            onClick={() => setCurrentPage(prev => prev + 1)}
+            disabled={page === totalPages}
+            onClick={() => goToPage(page + 1)}
             className="btn-tertiary disabled:opacity-30"
           >
             Następna →

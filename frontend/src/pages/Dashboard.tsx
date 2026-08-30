@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useClients } from '../hooks/useClients';
 import ClientForm from '../components/ClientForm';
-import ClientList from '../components/ClientList';
+import ClientList, { ClientListView, emptyClientListView } from '../components/ClientList';
 import ClientCard from '../components/ClientCard';
 import ProductsPanel from '../components/ProductsPanel';
 import PromotionsPanel from '../components/PromotionsPanel';
@@ -49,6 +49,9 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [viewClient, setViewClient] = useState<Client | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<FollowUp[]>([]);
+  // Filtry i numer strony listy klientów — trzymane tutaj, żeby przetrwały
+  // wejście w kartę klienta / formularz edycji i powrót na listę.
+  const [clientListView, setClientListView] = useState<ClientListView>(emptyClientListView);
 
   const loadTasks = useCallback(async () => {
     try {
@@ -331,7 +334,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
                 onClientUpdated={(updated) => { setViewClient(updated); fetchClients(); }}
               />
             ) : (
-              <ClientList clients={clients} onEdit={handleEditClick} onDelete={handleDeleteClient} onView={handleViewClick} />
+              <ClientList
+                clients={clients}
+                onEdit={handleEditClick}
+                onDelete={handleDeleteClient}
+                onView={handleViewClick}
+                view={clientListView}
+                onViewChange={setClientListView}
+              />
             )}
           </>
         )}
