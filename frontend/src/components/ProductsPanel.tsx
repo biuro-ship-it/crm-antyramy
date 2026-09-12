@@ -1,29 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getAuth } from 'firebase/auth';
 import {
   Product, ProductFormData,
-  getProductsList, createProduct, updateProduct, deleteProduct
+  getProductsList, createProduct, updateProduct, deleteProduct,
+  uploadImage, deleteUpload
 } from '../services/api';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-
-const uploadImage = async (file: File): Promise<string> => {
-  const auth = getAuth();
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const formData = new FormData();
-  formData.append('image', file);
-  const response = await fetch(`${API_URL}/api/upload`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData,
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error || 'Błąd uploadu zdjęcia');
-  }
-  const data = await response.json();
-  return data.imageUrl;
-};
 
 // ─── Pusty formularz ────────────────────────────────────────────────────────
 const emptyForm = (): ProductFormData => ({
@@ -184,14 +164,20 @@ const ProductsPanel: React.FC = () => {
   };
 
   const handleUpdate = async (id: string, data: ProductFormData) => {
+    const previousImage = products.find(p => p.id === id)?.imageUrl;
     const updated = await updateProduct(id, data);
     setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updated } : p));
+    // Podmiana zdjęcia zostawiała stary plik na dysku — sprzątamy go po zapisie.
+    if (previousImage && previousImage !== updated.imageUrl) await deleteUpload(previousImage);
     setEditingId(null);
   };
 
   const handleDelete = async (id: string) => {
+    const removed = products.find(p => p.id === id);
     await deleteProduct(id);
     setProducts(prev => prev.filter(p => p.id !== id));
+    // Zdjęcie produktu nie ma już właściciela — sprzątamy je z dysku.
+    if (removed?.imageUrl) await deleteUpload(removed.imageUrl);
     setDeleteConfirm(null);
   };
 

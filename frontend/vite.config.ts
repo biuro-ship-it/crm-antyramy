@@ -11,7 +11,7 @@ export default defineConfig({
         name: 'CRM Antyramy',
         short_name: 'CRM',
         description: 'System CRM dla firmy Antyramy',
-        theme_color: '#17205a',
+        theme_color: '#ffffff', // musi zgadzac sie z <meta name="theme-color"> w index.html
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait-primary',

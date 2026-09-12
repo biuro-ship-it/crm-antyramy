@@ -13,6 +13,7 @@ import {
   KanbanTask, KanbanColumn, KanbanColor, Client,
 } from '../services/api';
 import KanbanModal from './KanbanModal';
+import { isPastDate } from '../utils/date';
 
 const COLUMNS: { id: KanbanColumn; label: string; accent: string }[] = [
   { id: 'todo', label: 'Do zrobienia', accent: 'bg-block-pink' },
@@ -44,7 +45,7 @@ function SortableCard({ task, onEdit, onDelete }: CardProps) {
     touchAction: 'none',
   };
 
-  const isOverdue = task.dueDate && task.column !== 'done' && new Date().toISOString().split('T')[0] > task.dueDate;
+  const isOverdue = task.column !== 'done' && isPastDate(task.dueDate ?? '');
 
   return (
     <div

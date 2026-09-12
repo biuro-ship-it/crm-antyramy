@@ -7,7 +7,9 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '../services/firebase';
 
-// Dozwolone adresy e-mail — tylko te konta mają dostęp
+// Dozwolone adresy e-mail — blokada po stronie UI, żeby obce konto dostało od razu
+// komunikat, a nie pustą aplikację. Źródłem prawdy jest ALLOWED_EMAILS w .env backendu
+// (`backend/src/middleware/auth.ts`); tu wartości są wbudowane w build.
 const ALLOWED_EMAILS = [
   'biuro@antyramy.eu',
   'krzysiekgodek@gmail.com',

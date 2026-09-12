@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { downloadArchiveZip, getArchiveData, ArchiveDump } from '../services/api';
+import { todayISO } from '../utils/date';
 
 // Wymusza pobranie pliku z Bloba.
 const triggerDownload = (blob: Blob, filename: string) => {
@@ -26,7 +27,7 @@ const flatAddress = (a: any, prefix = '') => a ? {
 
 // Zagnieżdżony dump (kolekcja → { docId: {...} }) spłaszczamy do tablicy rekordów.
 // Podkolekcję _sub_interactions wyłuskujemy osobno (do własnego arkusza), więc usuwamy ją z wiersza rodzica.
-const toRows = (rec: Record<string, any> | undefined) =>
+const toRows = (rec: Record<string, any> | undefined): Record<string, any>[] =>
   Object.entries(rec ?? {}).map(([id, doc]) => {
     const { _sub_interactions, ...rest } = (doc ?? {}) as Record<string, any>;
     return { id, ...rest };
@@ -150,7 +151,7 @@ const ArchivePanel: React.FC = () => {
   const [loading, setLoading] = useState<null | 'zip' | 'json' | 'xlsx'>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  const today = todayISO();
 
   const handleZip = async () => {
     setError(null);

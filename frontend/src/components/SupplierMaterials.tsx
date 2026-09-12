@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   Supplier, SupplierMaterial, Interaction, InteractionFormData,
   updateSupplier, createSupplierInteraction,
 } from '../services/api';
+import { todayISO } from '../utils/date';
 
 interface SupplierMaterialsProps {
   supplier: Supplier;
@@ -28,7 +29,7 @@ const todayPl = () => {
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
 };
 
-const todayISO = () => new Date().toISOString().split('T')[0];
+
 
 type Draft = { name: string; unit: SupplierMaterial['unit']; price: string };
 const emptyDraft: Draft = { name: '', unit: 'szt', price: '' };

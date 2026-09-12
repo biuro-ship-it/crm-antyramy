@@ -23,7 +23,6 @@ export const emptyClientListView = (): ClientListView => ({
 interface ClientListProps {
   clients: Client[];
   onEdit: (client: Client) => void;
-  onDelete?: (id: string) => void;
   onView: (client: Client) => void;
   view: ClientListView;
   onViewChange: (next: ClientListView) => void;
@@ -69,36 +68,38 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, 
     return Array.from(new Set(routes)).sort((a, b) => a.localeCompare(b, 'pl'));
   }, [clients]);
 
-  let processed = clients.filter((c) => {
+  const processed = useMemo(() => {
     const q = search.toLowerCase();
-    const matchSearch =
-      (c.companyName ?? '').toLowerCase().includes(q) ||
-      (c.contactPerson ?? '').toLowerCase().includes(q) ||
-      (c.email ?? '').toLowerCase().includes(q) ||
-      (c.phone ?? '').toLowerCase().includes(q);
-    const matchProvince = provinceFilter === '' ? true : c.address?.province === provinceFilter;
-    const matchRoute = routeFilter === '' ? true : (c.route?.trim() || '') === routeFilter;
-    return matchSearch && matchProvince && matchRoute;
-  });
+    const filtered = clients.filter((c) => {
+      const matchSearch =
+        (c.companyName ?? '').toLowerCase().includes(q) ||
+        (c.contactPerson ?? '').toLowerCase().includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q) ||
+        (c.phone ?? '').toLowerCase().includes(q);
+      const matchProvince = provinceFilter === '' ? true : c.address?.province === provinceFilter;
+      const matchRoute = routeFilter === '' ? true : (c.route?.trim() || '') === routeFilter;
+      return matchSearch && matchProvince && matchRoute;
+    });
 
-  processed.sort((a, b) => {
-    if (sortBy === 'alpha') return (a.companyName || '').localeCompare(b.companyName || '', 'pl');
-    if (sortBy === 'type') return (a.type || '').localeCompare(b.type || '', 'pl');
-    if (sortBy === 'route') {
-      const ra = a.route || '';
-      const rb = b.route || '';
-      if (ra === rb) return (a.companyName || '').localeCompare(b.companyName || '', 'pl');
-      if (!ra) return 1;
-      if (!rb) return -1;
-      return ra.localeCompare(rb, 'pl');
-    }
-    if (sortBy === 'oldest') {
-      const dateA = new Date(a.lastContactAt || a.createdAt).getTime();
-      const dateB = new Date(b.lastContactAt || b.createdAt).getTime();
-      return dateA - dateB;
-    }
-    return 0;
-  });
+    return filtered.sort((a, b) => {
+      if (sortBy === 'alpha') return (a.companyName || '').localeCompare(b.companyName || '', 'pl');
+      if (sortBy === 'type') return (a.type || '').localeCompare(b.type || '', 'pl');
+      if (sortBy === 'route') {
+        const ra = a.route || '';
+        const rb = b.route || '';
+        if (ra === rb) return (a.companyName || '').localeCompare(b.companyName || '', 'pl');
+        if (!ra) return 1;
+        if (!rb) return -1;
+        return ra.localeCompare(rb, 'pl');
+      }
+      if (sortBy === 'oldest') {
+        const dateA = new Date(a.lastContactAt || a.createdAt).getTime();
+        const dateB = new Date(b.lastContactAt || b.createdAt).getTime();
+        return dateA - dateB;
+      }
+      return 0;
+    });
+  }, [clients, search, provinceFilter, routeFilter, sortBy]);
 
   const totalPages = Math.ceil(processed.length / PAGE_SIZE) || 1;
   // Gdy lista sie skurczy (usuniety klient, wezszy filtr), zapamietana strona moze

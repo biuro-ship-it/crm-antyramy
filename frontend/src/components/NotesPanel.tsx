@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getNotes, deleteNote, Note, NoteColor } from '../services/api';
+import { getNotes, deleteNote, deleteUpload, Note, NoteColor } from '../services/api';
 import NoteModal from './NoteModal';
 
 const colorClasses: Record<NoteColor, string> = {
@@ -36,9 +36,12 @@ export default function NotesPanel() {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Zapobiega otwarciu modalu przy kliknięciu w "Usuń"
     if (!confirm('Czy na pewno chcesz usunąć tę notatkę?')) return;
+    const removed = notes.find(n => n.id === id);
     try {
       await deleteNote(id);
       setNotes(prev => prev.filter(n => n.id !== id));
+      // Załączniki notatki nie mają już właściciela — sprzątamy je z dysku.
+      await Promise.all((removed?.attachments ?? []).map(a => deleteUpload(a.url)));
     } catch (err) {
       alert('Nie udało się usunąć notatki');
     }
@@ -107,7 +110,8 @@ export default function NotesPanel() {
               <div>
                 <span className="text-xs font-mono text-ink font-light block mb-1">{note.createdAt}</span>
                 <h3 className="font-semibold text-lg line-clamp-1 pr-12">{note.title}</h3>
-                {/* Prosty podgląd czystego tekstu zamiast HTML stripu dla optymalizacji */}
+                {/* Podgląd HTML z edytora TipTap — treść pisana wyłącznie przez
+                    zalogowanych użytkowników CRM, obcy HTML tu nie trafia. */}
                 <div 
                   className="text-sm opacity-75 line-clamp-3 mt-2" 
                   dangerouslySetInnerHTML={{ __html: note.content }}

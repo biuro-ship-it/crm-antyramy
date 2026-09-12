@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Client, ClientFile, Interaction, InteractionFormData, Product, Order, FakturowniaInvoice,
   getClientInteractions, createClientInteraction, updateClientInteraction,
-  getProductsList, createFollowUp, updateClient, getClients,
-  fakturowniaLookup, openFakturowniaPdf, uploadFile
+  getProductsList, createFollowUp, updateClient,
+  fakturowniaLookup, openFakturowniaPdf, uploadFile, deleteUpload
 } from '../services/api';
 import { zl, clientYearTotal, clientMonthTotal } from '../utils/sales';
+import { openFile } from '../utils/files';
+import { todayISO } from '../utils/date';
 import EmailSendModal from './EmailSendModal';
 
 const colorClasses: Record<string, string> = {
@@ -177,6 +179,9 @@ Pozdrawiam serdecznie,`;
 
 interface ClientCardProps {
   client: Client;
+  /** Cała baza klientów — potrzebna tylko do udziału % w obrocie. Dashboard ma ją
+   *  już w stanie, więc karta nie musi jej pobierać z serwera przy każdym otwarciu. */
+  allClients: Client[];
   onClose: () => void;
   onClientUpdated?: (c: Client) => void;
 }
@@ -189,7 +194,7 @@ const CHANNEL_ICON: Record<string, string> = {
 };
 
 const emptyForm = (): InteractionFormData => ({
-  contactDate: new Date().toISOString().split('T')[0],
+  contactDate: todayISO(),
   channel: 'telefon',
   notes: '',
   tradeNotes: '',
@@ -408,13 +413,13 @@ const InteractionForm: React.FC<InteractionFormProps> = ({
 };
 
 // ─── Główny komponent ──────────────────────────────────────────────────────
-const todaySaleISO = () => new Date().toISOString().split('T')[0];
+const todaySaleISO = () => todayISO();
 const parseAmount = (v: string): number => {
   const n = parseFloat(v.replace(',', '.'));
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdated }) => {
+const ClientCard: React.FC<ClientCardProps> = ({ client, allClients, onClose, onClientUpdated }) => {
   const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -462,7 +467,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
         name: file.name,
         url,
         size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        uploadedAt: new Date().toISOString().split('T')[0],
+        uploadedAt: todayISO(),
       };
       await persistFiles([...files, newFile]);
     } catch (err) {
@@ -474,8 +479,11 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
 
   const handleDeleteFile = async (fileId: string) => {
     if (!window.confirm('Usunąć ten dokument?')) return;
+    const removed = files.find(f => f.id === fileId);
     try {
       await persistFiles(files.filter(f => f.id !== fileId));
+      // Dopiero po udanym zapisie kasujemy plik z dysku serwera.
+      if (removed) await deleteUpload(removed.url);
     } catch {
       alert('Nie udało się usunąć dokumentu.');
     }
@@ -580,27 +588,19 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
   // Udział % w globalnym obrocie (rok / miesiąc). Sumy pozostałych klientów
   // pobieramy raz; obrót bieżącego klienta liczymy z żywego `orders`, żeby
   // udział reagował na dodanie/usunięcie sprzedaży bez przeładowania.
-  const [othersSales, setOthersSales] = useState<{ year: number; month: number } | null>(null);
-  useEffect(() => {
-    let active = true;
-    getClients()
-      .then(all => {
-        if (!active) return;
-        const others = all.filter(c => c.id !== client.id);
-        setOthersSales({
-          year: others.reduce((s, c) => s + clientYearTotal(c), 0),
-          month: others.reduce((s, c) => s + clientMonthTotal(c), 0),
-        });
-      })
-      .catch(() => active && setOthersSales({ year: 0, month: 0 }));
-    return () => { active = false; };
-  }, [client.id]);
+  const othersSales = useMemo(() => {
+    const others = allClients.filter(c => c.id !== client.id);
+    return {
+      year: others.reduce((s, c) => s + clientYearTotal(c), 0),
+      month: others.reduce((s, c) => s + clientMonthTotal(c), 0),
+    };
+  }, [allClients, client.id]);
 
   const liveClient = { ...client, orders } as Client;
   const myYear = clientYearTotal(liveClient);
   const myMonth = clientMonthTotal(liveClient);
-  const globalYear = (othersSales?.year ?? 0) + myYear;
-  const globalMonth = (othersSales?.month ?? 0) + myMonth;
+  const globalYear = othersSales.year + myYear;
+  const globalMonth = othersSales.month + myMonth;
   const shareYear = globalYear > 0 ? (myYear / globalYear) * 100 : 0;
   const shareMonth = globalMonth > 0 ? (myMonth / globalMonth) * 100 : 0;
   const pct = (n: number) =>
@@ -817,7 +817,7 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, onClose, onClientUpdate
                 <div key={file.id} className="flex items-center justify-between gap-3 bg-canvas border border-hairline rounded-xl p-3">
                   <button
                     type="button"
-                    onClick={() => window.open(file.url, '_blank', 'noopener,noreferrer')}
+                    onClick={() => openFile(file.url)}
                     className="flex items-center gap-2 min-w-0 hover:underline text-left"
                     title={file.name}
                   >

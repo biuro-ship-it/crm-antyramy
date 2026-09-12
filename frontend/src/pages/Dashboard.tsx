@@ -1,24 +1,32 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { useClients } from '../hooks/useClients';
 import ClientForm from '../components/ClientForm';
 import ClientList, { ClientListView, emptyClientListView } from '../components/ClientList';
 import ClientCard from '../components/ClientCard';
-import ProductsPanel from '../components/ProductsPanel';
-import PromotionsPanel from '../components/PromotionsPanel';
-import EmailTemplatesPanel from '../components/EmailTemplatesPanel';
-import NotesPanel from '../components/NotesPanel';
-import SuppliersPanel from '../components/SuppliersPanel';
-import ArchivePanel from '../components/ArchivePanel';
-import CalendarPanel from '../components/CalendarPanel';
-import KanbanPanel from '../components/KanbanPanel';
 import MobileNav from '../components/MobileNav';
-import AdminPanel from '../components/AdminPanel';
 import ThemeToggle from '../components/ThemeToggle';
+
+// Panele poza zakładką „Klienci" ładujemy dopiero przy wejściu w nie. Dzięki temu
+// TipTap (edytor notatek i szablonów) oraz dnd-kit (Kanban) nie siedzą w głównym
+// bundlu — to z nich brała się większość jego wagi.
+const ProductsPanel = lazy(() => import('../components/ProductsPanel'));
+const PromotionsPanel = lazy(() => import('../components/PromotionsPanel'));
+const EmailTemplatesPanel = lazy(() => import('../components/EmailTemplatesPanel'));
+const NotesPanel = lazy(() => import('../components/NotesPanel'));
+const SuppliersPanel = lazy(() => import('../components/SuppliersPanel'));
+const ArchivePanel = lazy(() => import('../components/ArchivePanel'));
+const CalendarPanel = lazy(() => import('../components/CalendarPanel'));
+const KanbanPanel = lazy(() => import('../components/KanbanPanel'));
+const AdminPanel = lazy(() => import('../components/AdminPanel'));
+
+const PanelFallback = () => (
+  <p className="text-center text-body font-light py-10">Ładowanie…</p>
+);
 import { useTheme } from '../hooks/useTheme';
+import { isPastDate } from '../utils/date';
 import { Client, ClientFormData, FollowUp, getFollowUpSummary, updateFollowUpStatus } from '../services/api';
 import { User } from 'firebase/auth';
 
-// DODANE: 'suppliers' do dostępnych zakładek
 type ActiveTab = 'clients' | 'calendar' | 'kanban' | 'products' | 'promotions' | 'email-templates' | 'notes' | 'suppliers' | 'archive' | 'admin';
 
 interface DashboardProps {
@@ -34,7 +42,7 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'promotions', label: 'Promocje' },
   { id: 'email-templates', label: 'Szablony maili' },
   { id: 'notes', label: 'Notatki' },
-  { id: 'suppliers', label: 'Dostawcy' }, // DODANE: Zakładka w nawigacji
+  { id: 'suppliers', label: 'Dostawcy' },
   { id: 'archive', label: 'Archiwum' },
   { id: 'admin', label: 'Administracja' },
 ];
@@ -104,7 +112,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
     }
   };
 
-  const isOverdue = (dateStr: string) => new Date().toISOString().split('T')[0] > dateStr;
+  const isOverdue = (dateStr: string) => isPastDate(dateStr);
 
   const activeThisMonth = clients.filter(c => {
     const dateToUse = c.lastContactAt || c.createdAt;
@@ -292,24 +300,18 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           </div>
         )}
 
-        {activeTab === 'calendar' ? (
-          <CalendarPanel />
-        ) : activeTab === 'kanban' ? (
-          <KanbanPanel />
-        ) : activeTab === 'products' ? (
-          <ProductsPanel />
-        ) : activeTab === 'promotions' ? (
-          <PromotionsPanel />
-        ) : activeTab === 'email-templates' ? (
-          <EmailTemplatesPanel />
-        ) : activeTab === 'notes' ? (
-          <NotesPanel />
-        ) : activeTab === 'suppliers' ? ( // DODANE: Logika ładowania Panelu Dostawców
-          <SuppliersPanel />
-        ) : activeTab === 'archive' ? (
-          <ArchivePanel />
-        ) : activeTab === 'admin' ? (
-          <AdminPanel />
+        {activeTab !== 'clients' ? (
+          <Suspense fallback={<PanelFallback />}>
+            {activeTab === 'calendar' && <CalendarPanel />}
+            {activeTab === 'kanban' && <KanbanPanel />}
+            {activeTab === 'products' && <ProductsPanel />}
+            {activeTab === 'promotions' && <PromotionsPanel />}
+            {activeTab === 'email-templates' && <EmailTemplatesPanel />}
+            {activeTab === 'notes' && <NotesPanel />}
+            {activeTab === 'suppliers' && <SuppliersPanel />}
+            {activeTab === 'archive' && <ArchivePanel />}
+            {activeTab === 'admin' && <AdminPanel />}
+          </Suspense>
         ) : (
           <>
             {error && <div className="alert-error mb-6">⚠️ {error}</div>}
@@ -318,7 +320,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               <p className="text-center text-body font-light py-10">Ładowanie danych z bazy...</p>
             ) : showForm ? (
               <div className="max-w-3xl mx-auto">
-                {/* Podpięcie funkcji usuwania, o której pisaliśmy wcześniej */}
                 <ClientForm
                   onSubmit={handleSubmit}
                   onCancel={() => setShowForm(false)}
@@ -330,6 +331,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             ) : viewClient ? (
               <ClientCard
                 client={viewClient}
+                allClients={clients}
                 onClose={() => { setViewClient(null); loadTasks(); fetchClients(); }}
                 onClientUpdated={(updated) => { setViewClient(updated); fetchClients(); }}
               />
@@ -337,7 +339,6 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
               <ClientList
                 clients={clients}
                 onEdit={handleEditClick}
-                onDelete={handleDeleteClient}
                 onView={handleViewClick}
                 view={clientListView}
                 onViewChange={setClientListView}

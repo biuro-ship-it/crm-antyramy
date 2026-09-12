@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { openFile } from '../utils/files';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-import { createNote, updateNote, uploadImage, getColorLabels, Note, NoteColor, NoteAttachment, ColorLabels } from '../services/api';
+import { createNote, updateNote, uploadImage, deleteUpload, getColorLabels, Note, NoteColor, NoteAttachment, ColorLabels } from '../services/api';
 
 const NOTE_COLOR_FALLBACK: Record<NoteColor, string> = {
   default: 'Biały', blue: 'Niebieski', yellow: 'Żółty', red: 'Czerwony', green: 'Zielony',
@@ -126,6 +127,11 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
       } else {
         await createNote(formData);
       }
+      // Załączniki usunięte z listy w trakcie edycji sprzątamy z dysku dopiero
+      // po udanym zapisie — anulowanie modalu nie może skasować żywego pliku.
+      const keptUrls = new Set(attachments.map(a => a.url));
+      const droppedFiles = (note?.attachments ?? []).filter(a => !keptUrls.has(a.url));
+      await Promise.all(droppedFiles.map(a => deleteUpload(a.url)));
       onSaved();
       onClose();
     } catch (err) {
@@ -271,9 +277,13 @@ export default function NoteModal({ note, onClose, onSaved }: NoteModalProps) {
                       <span className="text-xs">
                         {file.type.startsWith('image/') ? '🖼️' : '📄'}
                       </span>
-                      <a href={file.url} target="_blank" rel="noreferrer" className="text-ink hover:underline truncate font-medium">
+                      <button
+                        type="button"
+                        onClick={() => openFile(file.url)}
+                        className="text-ink hover:underline truncate font-medium text-left"
+                      >
                         {file.name}
-                      </a>
+                      </button>
                     </div>
                     <button
                       type="button"

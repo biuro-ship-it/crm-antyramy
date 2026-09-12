@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierInteractions, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage } from '../services/api';
+import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierInteractions, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage, deleteUpload } from '../services/api';
 import SupplierMaterials from './SupplierMaterials';
+import { openFile } from '../utils/files';
+import { todayISO } from '../utils/date';
 
 const colorClasses: Record<string, string> = {
   default: 'bg-canvas', lilac: 'bg-block-lilac', cream: 'bg-block-cream', pink: 'bg-block-gray', mint: 'bg-block-mint',
@@ -36,7 +38,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
     e.preventDefault();
     if (!noteText.trim()) return;
     const data: InteractionFormData = {
-      contactDate: new Date().toISOString().split('T')[0],
+      contactDate: todayISO(),
       channel: 'telefon',
       notes: noteText,
       tradeNotes: '',
@@ -88,7 +90,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
         name: file.name,
         url: url,
         size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        uploadedAt: new Date().toISOString().split('T')[0],
+        uploadedAt: todayISO(),
       };
       const updatedSupplier = await updateSupplier(supplier.id, {
         ...supplier,
@@ -104,10 +106,13 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
 
   const handleDeleteFile = async (fileId: string) => {
     if (!window.confirm('Usunąć ten plik?')) return;
+    const removed = (supplier.files || []).find(f => f.id === fileId);
     try {
       const updatedFiles = (supplier.files || []).filter(f => f.id !== fileId);
       const updatedSupplier = await updateSupplier(supplier.id, { ...supplier, files: updatedFiles });
       onSupplierUpdated(updatedSupplier);
+      // Dopiero po udanym zapisie kasujemy plik z dysku serwera.
+      if (removed) await deleteUpload(removed.url);
     } catch {
       alert('Błąd usuwania pliku.');
     }
@@ -238,7 +243,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
             ) : (
               supplier.files.map(file => (
                 <div key={file.id} className="flex justify-between items-center bg-white dark:bg-surface-soft p-2 rounded border border-hairline text-xs shadow-sm">
-                  <a href={file.url} target="_blank" rel="noreferrer" className="font-medium hover:underline text-ink truncate mr-2" title={file.name}>📄 {file.name}</a>
+                  <button type="button" onClick={() => openFile(file.url)} className="font-medium hover:underline text-ink truncate mr-2 text-left" title={file.name}>📄 {file.name}</button>
                   <button type="button" onClick={() => handleDeleteFile(file.id)} className="text-red-500 font-bold hover:underline shrink-0 px-1">Usuń</button>
                 </div>
               ))
