@@ -22,6 +22,11 @@ jobs:
         working-directory: frontend
         run: npm install
 
+      # Nieudany test wstrzymuje deploy — lepiej to niż wysyłka zepsutej wersji.
+      - name: Testy frontendu
+        working-directory: frontend
+        run: npm test
+
       - name: Zbuduj frontend
         working-directory: frontend
         env:
@@ -38,6 +43,10 @@ jobs:
       - name: Zainstaluj zależności backendu
         working-directory: backend
         run: npm install
+
+      - name: Testy backendu
+        working-directory: backend
+        run: npm test
 
       - name: Skompiluj backend TypeScript → JS
         working-directory: backend

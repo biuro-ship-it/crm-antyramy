@@ -32,6 +32,8 @@ Thumbs.db
 frontend/.vite/
 # foldery tylko lokalnie
 secret/
+# materialy firmowe i dane osobowe — nigdy do repo
+dane/
 .claude/
 info.md
 crm.md
