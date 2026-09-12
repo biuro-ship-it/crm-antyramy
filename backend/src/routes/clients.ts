@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
+import { recomputeLastContact } from '../utils/date';
+import { isNotFound } from '../utils/firestore';
 
 const router = Router();
 router.use(authenticate);
@@ -83,6 +85,7 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
     const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(clients);
   } catch (err) {
+    console.error('[clients] GET / błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania klientów' });
   }
 });
@@ -104,6 +107,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const docRef = await db.collection(COLLECTION).add(data);
     res.status(201).json({ id: docRef.id, ...data });
   } catch (err) {
+    console.error('[clients] POST / błąd:', err);
     res.status(500).json({ error: 'Błąd zapisu klienta' });
   }
 });
@@ -121,6 +125,11 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const updated = await db.collection(COLLECTION).doc(id).get();
     res.json({ id: updated.id, ...updated.data() });
   } catch (err) {
+    if (isNotFound(err)) {
+      res.status(404).json({ error: 'Klient nie istnieje' });
+      return;
+    }
+    console.error('[clients] PUT /:id błąd:', err);
     res.status(500).json({ error: 'Błąd aktualizacji klienta' });
   }
 });
@@ -141,6 +150,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
     await db.collection(COLLECTION).doc(id).delete();
     res.status(204).send();
   } catch (err) {
+    console.error('[clients] DELETE /:id błąd:', err);
     res.status(500).json({ error: 'Błąd usuwania klienta' });
   }
 });
@@ -159,6 +169,7 @@ router.get('/:id/interactions', async (req: AuthenticatedRequest, res: Response)
     const interactions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(interactions);
   } catch (err) {
+    console.error('[clients] GET /:id/interactions błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania historii kontaktów' });
   }
 });
@@ -179,14 +190,12 @@ router.post('/:id/interactions', async (req: AuthenticatedRequest, res: Response
     };
     const docRef = await db.collection(COLLECTION).doc(id).collection('interactions').add(data);
 
-    // aktualizuj datę ostatniego kontaktu
-    await db.collection(COLLECTION).doc(id).update({
-      lastContactAt: parsed.data.contactDate,
-      updatedAt: now,
-    });
+    // Data ostatniego kontaktu = najpóźniejsza notatka, nie po prostu ta dopisana.
+    await recomputeLastContact(db.collection(COLLECTION).doc(id));
 
     res.status(201).json({ id: docRef.id, ...data });
   } catch (err) {
+    console.error('[clients] POST /:id/interactions błąd:', err);
     res.status(500).json({ error: 'Błąd zapisu kontaktu' });
   }
 });
@@ -206,9 +215,12 @@ router.put('/:id/interactions/:interactionId', async (req: AuthenticatedRequest,
     };
     const ref = db.collection(COLLECTION).doc(id).collection('interactions').doc(interactionId);
     await ref.update(updateData);
+    // Zmiana daty notatki musi przeliczyć „ostatni kontakt" na karcie klienta.
+    await recomputeLastContact(db.collection(COLLECTION).doc(id));
     const updated = await ref.get();
     res.json({ id: interactionId, ...updated.data() });
   } catch (err) {
+    console.error('[clients] PUT /:id/interactions/:interactionId błąd:', err);
     res.status(500).json({ error: 'Błąd aktualizacji notatki' });
   }
 });

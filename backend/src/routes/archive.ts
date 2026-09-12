@@ -5,6 +5,7 @@ import archiver from 'archiver';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { db } from '../services/firebase';
+import { todayISO } from '../utils/date';
 
 const router = Router();
 router.use(authenticate);
@@ -58,7 +59,7 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
     res.json(await exportAll());
   } catch (error) {
     console.error('[archive] GET / błąd Firestore:', error);
-    res.status(500).json({ error: 'Nie udało się przygotować archiwum', detail: String(error) });
+    res.status(500).json({ error: 'Nie udało się przygotować archiwum' });
   }
 });
 
@@ -66,7 +67,7 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
 router.get('/zip', async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const data = await exportAll();
-    const date = new Date().toISOString().slice(0, 10);
+    const date = todayISO();
 
     res.setHeader('Content-Type', 'application/zip');
     res.setHeader('Content-Disposition', `attachment; filename="crm-antyramy-backup-${date}.zip"`);
@@ -94,7 +95,7 @@ router.get('/zip', async (_req: AuthenticatedRequest, res: Response) => {
   } catch (error) {
     console.error('[archive] GET /zip błąd:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Nie udało się przygotować archiwum ZIP', detail: String(error) });
+      res.status(500).json({ error: 'Nie udało się przygotować archiwum ZIP' });
     }
   }
 });

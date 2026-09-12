@@ -62,22 +62,6 @@ export const createEvent = async (input: CalendarEventInput): Promise<string> =>
   return res.data.id || '';
 };
 
-/** Aktualizuje istniejące wydarzenie (patch). */
-export const updateEvent = async (
-  eventId: string,
-  patch: Partial<CalendarEventInput>
-): Promise<void> => {
-  const calendar = getCalendarClient();
-  const requestBody: calendar_v3.Schema$Event = {};
-  if (patch.summary !== undefined) requestBody.summary = patch.summary;
-  if (patch.description !== undefined) requestBody.description = patch.description;
-  if (patch.date !== undefined) {
-    requestBody.start = { date: patch.date };
-    requestBody.end = { date: nextDay(patch.date) };
-  }
-  await calendar.events.patch({ calendarId: CALENDAR_ID, eventId, requestBody });
-};
-
 /** Usuwa wydarzenie. Ignoruje 404/410 (już usunięte). */
 export const deleteEvent = async (eventId: string): Promise<void> => {
   const calendar = getCalendarClient();
@@ -85,6 +69,10 @@ export const deleteEvent = async (eventId: string): Promise<void> => {
     await calendar.events.delete({ calendarId: CALENDAR_ID, eventId });
   } catch (err) {
     const code = (err as { code?: number }).code;
-    if (code !== 404 && code !== 410) throw err;
+    // 404/410 = wydarzenia już nie ma, to nie błąd. Resztę logujemy i podajemy wyżej.
+    if (code !== 404 && code !== 410) {
+      console.error('[calendar] deleteEvent błąd:', err);
+      throw err;
+    }
   }
 };

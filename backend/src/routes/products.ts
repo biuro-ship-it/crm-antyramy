@@ -19,6 +19,7 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
     const products = await productsService.getProducts();
     res.json(products);
   } catch (err) {
+    console.error('[products] GET / błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania produktów' });
   }
 });
@@ -33,6 +34,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const product = await productsService.createProduct(parsed.data);
     res.status(201).json(product);
   } catch (err) {
+    console.error('[products] POST / błąd:', err);
     res.status(500).json({ error: 'Błąd dodawania produktu' });
   }
 });
@@ -48,6 +50,7 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const product = await productsService.updateProduct(id, parsed.data);
     res.json(product);
   } catch (err) {
+    console.error('[products] PUT /:id błąd:', err);
     res.status(500).json({ error: 'Błąd aktualizacji produktu' });
   }
 });
@@ -58,6 +61,7 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
     await productsService.deleteProduct(id);
     res.status(204).send();
   } catch (err) {
+    console.error('[products] DELETE /:id błąd:', err);
     res.status(500).json({ error: 'Błąd usuwania produktu' });
   }
 });

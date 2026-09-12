@@ -13,10 +13,9 @@ import clientsRouter from './routes/clients';
 import productsRouter from './routes/products';
 import followupsRouter from './routes/followups';
 import uploadRouter from './routes/upload';
-import nipRouter from './routes/nip';
 import promotionsRouter from './routes/promotions';
 import emailTemplatesRouter from './routes/emailTemplates';
-import noteRoutes from './routes/notes'; // DODANE: Poprawka błędu 'Cannot find name noteRoutes'
+import notesRouter from './routes/notes';
 import suppliersRouter from './routes/suppliers';
 import archiveRouter from './routes/archive';
 import kanbanRouter from './routes/kanban';
@@ -35,17 +34,14 @@ app.use(helmet({
 }));
 
 // CORS
+// Produkcja przez HTTPS (.htaccess przekierowuje http→https i zbija „www."),
+// plus porty Vite z dev (5173 domyslny, 5174 ustawiony w vite.config.ts).
 app.use(cors({
   origin: [
     FRONTEND_URL,
     'https://crm.antyramy.eu',
-    'http://crm.antyramy.eu',
-    'https://www.crm.antyramy.eu', // DODANE
-    'http://www.crm.antyramy.eu',  // DODANE
-    'http://localhost:5174',
     'http://localhost:5173',
-    'http://localhost:5175', // DODANE
-    'http://localhost:5176', // DODANE na zapas
+    'http://localhost:5174',
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -77,10 +73,9 @@ app.use('/api/clients', clientsRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/followups', followupsRouter);
 app.use('/api/upload', uploadRouter);
-app.use('/api/nip', nipRouter);
 app.use('/api/promotions', promotionsRouter);
 app.use('/api/email-templates', emailTemplatesRouter);
-app.use('/api/notes', noteRoutes); // Zgłoszone wcześniej jako błąd przez brak importu
+app.use('/api/notes', notesRouter);
 app.use('/api/suppliers', suppliersRouter);
 app.use('/api/archive', archiveRouter);
 app.use('/api/kanban', kanbanRouter);

@@ -56,21 +56,33 @@ const drawText = (page: PDFPage, text: string, opts: TextOptions): number => {
   return currentY;
 };
 
+/**
+ * Zdjęcie produktu pobieramy najpierw z dysku, a dopiero potem HTTP-em.
+ *
+ * Poprzednia wersja sklejała ścieżkę dwa razy (`path.join(cwd, 'public', localPath)`,
+ * gdzie `localPath` był już absolutny), więc gałąź lokalna nigdy nie trafiała
+ * w plik — każde zdjęcie leciało zapytaniem HTTP do własnego serwera.
+ */
 const fetchImageBytes = async (url: string): Promise<Uint8Array | null> => {
-  try {
-    if (url.startsWith('/') || url.startsWith('http://localhost') || url.startsWith('https://api.crm')) {
-      const localPath = url.startsWith('/')
-        ? path.join(process.cwd(), 'public', url)
-        : url.replace(/https?:\/\/[^/]+/, '');
+  // `/uploads/<plik>` z URL-a albo ścieżki względnej → public_nodejs/public/uploads/<plik>
+  const pathname = url.startsWith('/') ? url : (() => {
+    try { return new URL(url).pathname; } catch { return ''; }
+  })();
 
-      const filePath = path.join(process.cwd(), 'public', localPath);
-      if (fs.existsSync(filePath)) {
-        return new Uint8Array(fs.readFileSync(filePath));
-      }
+  if (pathname.startsWith('/uploads/') && !pathname.includes('..')) {
+    const filePath = path.join(process.cwd(), 'public', pathname);
+    if (fs.existsSync(filePath)) {
+      return new Uint8Array(fs.readFileSync(filePath));
     }
+  }
+
+  if (!/^https?:\/\//.test(url)) return null;
+
+  try {
     const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 8000 });
     return new Uint8Array(response.data);
-  } catch {
+  } catch (err) {
+    console.error('[pdf] nie udało się pobrać zdjęcia:', url, (err as Error).message);
     return null;
   }
 };

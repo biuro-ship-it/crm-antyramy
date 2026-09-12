@@ -1,70 +1,16 @@
 import { Request } from 'express';
 
+// Backend trzyma tylko te typy, których realnie używa. Kształt danych klienta,
+// dostawcy, notatki, follow-upa i zadania Kanban opisują schematy zod w
+// `src/routes/*.ts` (to one walidują wejście) oraz interfejsy w
+// `frontend/src/services/api.ts` (to one opisują odpowiedzi API).
+// Wcześniej leżały tu ich kopie, nieużywane i rozjeżdżające się z oryginałami.
+
 export interface AuthenticatedRequest extends Request {
   user?: {
     uid: string;
     email: string;
   };
-}
-
-export interface Address {
-  province: string;
-  zipCode: string;
-  city: string;
-  street: string;
-  number: string;
-}
-
-export interface Client {
-  id?: string;
-  companyName: string;
-  type: 'zakład' | 'sklep' | 'agencja' | 'inne';
-  contactPerson: string;
-  email: string;
-  phone: string;
-  address: Address;
-  lastContactAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  relationshipColor?: string; // DODANE: Kolor relacji klienta
-  vatStatus?: string;   // Status VAT z Białej listy MF
-  regon?: string;
-  bankAccount?: string; // Rachunek z Białej listy MF
-  fakturowniaInvoices?: FakturowniaInvoiceSnapshot[];
-  fakturowniaSyncedAt?: string;
-  files?: ClientFile[]; // Załączone dokumenty (skany, PDF-y, DOCX)
-}
-
-export interface ClientFile {
-  id: string;
-  name: string;
-  url: string;
-  size?: string;
-  uploadedAt: string;
-}
-
-export interface FakturowniaInvoiceSnapshot {
-  id: number;
-  number: string;
-  issueDate: string;
-  sellDate: string;
-  paymentTo: string;
-  priceNet: number;
-  priceGross: number;
-  currency: string;
-  status: string;
-  kind: string;
-}
-
-export interface Interaction {
-  id?: string;
-  contactDate: string;
-  channel: 'telefon' | 'mail' | 'spotkanie' | 'inne';
-  notes: string;
-  tradeNotes?: string;
-  products?: string[];
-  createdBy: string;
-  createdAt: string;
 }
 
 export interface Product {
@@ -75,37 +21,6 @@ export interface Product {
   imageUrl: string;
   createdAt: string;
   updatedAt?: string;
-}
-
-export interface FollowUp {
-  id?: string;
-  clientId: string;
-  clientName: string;
-  dueDate: string;
-  reminderText: string;
-  status: 'zaplanowane' | 'zrealizowane' | 'przesunięte';
-  createdAt: string;
-  completedAt?: string;
-  googleEventId?: string; // ID wydarzenia w Google Calendar (jeśli zsynchronizowano)
-  syncedAt?: string;      // Kiedy ostatnio udało się zsynchronizować z Google
-  syncError?: string;     // Komunikat błędu, jeśli sync z Google się nie powiódł
-}
-
-export type KanbanColumn = 'todo' | 'doing' | 'done';
-
-export interface KanbanTask {
-  id?: string;
-  title: string;
-  description?: string;
-  column: KanbanColumn;
-  order: number;          // pozycja w obrębie kolumny (rosnąco)
-  clientId?: string;
-  clientName?: string;
-  color?: 'default' | 'blue' | 'yellow' | 'red' | 'green';
-  dueDate?: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy: string;
 }
 
 export interface EmailTemplateVersion {
@@ -125,67 +40,4 @@ export interface EmailTemplate {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface EmailTemplateFormData {
-  name: string;
-  category: string;
-  subject: string;
-  body: string;
-}
-
-export interface SupplierFile {
-  id: string;
-  name: string;
-  url: string;
-  size?: string;
-  uploadedAt: string;
-}
-
-export interface SupplierMaterial {
-  id: string;
-  name: string;
-  unit: 'szt' | 'm²' | 'ark.' | 'kpl';
-  price: number; // cena netto za jednostkę
-}
-
-export interface SupplierAddress {
-  street: string;
-  zipCode: string;
-  city: string;
-}
-
-export interface SupplierContactNames {
-  company: string;
-  sales: string;
-  owner: string;
-}
-
-export interface SupplierAgreements {
-  discount: string;
-  paymentTerm: string;
-  deliveryFreq: string;
-}
-
-export interface Supplier {
-  id?: string;
-  companyName: string;
-  category: string;
-  email: string;
-  phoneCompany: string;
-  phoneSales: string;
-  phoneOwner: string;
-  whatsapp?: string;
-  messenger?: string;
-  notes: string;
-  relationshipColor: string;
-  files: SupplierFile[];
-  materials?: SupplierMaterial[];
-  lastContactAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-
-  address?: SupplierAddress;
-  contactNames?: SupplierContactNames;
-  agreements?: SupplierAgreements;
 }

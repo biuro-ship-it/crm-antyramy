@@ -32,6 +32,7 @@ router.get('/colorLabels', async (_req: AuthenticatedRequest, res: Response) => 
     const data = snap.exists ? snap.data() : {};
     res.json(data ?? {});
   } catch (err) {
+    console.error('[settings] GET /colorLabels błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania etykiet kolorów' });
   }
 });
@@ -43,6 +44,7 @@ router.put('/colorLabels', async (req: AuthenticatedRequest, res: Response) => {
     res.json(parsed);
   } catch (err) {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
+    console.error('[settings] PUT /colorLabels błąd:', err);
     res.status(500).json({ error: 'Błąd zapisu etykiet kolorów' });
   }
 });

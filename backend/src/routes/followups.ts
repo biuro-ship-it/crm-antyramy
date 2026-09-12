@@ -4,6 +4,7 @@ import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { createEvent, deleteEvent } from '../services/calendar';
+import { todayISO } from '../utils/date';
 
 const router = Router();
 router.use(authenticate);
@@ -19,7 +20,7 @@ const FollowUpSchema = z.object({
 // Pobierz zadania na dziś i zaległe (status: zaplanowane)
 router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = todayISO();
     const snapshot = await db
       .collection(COLLECTION)
       .where('status', '==', 'zaplanowane')
@@ -30,6 +31,7 @@ router.get('/summary', async (_req: AuthenticatedRequest, res: Response) => {
     const followups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(followups);
   } catch (err) {
+    console.error('[followups] GET /summary błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania zadań' });
   }
 });
@@ -96,6 +98,7 @@ router.post('/client/:clientId', async (req: AuthenticatedRequest, res: Response
 
     res.status(201).json({ id: docRef.id, ...data });
   } catch (err) {
+    console.error('[followups] POST /client/:clientId błąd:', err);
     res.status(500).json({ error: 'Błąd dodawania przypomnienia' });
   }
 });
@@ -136,6 +139,7 @@ router.patch('/:id/status', async (req: AuthenticatedRequest, res: Response) => 
 
     res.status(200).json({ id, ...updateData });
   } catch (err) {
+    console.error('[followups] PATCH /:id/status błąd:', err);
     res.status(500).json({ error: 'Błąd zmiany statusu zadania' });
   }
 });

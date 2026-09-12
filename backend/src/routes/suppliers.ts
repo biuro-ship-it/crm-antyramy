@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
+import { recomputeLastContact } from '../utils/date';
+import { isNotFound } from '../utils/firestore';
 
 const router = Router();
 router.use(authenticate);
@@ -69,6 +71,7 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
     const suppliers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(suppliers);
   } catch (err) {
+    console.error('[suppliers] GET / błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania dostawców' });
   }
 });
@@ -83,6 +86,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const docRef = await db.collection(COLLECTION).add(data);
     res.status(201).json({ id: docRef.id, ...data });
   } catch (err) {
+    console.error('[suppliers] POST / błąd:', err);
     res.status(500).json({ error: 'Błąd zapisu dostawcy' });
   }
 });
@@ -98,15 +102,33 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
     const updated = await db.collection(COLLECTION).doc(id).get();
     res.json({ id: updated.id, ...updated.data() });
   } catch (err) {
+    if (isNotFound(err)) {
+      res.status(404).json({ error: 'Dostawca nie istnieje' });
+      return;
+    }
+    console.error('[suppliers] PUT /:id błąd:', err);
     res.status(500).json({ error: 'Błąd aktualizacji dostawcy' });
   }
 });
 
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
-    await db.collection(COLLECTION).doc(req.params.id).delete();
+    const { id } = req.params;
+    // Firestore nie usuwa subkolekcji automatycznie — bez tego historia kontaktów
+    // usuniętego dostawcy zostawała w bazie na zawsze (tak jak w clients.ts).
+    const interactionsSnap = await db
+      .collection(COLLECTION).doc(id).collection('interactions').get();
+
+    if (!interactionsSnap.empty) {
+      const batch = db.batch();
+      interactionsSnap.docs.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+    }
+
+    await db.collection(COLLECTION).doc(id).delete();
     res.status(204).send();
   } catch (err) {
+    console.error('[suppliers] DELETE /:id błąd:', err);
     res.status(500).json({ error: 'Błąd usuwania dostawcy' });
   }
 });
@@ -118,6 +140,7 @@ router.get('/:id/interactions', async (req: AuthenticatedRequest, res: Response)
     const snapshot = await db.collection(COLLECTION).doc(req.params.id).collection('interactions').orderBy('contactDate', 'desc').get();
     res.json(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
   } catch (err) {
+    console.error('[suppliers] GET /:id/interactions błąd:', err);
     res.status(500).json({ error: 'Błąd pobierania historii' });
   }
 });
@@ -130,9 +153,11 @@ router.post('/:id/interactions', async (req: AuthenticatedRequest, res: Response
     const now = new Date().toISOString();
     const data = { ...parsed.data, createdBy: req.user?.email || 'Nieznany', createdAt: now };
     const docRef = await db.collection(COLLECTION).doc(req.params.id).collection('interactions').add(data);
-    await db.collection(COLLECTION).doc(req.params.id).update({ lastContactAt: parsed.data.contactDate, updatedAt: now });
+    // Data ostatniego kontaktu = najpóźniejsza notatka, nie po prostu ta dopisana.
+    await recomputeLastContact(db.collection(COLLECTION).doc(req.params.id));
     res.status(201).json({ id: docRef.id, ...data });
   } catch (err) {
+    console.error('[suppliers] POST /:id/interactions błąd:', err);
     res.status(500).json({ error: 'Błąd dodawania notatki' });
   }
 });
@@ -150,9 +175,12 @@ router.put('/:id/interactions/:interactionId', async (req: AuthenticatedRequest,
     };
     const ref = db.collection(COLLECTION).doc(id).collection('interactions').doc(interactionId);
     await ref.update(updateData);
+    // Zmiana daty notatki musi przeliczyć „ostatni kontakt" na karcie dostawcy.
+    await recomputeLastContact(db.collection(COLLECTION).doc(id));
     const updated = await ref.get();
     res.json({ id: interactionId, ...updated.data() });
   } catch (err) {
+    console.error('[suppliers] PUT /:id/interactions/:interactionId błąd:', err);
     res.status(500).json({ error: 'Błąd aktualizacji notatki' });
   }
 });

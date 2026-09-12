@@ -30,6 +30,7 @@ router.get('/', authenticate, async (_req: AuthenticatedRequest, res: Response) 
     const templates = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     res.json(templates);
   } catch (err) {
+    console.error('[emailTemplates] GET / błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd pobierania szablonów';
     res.status(500).json({ error: message });
   }
@@ -64,6 +65,7 @@ router.post('/', authenticate, async (req: AuthenticatedRequest, res: Response) 
     const docRef = await db.collection('emailTemplates').add(templateData);
     res.status(201).json({ id: docRef.id, ...templateData });
   } catch (err) {
+    console.error('[emailTemplates] POST / błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd zapisu szablonu';
     res.status(500).json({ error: message });
   }
@@ -106,6 +108,7 @@ router.put('/:id', authenticate, async (req: AuthenticatedRequest, res: Response
 
     res.json({ id, ...existing, name, category, subject, body, currentVersion: nextVersion, updatedAt: now });
   } catch (err) {
+    console.error('[emailTemplates] PUT /:id błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd aktualizacji szablonu';
     res.status(500).json({ error: message });
   }
@@ -125,6 +128,7 @@ router.delete('/:id', authenticate, async (req: AuthenticatedRequest, res: Respo
     await db.collection('emailTemplates').doc(id).delete();
     res.json({ success: true });
   } catch (err) {
+    console.error('[emailTemplates] DELETE /:id błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd usuwania szablonu';
     res.status(500).json({ error: message });
   }
@@ -175,6 +179,7 @@ router.post('/:id/send', authenticate, async (req: AuthenticatedRequest, res: Re
     await sendEmail({ to, subject, htmlBody });
     res.json({ success: true, message: 'Mail wysłany' });
   } catch (err) {
+    console.error('[emailTemplates] POST /:id/send błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd wysyłki maila';
     res.status(500).json({ error: message });
   }

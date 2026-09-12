@@ -17,7 +17,7 @@ export const getGmailClient = () => {
   return google.gmail({ version: 'v1', auth: oauth2Client });
 };
 
-interface SendEmailOptions {
+export interface SendEmailOptions {
   to: string;
   subject: string;
   htmlBody: string;
@@ -25,7 +25,8 @@ interface SendEmailOptions {
   pdfFilename?: string;
 }
 
-const buildRawMessage = (options: SendEmailOptions, sender: string): string => {
+/** Eksportowane dla testów — składa wiadomość RFC 2822 zakodowaną base64url. */
+export const buildRawMessage = (options: SendEmailOptions, sender: string): string => {
   const { to, subject, htmlBody, pdfBuffer, pdfFilename } = options;
   const boundary = `boundary_${Date.now()}`;
 
@@ -33,6 +34,15 @@ const buildRawMessage = (options: SendEmailOptions, sender: string): string => {
     Buffer.from(str).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
   const subjectEncoded = `=?UTF-8?B?${Buffer.from(subject).toString('base64')}?=`;
+
+  // Cialo HTML kodujemy base64 w liniach po 76 znakow (RFC 2045).
+  // Wczesniej deklarowalismy quoted-printable, ale wstawialismy surowy HTML —
+  // a w QP kazde `=` (czyli kazde `style=`, `href=`, `width=`) to poczatek
+  // sekwencji escape, wiec zgodny ze specyfikacja klient pocztowy psul tresc
+  // i polskie znaki diakrytyczne.
+  const bodyBase64 = Buffer.from(htmlBody, 'utf-8')
+    .toString('base64')
+    .replace(/(.{76})/g, '$1\r\n');
 
   let raw: string;
 
@@ -47,9 +57,9 @@ const buildRawMessage = (options: SendEmailOptions, sender: string): string => {
       '',
       `--${boundary}`,
       `Content-Type: text/html; charset=UTF-8`,
-      `Content-Transfer-Encoding: quoted-printable`,
+      `Content-Transfer-Encoding: base64`,
       '',
-      htmlBody,
+      bodyBase64,
       '',
       `--${boundary}`,
       `Content-Type: application/pdf; name="${pdfFilename}"`,
@@ -67,8 +77,9 @@ const buildRawMessage = (options: SendEmailOptions, sender: string): string => {
       `Subject: ${subjectEncoded}`,
       `MIME-Version: 1.0`,
       `Content-Type: text/html; charset=UTF-8`,
+      `Content-Transfer-Encoding: base64`,
       '',
-      htmlBody,
+      bodyBase64,
     ].join('\r\n');
   }
 
@@ -106,6 +117,7 @@ export const sendBulkEmails = async (
       // Przerwa 200ms między mailami — ochrona przed rate limit Gmail API
       await new Promise(r => setTimeout(r, 200));
     } catch (err) {
+      console.error(`[gmail] wysyłka do ${recipient.email} nieudana:`, err);
       failed.push({ email: recipient.email, error: (err as Error).message });
     }
   }

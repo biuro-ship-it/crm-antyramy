@@ -5,6 +5,7 @@ import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { generatePromotionPdf } from '../services/pdf';
 import { sendBulkEmails } from '../services/gmail';
+import { todayISO, recomputeLastContact } from '../utils/date';
 
 const router = Router();
 
@@ -46,11 +47,13 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
     const clientSnapshots = await Promise.all(
       clientIds.map(id => db.collection('clients').doc(id).get())
     );
+    // Zachowujemy id klienta — historia kontaktów musi trafić TYLKO do tych,
+    // do których mail faktycznie poszedł (patrz filtr po result.failed niżej).
     const recipients = clientSnapshots
       .filter(s => s.exists)
       .map(s => {
         const data = s.data() as { companyName: string; email: string };
-        return { email: data.email, name: data.companyName };
+        return { id: s.id, email: data.email, name: data.companyName };
       })
       .filter(r => r.email);
 
@@ -127,18 +130,21 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
 </body>
 </html>`;
 
+    const today = todayISO();
+
     // Wyślij maile
     const result = await sendBulkEmails(
       recipients,
       subject,
       htmlBody,
       pdfBuffer,
-      `oferta-antyramy-${new Date().toISOString().split('T')[0]}.pdf`
+      `oferta-antyramy-${today}.pdf`
     );
 
-    // Zapisz historię interakcji dla każdego klienta
+    // Zapisz historię interakcji — tylko dla klientów, do których mail dotarł.
+    // Klient bez adresu e-mail lub z błędem wysyłki NIE dostaje wpisu, bo inaczej
+    // wypadałby z listy „najdawniej kontaktowani" mimo braku kontaktu.
     const now = new Date().toISOString();
-    const today = now.split('T')[0];
     const interactionData = {
       contactDate: today,
       channel: 'mail',
@@ -149,13 +155,13 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
       createdAt: now,
     };
 
+    const failedEmails = new Set(result.failed.map(f => f.email));
+    const delivered = recipients.filter(r => !failedEmails.has(r.email));
+
     await Promise.allSettled(
-      clientIds.map(clientId =>
-        db.collection('clients').doc(clientId).collection('interactions').add(interactionData)
-          .then(() => db.collection('clients').doc(clientId).update({
-            lastContactAt: today,
-            updatedAt: now,
-          }))
+      delivered.map(r =>
+        db.collection('clients').doc(r.id).collection('interactions').add(interactionData)
+          .then(() => recomputeLastContact(db.collection('clients').doc(r.id)))
       )
     );
 
@@ -166,6 +172,7 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
     });
 
   } catch (err) {
+    console.error('[promotions] POST /send błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd wysyłki promocji';
     res.status(500).json({ error: message });
   }
@@ -204,6 +211,7 @@ router.post('/preview-pdf', authenticate, async (req: AuthenticatedRequest, res:
     });
     res.send(pdfBuffer);
   } catch (err) {
+    console.error('[promotions] POST /preview-pdf błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd generowania PDF';
     res.status(500).json({ error: message });
   }
