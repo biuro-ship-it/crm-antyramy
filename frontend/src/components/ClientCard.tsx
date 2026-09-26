@@ -499,7 +499,8 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, allClients, onClose, on
       // Faktury zasilają sprzedaż klienta wartością NETTO — tak jak ręcznie dodane wpisy.
       // Wpisy z faktur tagujemy id "fv-<id>", by przy odświeżeniu je podmienić, a ręczne zostawić.
       const manualOrders = (client.orders ?? []).filter(o => !String(o.id).startsWith('fv-'));
-      const invoiceOrders: Order[] = invoices.map(inv => ({
+      // Korekty (kwota ujemna) zostają tylko na liście faktur — schemat zamówień nie dopuszcza ujemnych
+      const invoiceOrders: Order[] = invoices.filter(inv => inv.priceNet >= 0).map(inv => ({
         id: `fv-${inv.id}`,
         amount: inv.priceNet,
         date: inv.sellDate || inv.issueDate,
