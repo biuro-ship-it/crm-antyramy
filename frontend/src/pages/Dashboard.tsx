@@ -342,6 +342,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
                 onView={handleViewClick}
                 view={clientListView}
                 onViewChange={setClientListView}
+                onSalesSynced={fetchClients}
               />
             )}
           </>

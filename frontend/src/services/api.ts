@@ -490,6 +490,25 @@ export const fakturowniaLookup = async (nip: string): Promise<FakturowniaLookup>
   return response.json();
 };
 
+export interface FakturowniaSyncSummary {
+  invoicesFetched: number;
+  invoicesMatched: number;
+  invoicesWithoutNip: number;
+  updatedClients: number;
+  noNip: string[];
+  noInvoices: string[];
+  unmatchedBuyers: { nip: string; name: string; count: number }[];
+}
+
+/** Hurtowo pobiera faktury sprzedaży i przypisuje je klientom CRM po NIP. */
+export const fakturowniaSyncAll = async (): Promise<FakturowniaSyncSummary> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/fakturownia/sync-all`, { method: 'POST', headers });
+  if (response.status === 503) throw new Error('Integracja z Fakturownią nie jest skonfigurowana');
+  if (!response.ok) await fail(response, 'Błąd hurtowej aktualizacji z Fakturowni');
+  return response.json();
+};
+
 /** Otwiera PDF faktury w nowej karcie (token zostaje po stronie backendu). */
 export const openFakturowniaPdf = async (invoiceId: number): Promise<void> => {
   const headers = await getHeaders();

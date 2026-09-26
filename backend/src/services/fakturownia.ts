@@ -64,6 +64,19 @@ export const getClientByNip = async (nip: string): Promise<FakturowniaClient | n
   };
 };
 
+const mapInvoice = (inv: any): FakturowniaInvoice => ({
+  id: inv.id,
+  number: inv.number || '',
+  issueDate: inv.issue_date || '',
+  sellDate: inv.sell_date || '',
+  paymentTo: inv.payment_to || '',
+  priceNet: toNumber(inv.price_net),
+  priceGross: toNumber(inv.price_gross),
+  currency: inv.currency || 'PLN',
+  status: inv.status || '',
+  kind: inv.kind || '',
+});
+
 /** Pobiera faktury danego klienta (po client_id), z paginacją (per_page=100, max 5 stron). */
 export const getInvoicesByClientId = async (clientId: number): Promise<FakturowniaInvoice[]> => {
   const all: FakturowniaInvoice[] = [];
@@ -74,25 +87,52 @@ export const getInvoicesByClientId = async (clientId: number): Promise<Fakturown
     if (!res.ok) throw new Error(`Fakturownia invoices: ${res.status}`);
     const arr = (await res.json()) as any[];
     if (!Array.isArray(arr) || arr.length === 0) break;
-    for (const inv of arr) {
-      all.push({
-        id: inv.id,
-        number: inv.number || '',
-        issueDate: inv.issue_date || '',
-        sellDate: inv.sell_date || '',
-        paymentTo: inv.payment_to || '',
-        priceNet: toNumber(inv.price_net),
-        priceGross: toNumber(inv.price_gross),
-        currency: inv.currency || 'PLN',
-        status: inv.status || '',
-        kind: inv.kind || '',
-      });
-    }
+    for (const inv of arr) all.push(mapInvoice(inv));
     if (arr.length < 100) break;
   }
   // Najnowsze u góry
   all.sort((a, b) => (b.issueDate || '').localeCompare(a.issueDate || ''));
   return all;
+};
+
+/** Faktura z danymi nabywcy — do hurtowego dopasowania po NIP. */
+export interface FakturowniaSalesInvoice extends FakturowniaInvoice {
+  buyerTaxNo: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string;
+  buyerPerson: string;
+}
+
+/**
+ * Wszystkie faktury sprzedaży z konta (period=all), strona po stronie.
+ * Faktury kosztowe (income=0) pomijamy. Przy przekroczeniu bezpiecznika rzucamy błąd,
+ * bo niepełna lista skasowałaby klientom starsze faktury.
+ */
+export const getAllSalesInvoices = async (): Promise<FakturowniaSalesInvoice[]> => {
+  const byId = new Map<number, FakturowniaSalesInvoice>();
+  const MAX_PAGES = 200; // 20 000 faktur
+  for (let page = 1; ; page++) {
+    if (page > MAX_PAGES) throw new Error('Fakturownia: zbyt wiele faktur do pobrania naraz');
+    const url = `${baseUrl()}/invoices.json?period=all&page=${page}&per_page=100&api_token=${TOKEN}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) throw new Error(`Fakturownia invoices: ${res.status}`);
+    const arr = (await res.json()) as any[];
+    if (!Array.isArray(arr) || arr.length === 0) break;
+    for (const inv of arr) {
+      if (inv.income === false || String(inv.income) === '0') continue;
+      byId.set(inv.id, {
+        ...mapInvoice(inv),
+        buyerTaxNo: inv.buyer_tax_no || '',
+        buyerName: inv.buyer_name || '',
+        buyerEmail: inv.buyer_email || '',
+        buyerPhone: inv.buyer_phone || '',
+        buyerPerson: inv.buyer_person || '',
+      });
+    }
+    if (arr.length < 100) break;
+  }
+  return Array.from(byId.values());
 };
 
 /** Pobiera PDF faktury jako bufor (token po stronie serwera). */

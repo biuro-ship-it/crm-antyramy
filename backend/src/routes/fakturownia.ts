@@ -5,7 +5,10 @@ import {
   getClientByNip,
   getInvoicesByClientId,
   getInvoicePdf,
+  getAllSalesInvoices,
 } from '../services/fakturownia';
+import { planBulkSync, SyncClient } from '../services/fakturowniaSync';
+import { db } from '../services/firebase';
 
 const router = Router();
 router.use(authenticate);
@@ -32,6 +35,34 @@ router.get('/lookup/:nip', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('Fakturownia lookup error:', err);
     res.status(502).json({ error: 'Błąd komunikacji z Fakturownią.' });
+  }
+});
+
+// Hurtowa aktualizacja: wszystkie faktury sprzedaży → klienci CRM dopasowani po NIP.
+router.post('/sync-all', async (_req: Request, res: Response) => {
+  if (!isFakturowniaConfigured()) {
+    res.status(503).json({ error: 'Integracja z Fakturownią nie jest skonfigurowana (brak FAKTUROWNIA_DOMAIN/TOKEN).' });
+    return;
+  }
+  try {
+    const invoices = await getAllSalesInvoices();
+    const snapshot = await db.collection('clients').get();
+    const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as SyncClient);
+    const { updates, summary } = planBulkSync(clients, invoices, new Date().toISOString());
+
+    // Firestore: max 500 operacji w jednym batchu
+    const CHUNK = 400;
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const batch = db.batch();
+      for (const u of updates.slice(i, i + CHUNK)) {
+        batch.update(db.collection('clients').doc(u.id), u.data);
+      }
+      await batch.commit();
+    }
+    res.json(summary);
+  } catch (err) {
+    console.error('Fakturownia sync-all error:', err);
+    res.status(502).json({ error: 'Błąd hurtowej aktualizacji z Fakturowni.' });
   }
 });
 

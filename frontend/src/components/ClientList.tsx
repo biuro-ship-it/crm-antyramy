@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Client } from '../services/api';
+import React, { useMemo, useState } from 'react';
+import { Client, fakturowniaSyncAll, FakturowniaSyncSummary } from '../services/api';
 import { clientTotal, clientYearTotal, clientMonthTotal, zl } from '../utils/sales';
 
 // Stan widoku listy (filtry + strona) mieszka w Dashboardzie, bo ClientList jest
@@ -26,6 +26,7 @@ interface ClientListProps {
   onView: (client: Client) => void;
   view: ClientListView;
   onViewChange: (next: ClientListView) => void;
+  onSalesSynced?: () => void;
 }
 
 const PROVINCES = [
@@ -52,8 +53,25 @@ const colorClasses: Record<string, string> = {
   mint: 'bg-block-mint',
 };
 
-const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, onViewChange }) => {
+const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, onViewChange, onSalesSynced }) => {
   const { search, provinceFilter, routeFilter, sortBy, currentPage } = view;
+
+  // Hurtowa aktualizacja sprzedaży z Fakturowni
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState('');
+  const [syncSummary, setSyncSummary] = useState<FakturowniaSyncSummary | null>(null);
+
+  const handleSyncAll = async () => {
+    setSyncing(true); setSyncError(''); setSyncSummary(null);
+    try {
+      setSyncSummary(await fakturowniaSyncAll());
+      onSalesSynced?.();
+    } catch (e) {
+      setSyncError(e instanceof Error ? e.message : 'Błąd aktualizacji z Fakturowni');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // Zmiana filtra/sortowania cofa na pierwszą stronę; samo przewijanie stron jej nie rusza.
   const setFilters = (patch: Partial<ClientListView>) =>
@@ -138,6 +156,50 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, 
 
   return (
     <div>
+      {/* HURTOWA AKTUALIZACJA SPRZEDAŻY */}
+      <div className="flex flex-col items-end gap-3 mb-4">
+        <button type="button" onClick={handleSyncAll} disabled={syncing} className="btn-secondary disabled:opacity-50">
+          {syncing ? '⏳ Pobieram faktury z Fakturowni…' : '🔄 Aktualizuj sprzedaż z Fakturowni'}
+        </button>
+        {syncError && <p className="text-body-sm text-red-700 dark:text-red-300">{syncError}</p>}
+      </div>
+      {syncSummary && (
+        <div className="card-padded mb-6 text-body-sm">
+          <div className="flex justify-between items-start mb-2">
+            <p className="font-semibold text-success">
+              ✓ Zaktualizowano {syncSummary.updatedClients} klientów · {syncSummary.invoicesMatched} faktur
+            </p>
+            <button type="button" onClick={() => setSyncSummary(null)} className="btn-tertiary py-0" aria-label="Zamknij podsumowanie">✕</button>
+          </div>
+          <p className="text-ink/60 font-light mb-2">
+            Pobrano z Fakturowni {syncSummary.invoicesFetched} faktur sprzedaży
+            {syncSummary.invoicesWithoutNip > 0 && ` (w tym ${syncSummary.invoicesWithoutNip} bez NIP nabywcy)`}.
+          </p>
+          {syncSummary.noNip.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer">Klienci bez NIP w CRM: <strong>{syncSummary.noNip.length}</strong></summary>
+              <p className="mt-1 text-ink/70 font-light">{syncSummary.noNip.join(', ')}</p>
+            </details>
+          )}
+          {syncSummary.noInvoices.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer">Klienci z NIP, bez faktur w Fakturowni: <strong>{syncSummary.noInvoices.length}</strong></summary>
+              <p className="mt-1 text-ink/70 font-light">{syncSummary.noInvoices.join(', ')}</p>
+            </details>
+          )}
+          {syncSummary.unmatchedBuyers.length > 0 && (
+            <details className="mt-1">
+              <summary className="cursor-pointer">Nabywcy z faktur, których nie ma w CRM: <strong>{syncSummary.unmatchedBuyers.length}</strong></summary>
+              <ul className="mt-1 text-ink/70 font-light space-y-0.5">
+                {syncSummary.unmatchedBuyers.map(b => (
+                  <li key={b.nip}>{b.name || '—'} <span className="font-mono">({b.nip})</span> — {b.count} fakt.</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
       {/* FILTRY */}
       <div className="card-padded mb-6 flex flex-col gap-3">
         <div className="flex flex-col md:flex-row gap-3">
