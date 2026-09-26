@@ -45,6 +45,7 @@ const getVoivodeshipByZip = (zipCode: string): string => {
 
 const emptyForm = (c?: Client | null): ClientFormData => ({
   companyName: c?.companyName || '',
+  fullName: c?.fullName || '',
   type: (c?.type as 'zakład' | 'sklep' | 'agencja' | 'inne') || 'zakład',
   nip: c?.nip || '',
   contactPerson: c?.contactPerson || '',
@@ -132,7 +133,9 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
         const province = pa.zipCode ? getVoivodeshipByZip(pa.zipCode) : prev.address.province;
         return {
           ...prev,
-          companyName: data.companyName || prev.companyName,
+          // Pełna nazwa rejestrowa trafia do osobnego pola; roboczą nazwę uzupełniamy tylko gdy pusta
+          fullName: data.companyName || prev.fullName,
+          companyName: prev.companyName || data.companyName,
           // Osobę uzupełniamy tylko gdy MF ją zwrócił i pole jest puste (nie nadpisujemy ręcznych danych)
           contactPerson: (!prev.contactPerson && data.managingPerson) ? data.managingPerson : prev.contactPerson,
           vatStatus: data.vatStatus || prev.vatStatus,
@@ -288,6 +291,11 @@ const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, on
           </datalist>
         )}
         <p className="text-caption text-ink/50 mt-1">Nazwa trasy handlowej — umożliwia filtrowanie klientów przed wyjazdem</p>
+      </div>
+
+      <div className="mb-4">
+        <label className={labelClass}>Pełna nazwa firmy</label>
+        <input type="text" name="fullName" value={formData.fullName || ''} onChange={handleTopChange} className="input-field bg-white dark:bg-surface-soft" placeholder="Pobierana z Białej listy VAT" />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">

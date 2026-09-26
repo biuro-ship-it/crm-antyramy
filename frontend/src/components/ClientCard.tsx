@@ -724,6 +724,9 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, allClients, onClose, on
             <span>✉️</span>
             <a href={`mailto:${client.email}`} className="hover:underline font-bold">{client.email || 'Brak'}</a>
           </p>
+          {client.fullName && (
+            <p className="mt-2 text-xs font-semibold md:text-right leading-5">🏢 {client.fullName}</p>
+          )}
           {(client.address?.street || client.address?.city || client.address?.zipCode) ? (
             <div className="mt-2 text-xs md:text-right leading-5">
               <span className="mr-1">📍</span>

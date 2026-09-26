@@ -36,6 +36,8 @@ const ClientFileSchema = z.object({
 
 const ClientSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
+  // Pełna (rejestrowa) nazwa z Białej listy VAT — companyName to nazwa robocza
+  fullName: z.string().optional().default(''),
   type: z.enum(['zakład', 'sklep', 'agencja', 'inne']),
   nip: z.string().default(''),
   contactPerson: z.string().default(''),

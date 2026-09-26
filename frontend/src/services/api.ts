@@ -21,6 +21,7 @@ export interface Order {
 export interface Client {
   id: string;
   companyName: string;
+  fullName?: string;    // pełna nazwa rejestrowa (z Białej listy VAT)
   type: 'zakład' | 'sklep' | 'agencja' | 'inne';
   nip: string;
   contactPerson: string;
@@ -85,6 +86,7 @@ export interface FakturowniaLookup {
 
 export interface ClientFormData {
   companyName: string;
+  fullName?: string;
   type: 'zakład' | 'sklep' | 'agencja' | 'inne';
   nip: string;
   contactPerson: string;
