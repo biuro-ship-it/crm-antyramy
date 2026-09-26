@@ -281,6 +281,7 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, 
               <div className="space-y-2 mb-6 flex-grow text-body-sm font-light">
                 <p>{client.address?.city || 'Brak miasta'}, {client.address?.province || '—'}</p>
                 <p>{client.phone || 'Brak telefonu'}</p>
+                <p className="break-all">{client.email || 'Brak e-maila'}</p>
                 {clientTotal(client) > 0 && (
                   <p className="font-semibold text-ink pt-1">
                     💰 {zl(clientTotal(client))}
