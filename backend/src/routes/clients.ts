@@ -34,6 +34,19 @@ const ClientFileSchema = z.object({
   uploadedAt: z.string(),
 });
 
+// Tagi: przycięte, małymi literami, bez duplikatów — filtr w kampaniach porównuje dosłownie
+function normalizeTags(tags: string[]): string[] {
+  return [...new Set(tags.map(t => t.trim().toLowerCase()).filter(Boolean))];
+}
+
+// Pola kampanii. lastCampaignAt celowo poza schematem — ustawia je tylko wysyłka
+// kampanii, a zod wycina nieznane klucze, więc PUT go nie ruszy.
+const MarketingFields = {
+  salutation: z.string().trim().max(60).optional(),
+  tags: z.array(z.string().max(40)).max(30).transform(normalizeTags).optional(),
+  noMarketing: z.boolean().optional(),
+};
+
 const ClientSchema = z.object({
   companyName: z.string().min(1, 'Nazwa firmy jest wymagana'),
   // Pełna (rejestrowa) nazwa z Białej listy VAT — companyName to nazwa robocza
@@ -46,7 +59,9 @@ const ClientSchema = z.object({
   address: AddressSchema,
   relationshipColor: z.string().optional().default('default'),
   route: z.string().optional().default(''),
-  // UWAGA: bez .default() PUT klienta wykasowałby te pola (parsed.data je wycina)
+  // UWAGA: pole z .default() w PUT bez tego pola zostaje NADPISANE wartością
+  // domyślną (zod ją wstawia, update() zapisuje). Pola, których formularz
+  // „Edytuj dane” nie wysyła, mają więc samo .optional() — brak klucza = bez zmian.
   salesEnabled: z.boolean().optional().default(false),
   orders: z.array(OrderSchema).optional().default([]),
   // Dane z Białej listy VAT (Ministerstwo Finansów) — pobierane po NIP
@@ -65,10 +80,12 @@ const ClientSchema = z.object({
     currency: z.string().default('PLN'),
     status: z.string().default(''),
     kind: z.string().default(''),
-  })).optional().default([]),
-  fakturowniaSyncedAt: z.string().optional().default(''),
-  // Załączone dokumenty klienta (bez .default() PUT by je wykasował)
-  files: z.array(ClientFileSchema).optional().default([]),
+  })).optional(),
+  fakturowniaSyncedAt: z.string().optional(),
+  // Załączone dokumenty klienta
+  files: z.array(ClientFileSchema).optional(),
+  // Kampanie: zwrot w wołaczu („Panie Marku”), tagi, wypis z ofert
+  ...MarketingFields,
 });
 
 const InteractionSchema = z.object({
@@ -133,6 +150,34 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
     }
     console.error('[clients] PUT /:id błąd:', err);
     res.status(500).json({ error: 'Błąd aktualizacji klienta' });
+  }
+});
+
+// PATCH /api/clients/:id/marketing — zwrot, tagi, wypis (z karty klienta).
+// Osobny endpoint, bo PUT nadpisuje całego klienta.
+const MarketingPatchSchema = z.object(MarketingFields).refine(
+  d => d.salutation !== undefined || d.tags !== undefined || d.noMarketing !== undefined,
+  { message: 'Brak pól do zmiany' },
+);
+
+router.patch('/:id/marketing', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = MarketingPatchSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  try {
+    const ref = db.collection(COLLECTION).doc(req.params.id);
+    await ref.update({ ...parsed.data, updatedAt: new Date().toISOString() });
+    const updated = await ref.get();
+    res.json({ id: updated.id, ...updated.data() });
+  } catch (err) {
+    if (isNotFound(err)) {
+      res.status(404).json({ error: 'Klient nie istnieje' });
+      return;
+    }
+    console.error('[clients] PATCH /:id/marketing błąd:', err);
+    res.status(500).json({ error: 'Błąd zapisu danych marketingowych' });
   }
 });
 

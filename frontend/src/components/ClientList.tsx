@@ -328,6 +328,11 @@ const ClientList: React.FC<ClientListProps> = ({ clients, onEdit, onView, view, 
                       🚚 {client.route}
                     </span>
                   )}
+                  {client.noMarketing && (
+                    <span className="badge bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300" title="Wypisany z ofert — kampanie go pomijają">
+                      wypisany
+                    </span>
+                  )}
                 </div>
                 <button type="button" onClick={() => onEdit(client)} className="btn-tertiary text-body-sm py-1 bg-white/40 hover:bg-white/80 dark:bg-white/10 dark:hover:bg-white/20">
                   Edytuj

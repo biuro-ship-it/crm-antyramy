@@ -43,6 +43,11 @@ export interface Client {
   fakturowniaInvoices?: FakturowniaInvoice[];
   fakturowniaSyncedAt?: string;
   files?: ClientFile[];
+  // Kampanie
+  salutation?: string;       // zwrot w wołaczu, np. „Panie Marku” — placeholder {zwrot}
+  tags?: string[];
+  noMarketing?: boolean;     // wypis z ofert — kampanie pomijają klienta
+  lastCampaignAt?: string | null; // ustawia wysyłka kampanii
 }
 
 export interface ClientFile {
@@ -103,6 +108,9 @@ export interface ClientFormData {
   fakturowniaInvoices?: FakturowniaInvoice[];
   fakturowniaSyncedAt?: string;
   files?: ClientFile[];
+  salutation?: string;
+  tags?: string[];
+  noMarketing?: boolean;
 }
 
 export interface NipData {
@@ -416,6 +424,20 @@ export const updateClient = async (id: string, data: ClientFormData): Promise<Cl
   const headers = await getHeaders();
   const response = await fetch(`${CLIENTS_URL}/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
   if (!response.ok) await fail(response, 'Nie udało się zaktualizować danych klienta');
+  return response.json();
+};
+
+export interface ClientMarketingData {
+  salutation?: string;
+  tags?: string[];
+  noMarketing?: boolean;
+}
+
+// Zwrot, tagi, wypis — osobny PATCH, żeby nie nadpisywać reszty klienta
+export const updateClientMarketing = async (id: string, data: ClientMarketingData): Promise<Client> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${CLIENTS_URL}/${id}/marketing`, { method: 'PATCH', headers, body: JSON.stringify(data) });
+  if (!response.ok) await fail(response, 'Nie udało się zapisać danych do kampanii');
   return response.json();
 };
 

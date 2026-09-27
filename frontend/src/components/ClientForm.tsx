@@ -65,6 +65,8 @@ const emptyForm = (c?: Client | null): ClientFormData => ({
   vatStatus: c?.vatStatus || '',
   regon: c?.regon || '',
   bankAccount: c?.bankAccount || '',
+  // Pól, których formularz nie edytuje, nie wysyłamy — PUT nadpisałby je
+  // pustą wartością. Idą osobnymi zapisami (karta klienta, PATCH /marketing).
 });
 
 const ClientForm: React.FC<ClientFormProps> = ({ initial, onSubmit, onCancel, onDelete, existingRoutes }) => {

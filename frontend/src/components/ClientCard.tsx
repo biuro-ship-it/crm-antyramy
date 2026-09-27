@@ -9,6 +9,7 @@ import { zl, clientYearTotal, clientMonthTotal } from '../utils/sales';
 import { openFile } from '../utils/files';
 import { todayISO } from '../utils/date';
 import EmailSendModal from './EmailSendModal';
+import ClientMarketing from './ClientMarketing';
 
 const colorClasses: Record<string, string> = {
   default: 'bg-canvas',
@@ -788,6 +789,9 @@ const ClientCard: React.FC<ClientCardProps> = ({ client, allClients, onClose, on
           )}
         </div>
       </div>
+
+      {/* KAMPANIE: zwrot, tagi, wypis */}
+      <ClientMarketing client={client} allClients={allClients} onClientUpdated={onClientUpdated} />
 
       {/* DOKUMENTY / ZAŁĄCZNIKI */}
       <div className="mt-8">
