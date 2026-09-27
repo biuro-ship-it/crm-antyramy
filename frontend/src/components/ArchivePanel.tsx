@@ -54,6 +54,7 @@ const buildWorkbook = (XLSX: typeof import('xlsx'), dump: ArchiveDump) => {
   const followups = toRows(dump.followups);
   const notes = toRows(dump.notes);
   const templates = toRows(dump.emailTemplates);
+  const promotions = toRows(dump.promotions);
 
   addSheet(clients.map(c => ({
     Firma: c.companyName ?? '',
@@ -134,6 +135,17 @@ const buildWorkbook = (XLSX: typeof import('xlsx'), dump: ArchiveDump) => {
     Temat: t.subject ?? '',
   })), 'Szablony maili');
 
+  addSheet(promotions.map(p => ({
+    Data: p.sentAt ?? '',
+    Tytuł: p.title ?? '',
+    Temat: p.subject ?? '',
+    Wysłano: p.sentCount ?? 0,
+    Błędy: p.failedCount ?? 0,
+    'Bez e-maila': p.skippedNoEmail ?? 0,
+    Produkty: Array.isArray(p.products) ? p.products.map((x: any) => x.name).join(', ') : '',
+    Autor: p.sentBy ?? '',
+  })), 'Promocje');
+
   return wb;
 };
 
@@ -142,6 +154,7 @@ const ITEMS = [
   { icon: '🚚', label: 'Dostawcy + historia kontaktów' },
   { icon: '📦', label: 'Produkty' },
   { icon: '✉️', label: 'Szablony maili' },
+  { icon: '📣', label: 'Archiwum wysłanych promocji' },
   { icon: '📝', label: 'Notatki' },
   { icon: '⏰', label: 'Przypomnienia (follow-upy)' },
   { icon: '🖼️', label: 'Zdjęcia produktów (tylko w ZIP)' },

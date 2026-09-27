@@ -3,8 +3,9 @@ import {
   Client, Product,
   getClients, getProductsList,
   sendPromotion, previewPromotionPdf,
-  PromotionSendResult,
+  PromotionSendResult, PromotionSummary, PromotionRecord, getPromotions,
 } from '../services/api';
+import PromotionsArchive from './PromotionsArchive';
 
 type Step = 1 | 2 | 3;
 
@@ -15,7 +16,14 @@ const PromotionsPanel: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [view, setView] = useState<'new' | 'sent'>('new');
   const [step, setStep] = useState<Step>(1);
+
+  // Archiwum wysłanych
+  const [archive, setArchive] = useState<PromotionSummary[]>([]);
+  const [archiveLoading, setArchiveLoading] = useState(true);
+  const [archiveError, setArchiveError] = useState('');
+  const [reuseInfo, setReuseInfo] = useState('');
 
   // Krok 1 — wybór produktów
   const [selectedProducts, setSelectedProducts] = useState<Set<string>>(new Set());
@@ -41,7 +49,34 @@ const PromotionsPanel: React.FC = () => {
       .then(([c, p]) => { setClients(c); setProducts(p); })
       .catch(() => setError('Błąd wczytywania danych'))
       .finally(() => setLoading(false));
+    loadArchive();
   }, []);
+
+  const loadArchive = () => {
+    setArchiveLoading(true);
+    getPromotions()
+      .then(list => { setArchive(list); setArchiveError(''); })
+      .catch(e => setArchiveError((e as Error).message))
+      .finally(() => setArchiveLoading(false));
+  };
+
+  // „Użyj ponownie” — kopiuje ofertę do kreatora; odbiorców wybiera się od nowa
+  const loadDraft = (record: PromotionRecord) => {
+    const available = record.products.filter(p => products.some(x => x.id === p.id));
+    const missing = record.products.length - available.length;
+    setSelectedProducts(new Set(available.map(p => p.id)));
+    setSelectedClients(new Set());
+    setTitle(record.title);
+    setSubject(record.subject || INITIAL_SUBJECT);
+    setContent(record.content);
+    setResult(null);
+    setError('');
+    setReuseInfo(missing > 0
+      ? `Skopiowano ofertę „${record.title}”. ${missing} ${missing === 1 ? 'produkt nie istnieje' : 'produkty nie istnieją'} już w katalogu i ${missing === 1 ? 'został pominięty' : 'zostały pominięte'}.`
+      : `Skopiowano ofertę „${record.title}”. Wybierz odbiorców.`);
+    setStep(available.length > 0 ? 2 : 1);
+    setView('new');
+  };
 
   const toggleProduct = (id: string) =>
     setSelectedProducts(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
@@ -105,7 +140,9 @@ const PromotionsPanel: React.FC = () => {
         clientIds: [...selectedClients],
       });
       setResult(res);
+      setReuseInfo('');
       if (res.sent > 0) {
+        loadArchive();
         setSelectedProducts(new Set());
         setSelectedClients(new Set());
         setTitle('');
@@ -133,6 +170,41 @@ const PromotionsPanel: React.FC = () => {
         <p className="text-ink font-light mt-1 text-sm">Wybierz produkty, klientów i treść — backend wyśle maile z PDF i zapisze historię kontaktów.</p>
       </div>
 
+      {/* Przełącznik: kreator / archiwum */}
+      <div className="flex gap-2 mb-6">
+        {([
+          { id: 'new' as const, label: 'Nowa promocja' },
+          { id: 'sent' as const, label: `Wysłane${archiveLoading ? '' : ` (${archive.length})`}` },
+        ]).map(v => (
+          <button
+            key={v.id}
+            onClick={() => setView(v.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              view === v.id ? 'bg-primary text-on-primary' : 'border border-hairline text-ink hover:bg-surface-soft'
+            }`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      {view === 'sent' && (
+        <PromotionsArchive
+          promotions={archive}
+          loading={archiveLoading}
+          error={archiveError}
+          onReuse={loadDraft}
+        />
+      )}
+
+      {view === 'new' && reuseInfo && (
+        <div className="bg-block-lilac border border-hairline rounded-lg px-4 py-3 mb-6 text-sm text-ink flex justify-between gap-3">
+          <span>{reuseInfo}</span>
+          <button onClick={() => setReuseInfo('')} className="text-ink font-light hover:text-ink leading-none">✕</button>
+        </div>
+      )}
+
+      {view === 'new' && (<>
       {/* Pasek kroków */}
       <div className="flex items-center gap-0 mb-8 bg-surface-soft rounded-xl p-1">
         {([
@@ -459,6 +531,7 @@ const PromotionsPanel: React.FC = () => {
           </div>
         </div>
       )}
+      </>)}
     </div>
   );
 };

@@ -216,6 +216,35 @@ export interface PromotionSendResult {
   sent: number;
   failed: Array<{ email: string; error: string }>;
   total: number;
+  promotionId?: string; // brak, gdy zapis do archiwum się nie udał
+}
+
+// Archiwum wysłanych promocji — pozycja listy (bez HTML i odbiorców)
+export interface PromotionSummary {
+  id: string;
+  title: string;
+  subject: string;
+  sentAt: string;
+  sentBy: string;
+  sentCount: number;
+  failedCount: number;
+  totalCount: number;
+  skippedNoEmail: number;
+  productCount: number;
+  legacy?: boolean; // odtworzona z historii klientów (sprzed archiwum)
+}
+
+export interface PromotionRecord extends Omit<PromotionSummary, 'productCount'> {
+  content: string;
+  htmlBody: string;
+  products: Array<{ id: string; name: string; code: string; priceNetto: number; imageUrl: string }>;
+  recipients: Array<{
+    clientId: string;
+    companyName: string;
+    email: string;
+    status: 'sent' | 'failed';
+    error?: string;
+  }>;
 }
 
 export interface EmailTemplateVersion {
@@ -664,6 +693,31 @@ export const previewPromotionPdf = async (
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
+export const getPromotions = async (): Promise<PromotionSummary[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/promotions`, { headers });
+  if (!response.ok) await fail(response, 'Nie udało się pobrać archiwum promocji');
+  return response.json();
+};
+
+export const getPromotion = async (id: string): Promise<PromotionRecord> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/promotions/${id}`, { headers });
+  if (!response.ok) await fail(response, 'Nie udało się pobrać promocji');
+  return response.json();
+};
+
+// PDF wysłanej oferty (z cenami z dnia wysyłki). Blob, bo endpoint wymaga tokenu.
+export const openPromotionPdf = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/promotions/${id}/pdf`, { headers });
+  if (!response.ok) await fail(response, 'Błąd generowania PDF oferty');
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
 const TEMPLATES_URL = `${API_URL}/api/email-templates`;
 
 export const getEmailTemplates = async (): Promise<EmailTemplate[]> => {
@@ -802,6 +856,7 @@ export interface ArchiveDump {
   followups: Record<string, any>;
   notes: Record<string, any>;
   emailTemplates: Record<string, any>;
+  promotions?: Record<string, any>; // brak w kopiach sprzed archiwum promocji
 }
 
 // Pełne dane jako JSON (do przycisku „Pobierz JSON" i do budowy Excela na froncie).

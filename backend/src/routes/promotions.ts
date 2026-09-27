@@ -5,9 +5,13 @@ import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { generatePromotionPdf } from '../services/pdf';
 import { sendBulkEmails } from '../services/gmail';
+import { buildPromotionEmailHtml } from '../services/promotionEmail';
 import { todayISO, recomputeLastContact } from '../utils/date';
 
 const router = Router();
+
+// Archiwum wysłanych kampanii (lista „Wysłane” w panelu Promocje)
+const COLLECTION = 'promotions';
 
 const PromotionSchema = z.object({
   title: z.string().min(1, 'Tytuł jest wymagany'),
@@ -49,8 +53,8 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
     );
     // Zachowujemy id klienta — historia kontaktów musi trafić TYLKO do tych,
     // do których mail faktycznie poszedł (patrz filtr po result.failed niżej).
-    const recipients = clientSnapshots
-      .filter(s => s.exists)
+    const existingClients = clientSnapshots.filter(s => s.exists);
+    const recipients = existingClients
       .map(s => {
         const data = s.data() as { companyName: string; email: string };
         return { id: s.id, email: data.email, name: data.companyName };
@@ -65,70 +69,7 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
     // Generuj PDF
     const pdfBuffer = await generatePromotionPdf(title, content, products);
 
-    // Buduj HTML body maila
-    const productListHtml = products.map(p => `
-      <tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;font-weight:600">${p.name}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;color:#666">${p.code || '—'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #f0f0f0;color:#1a56db;font-weight:700">${p.priceNetto > 0 ? `${p.priceNetto.toFixed(2)} zł netto` : '—'}</td>
-      </tr>`).join('');
-
-    const contentHtml = content.replace(/\n/g, '<br>');
-
-    const htmlBody = `
-<!DOCTYPE html>
-<html lang="pl">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:Arial,sans-serif">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 0">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
-
-        <!-- Header -->
-        <tr><td style="background:#1a56db;padding:28px 36px">
-          <div style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px">Antyramy</div>
-          <div style="color:rgba(255,255,255,0.7);font-size:12px;margin-top:2px">Ramy i antyramy</div>
-        </td></tr>
-
-        <!-- Tytuł -->
-        <tr><td style="padding:32px 36px 16px">
-          <h1 style="margin:0;font-size:22px;color:#111;font-weight:700">${title}</h1>
-          <div style="width:40px;height:3px;background:#1a56db;margin-top:12px;border-radius:2px"></div>
-        </td></tr>
-
-        <!-- Treść -->
-        <tr><td style="padding:0 36px 24px;color:#333;font-size:15px;line-height:1.7">
-          ${contentHtml}
-        </td></tr>
-
-        <!-- Tabela produktów -->
-        <tr><td style="padding:0 36px 32px">
-          <div style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#666;margin-bottom:12px">Produkty objęte ofertą</div>
-          <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #eee;border-radius:6px;overflow:hidden">
-            <tr style="background:#f8f9fa">
-              <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666;font-weight:600">Nazwa</th>
-              <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666;font-weight:600">Kod</th>
-              <th style="padding:10px 12px;text-align:left;font-size:12px;color:#666;font-weight:600">Cena</th>
-            </tr>
-            ${productListHtml}
-          </table>
-          <p style="font-size:12px;color:#888;margin-top:8px">Szczegółowa oferta w załączonym pliku PDF.</p>
-        </td></tr>
-
-        <!-- Footer -->
-        <tr><td style="background:#f8f9fa;padding:20px 36px;border-top:1px solid #eee">
-          <p style="margin:0;font-size:12px;color:#888">
-            Z poważaniem,<br>
-            <strong style="color:#333">Zespół Antyramy</strong><br>
-            <a href="https://antyramy.eu" style="color:#1a56db;text-decoration:none">antyramy.eu</a> · biuro@antyramy.eu
-          </p>
-        </td></tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+    const htmlBody = buildPromotionEmailHtml(title, content, products);
 
     const today = todayISO();
 
@@ -165,10 +106,47 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
       )
     );
 
+    // Archiwum kampanii. Maile już poszły, więc błąd zapisu tylko logujemy —
+    // odpowiedź o wysyłce musi dotrzeć do UI, inaczej ktoś wyśle drugi raz.
+    let promotionId: string | undefined;
+    try {
+      const failedByEmail = new Map(result.failed.map(f => [f.email, f.error]));
+      const record = {
+        title,
+        subject,
+        content,
+        htmlBody,
+        products: products.map(p => ({
+          id: p.id,
+          name: p.name || '',
+          code: p.code || '',
+          priceNetto: p.priceNetto || 0,
+          imageUrl: p.imageUrl || '',
+        })),
+        recipients: recipients.map(r => {
+          const error = failedByEmail.get(r.email);
+          return error === undefined
+            ? { clientId: r.id, companyName: r.name, email: r.email, status: 'sent' }
+            : { clientId: r.id, companyName: r.name, email: r.email, status: 'failed', error };
+        }),
+        sentCount: result.sent,
+        failedCount: result.failed.length,
+        totalCount: recipients.length,
+        skippedNoEmail: existingClients.length - recipients.length,
+        sentAt: now,
+        sentBy: req.user?.email || 'system',
+      };
+      const ref = await db.collection(COLLECTION).add(record);
+      promotionId = ref.id;
+    } catch (archiveErr) {
+      console.error('[promotions] zapis archiwum nieudany:', archiveErr);
+    }
+
     res.json({
       sent: result.sent,
       failed: result.failed,
       total: recipients.length,
+      promotionId,
     });
 
   } catch (err) {
@@ -212,6 +190,71 @@ router.post('/preview-pdf', authenticate, async (req: AuthenticatedRequest, res:
     res.send(pdfBuffer);
   } catch (err) {
     console.error('[promotions] POST /preview-pdf błąd:', err);
+    const message = err instanceof Error ? err.message : 'Błąd generowania PDF';
+    res.status(500).json({ error: message });
+  }
+});
+
+// --- ARCHIWUM WYSŁANYCH KAMPANII ---
+
+interface ArchivedProduct {
+  id: string; name: string; code: string; priceNetto: number; imageUrl: string;
+}
+
+// GET /api/promotions — lista kampanii (bez HTML i odbiorców, żeby była lekka)
+router.get('/', authenticate, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const snapshot = await db.collection(COLLECTION)
+      .select('title', 'subject', 'sentAt', 'sentBy', 'sentCount', 'failedCount',
+        'totalCount', 'skippedNoEmail', 'products', 'legacy')
+      .orderBy('sentAt', 'desc')
+      .get();
+
+    const list = snapshot.docs.map(doc => {
+      const { products, ...rest } = doc.data() as { products?: ArchivedProduct[] } & Record<string, unknown>;
+      return { id: doc.id, ...rest, productCount: products?.length ?? 0 };
+    });
+    res.json(list);
+  } catch (err) {
+    console.error('[promotions] GET / błąd:', err);
+    res.status(500).json({ error: 'Nie udało się pobrać archiwum promocji' });
+  }
+});
+
+// GET /api/promotions/:id — pełna kampania (HTML maila, produkty, odbiorcy)
+router.get('/:id', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const snap = await db.collection(COLLECTION).doc(req.params.id).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: 'Promocja nie istnieje' });
+      return;
+    }
+    res.json({ id: snap.id, ...snap.data() });
+  } catch (err) {
+    console.error('[promotions] GET /:id błąd:', err);
+    res.status(500).json({ error: 'Nie udało się pobrać promocji' });
+  }
+});
+
+// GET /api/promotions/:id/pdf — PDF z migawki produktów, czyli z cenami z dnia wysyłki
+router.get('/:id/pdf', authenticate, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const snap = await db.collection(COLLECTION).doc(req.params.id).get();
+    if (!snap.exists) {
+      res.status(404).json({ error: 'Promocja nie istnieje' });
+      return;
+    }
+    const data = snap.data() as { title: string; content: string; products?: ArchivedProduct[] };
+    const pdfBuffer = await generatePromotionPdf(data.title, data.content, data.products ?? []);
+
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'inline; filename="oferta-antyramy.pdf"',
+      'Content-Length': pdfBuffer.length,
+    });
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[promotions] GET /:id/pdf błąd:', err);
     const message = err instanceof Error ? err.message : 'Błąd generowania PDF';
     res.status(500).json({ error: message });
   }

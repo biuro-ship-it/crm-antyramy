@@ -18,6 +18,7 @@ const COLLECTIONS = [
   { name: 'notes',          subcollections: [] },
   { name: 'suppliers',      subcollections: ['interactions'] },
   { name: 'emailTemplates', subcollections: [] },
+  { name: 'promotions',     subcollections: [] },
 ] as const;
 
 const GDRIVE_FOLDER_ID  = process.env.GDRIVE_BACKUP_FOLDER_ID ?? '';
