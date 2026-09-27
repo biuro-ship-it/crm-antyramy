@@ -1,3 +1,5 @@
+import { EMAIL_SIGNATURE_HTML } from './emailSignature';
+
 // HTML maila promocyjnego. Wydzielony z routes/promotions.ts, bo korzysta z niego
 // też skrypt odtwarzający archiwum (scripts/backfill-promotions.ts) — stare
 // kampanie nie mają zapisanego HTML, więc składamy go ponownie tym samym kodem.
@@ -65,9 +67,7 @@ export const buildPromotionEmailHtml = (
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:20px 36px;border-top:1px solid #eee">
           <p style="margin:0;font-size:12px;color:#888">
-            Z poważaniem,<br>
-            <strong style="color:#333">Zespół Antyramy</strong><br>
-            <a href="https://antyramy.eu" style="color:#1a56db;text-decoration:none">antyramy.eu</a> · biuro@antyramy.eu
+            ${EMAIL_SIGNATURE_HTML}
           </p>
         </td></tr>
 
