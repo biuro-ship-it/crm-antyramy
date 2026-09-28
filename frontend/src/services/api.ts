@@ -212,49 +212,6 @@ export interface FollowUpFormData {
   reminderText: string;
 }
 
-export interface PromotionSendData {
-  title: string;
-  subject: string;
-  content: string;
-  productIds: string[];
-  clientIds: string[];
-}
-
-export interface PromotionSendResult {
-  sent: number;
-  failed: Array<{ email: string; error: string }>;
-  total: number;
-  promotionId?: string; // brak, gdy zapis do archiwum się nie udał
-}
-
-// Archiwum wysłanych promocji — pozycja listy (bez HTML i odbiorców)
-export interface PromotionSummary {
-  id: string;
-  title: string;
-  subject: string;
-  sentAt: string;
-  sentBy: string;
-  sentCount: number;
-  failedCount: number;
-  totalCount: number;
-  skippedNoEmail: number;
-  productCount: number;
-  legacy?: boolean; // odtworzona z historii klientów (sprzed archiwum)
-}
-
-export interface PromotionRecord extends Omit<PromotionSummary, 'productCount'> {
-  content: string;
-  htmlBody: string;
-  products: Array<{ id: string; name: string; code: string; priceNetto: number; imageUrl: string }>;
-  recipients: Array<{
-    clientId: string;
-    companyName: string;
-    email: string;
-    status: 'sent' | 'failed';
-    error?: string;
-  }>;
-}
-
 export interface EmailTemplateVersion {
   body: string;
   subject: string;
@@ -685,61 +642,6 @@ export const updateFollowUpStatus = async (id: string, status: 'zrealizowane' | 
   if (!response.ok) await fail(response, 'Błąd zmiany statusu zadania');
 };
 
-export const sendPromotion = async (data: PromotionSendData): Promise<PromotionSendResult> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/promotions/send`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  });
-  if (!response.ok) await fail(response, 'Błąd wysyłki promocji');
-  return response.json();
-};
-
-export const previewPromotionPdf = async (
-  title: string,
-  content: string,
-  productIds: string[]
-): Promise<void> => {
-  const auth = getAuth();
-  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-  const response = await fetch(`${API_URL}/api/promotions/preview-pdf`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify({ title, content, productIds }),
-  });
-  if (!response.ok) await fail(response, 'Błąd generowania podglądu PDF');
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-};
-
-export const getPromotions = async (): Promise<PromotionSummary[]> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/promotions`, { headers });
-  if (!response.ok) await fail(response, 'Nie udało się pobrać archiwum promocji');
-  return response.json();
-};
-
-export const getPromotion = async (id: string): Promise<PromotionRecord> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/promotions/${id}`, { headers });
-  if (!response.ok) await fail(response, 'Nie udało się pobrać promocji');
-  return response.json();
-};
-
-// PDF wysłanej oferty (z cenami z dnia wysyłki). Blob, bo endpoint wymaga tokenu.
-export const openPromotionPdf = async (id: string): Promise<void> => {
-  const headers = await getHeaders();
-  const response = await fetch(`${API_URL}/api/promotions/${id}/pdf`, { headers });
-  if (!response.ok) await fail(response, 'Błąd generowania PDF oferty');
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  window.open(url, '_blank');
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-};
-
 // ─── KAMPANIE ────────────────────────────────────────────────────────────────
 
 export type CampaignStatus = 'draft' | 'sending' | 'sent';
@@ -1026,7 +928,8 @@ export interface ArchiveDump {
   followups: Record<string, any>;
   notes: Record<string, any>;
   emailTemplates: Record<string, any>;
-  promotions?: Record<string, any>; // brak w kopiach sprzed archiwum promocji
+  promotions?: Record<string, any>; // stare archiwum Promocji (przeniesione do campaigns)
+  campaigns?: Record<string, any>;
 }
 
 // Pełne dane jako JSON (do przycisku „Pobierz JSON" i do budowy Excela na froncie).

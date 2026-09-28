@@ -66,3 +66,10 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - Podgląd maila liczony na backendzie (ten sam kod co wysyłka), odświeżany 0,5 s po zmianie treści. Placeholdery wstawiane kliknięciem w miejscu kursora.
 - **Wysyłka:** potwierdzenie → zapis szkicu → `start` → pętla `send-batch` z paskiem postępu. Pętla chroniona numerem uruchomienia (podwójny efekt w StrictMode / odmontowanie nie uruchamia dwóch pętli). Przerwaną kampanię wznawia się w szczegółach.
 - Szczegóły kampanii: liczniki, tematy A/B z liczbą wysłanych, podgląd dla wybranego odbiorcy (z aktualnym podpisem), PDF, lista odbiorców ze statusem, „Duplikuj kampanię” (otwiera kopię w edytorze).
+
+## 2026-09-28 — commit 5: migracja i usunięcie Promocji
+
+- Skrypt `migrate-promotions-to-campaigns.ts` (podgląd / `--live`, idempotentny przez `migratedFrom`). Przeniesione kampanie: `legacy: true`, `htmlBody` z oryginalnym mailem (szczegóły pokazują go zamiast ponownego renderu), wariant A = temat i treść promocji.
+- `lastCampaignAt` klientów ustawiany z przeniesionych wysyłek (tylko gdy późniejszy) — ochrona przed zmęczeniem obejmuje też wysyłki sprzed Kampanii.
+- Usunięte: trasa `/api/promotions`, `PromotionsPanel`, `PromotionsArchive`, `promotionEmail.ts`, jednorazowy skrypt `backfill-promotions.ts` (zrobił swoje 2026-09-27). Kolekcja `promotions` zostaje w bazie i w kopii zapasowej.
+- Eksport Excel: arkusz „Promocje” zastąpiony arkuszem „Kampanie”.
