@@ -55,3 +55,14 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - Historia kontaktów: wpis „Wysłano kampanię: {nazwa} (wariant X)” z rozwiniętą treścią, produktami i `campaignId`; `lastCampaignAt` i `recomputeLastContact` jak dotąd. Błąd zapisu historii nie cofa wysyłki.
 - `sendEmail` zwraca `{ id, threadId }` z Gmail API (dotąd `void`; stare wywołania bez zmian).
 - W bez-produktowej kampanii tytuł PDF (jeśli podany) nadal jest nagłówkiem maila; pusty tytuł = bez nagłówka.
+
+## 2026-09-28 — commit 4: ekran Kampanii
+
+- Zakładka „Promocje” nazywa się teraz **„Kampanie”** (id zakładki `promotions` bez zmian — linki i nawigacja mobilna działają jak dotąd). Stary ekran Promocji odłączony; pliki i trasę usuwa commit 5 razem z migracją.
+- Edytor w 4 krokach (Produkty → Odbiorcy → Treść → Wysyłka), kroki klikalne w dowolnej kolejności; szkic zapisywany przyciskiem „Zapisz szkic” i automatycznie przed wysyłką.
+- **Filtry** działają na froncie (lista klientów i tak jest ładowana w całości): „od X dni” traktuje brak daty jako spełnienie warunku (nigdy nie zamawiał / brak kontaktu / nie dostał kampanii). Ostatnie zamówienie = ręczne zamówienia + faktury z Fakturowni bez korekt.
+- Wypisani i klienci bez e-maila są widoczni na liście, ale nie da się ich zaznaczyć.
+- „Podziel losowo na A i B” dzieli zaznaczonych i włącza test A/B; jeśli temat B jest, a podziału nie ma — ostrzeżenie „wszyscy dostaną A”.
+- Podgląd maila liczony na backendzie (ten sam kod co wysyłka), odświeżany 0,5 s po zmianie treści. Placeholdery wstawiane kliknięciem w miejscu kursora.
+- **Wysyłka:** potwierdzenie → zapis szkicu → `start` → pętla `send-batch` z paskiem postępu. Pętla chroniona numerem uruchomienia (podwójny efekt w StrictMode / odmontowanie nie uruchamia dwóch pętli). Przerwaną kampanię wznawia się w szczegółach.
+- Szczegóły kampanii: liczniki, tematy A/B z liczbą wysłanych, podgląd dla wybranego odbiorcy (z aktualnym podpisem), PDF, lista odbiorców ze statusem, „Duplikuj kampanię” (otwiera kopię w edytorze).

@@ -740,6 +740,154 @@ export const openPromotionPdf = async (id: string): Promise<void> => {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 };
 
+// ─── KAMPANIE ────────────────────────────────────────────────────────────────
+
+export type CampaignStatus = 'draft' | 'sending' | 'sent';
+export type CampaignVariant = 'A' | 'B';
+
+export interface CampaignCounts {
+  total: number; sent: number; failed: number; skippedNoEmail: number; skippedNoMarketing: number;
+}
+export interface CampaignResults {
+  repliesA: number; repliesB: number; orders: number; orderValueNet: number; byPhone: number;
+}
+
+export interface CampaignRecipient {
+  clientId: string;
+  variant: CampaignVariant;
+  // Uzupełniane przy starcie wysyłki
+  companyName?: string;
+  email?: string;
+  status?: 'pending' | 'sent' | 'failed';
+  error?: string | null;
+  gmailMessageId?: string | null;
+  gmailThreadId?: string | null;
+  sentAt?: string | null;
+}
+
+export interface CampaignDraft {
+  name: string;
+  pdfTitle: string;
+  noProducts: boolean;
+  productIds: string[];
+  variantA: { subject: string; content: string };
+  variantB: { subject: string; content: string | null } | null; // content null = wspólna z A
+  recipients: Array<{ clientId: string; variant: CampaignVariant }>;
+}
+
+export interface Campaign extends Omit<CampaignDraft, 'recipients'> {
+  id: string;
+  status: CampaignStatus;
+  recipients: CampaignRecipient[];
+  productsSnapshot: Array<{ id: string; name: string; code: string; priceNetto: number; imageUrl: string }> | null;
+  counts: CampaignCounts | null;
+  results: CampaignResults;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  sentAt: string | null;
+  sentBy: string | null;
+  legacy?: boolean;
+  htmlBody?: string; // tylko kampanie przeniesione z Promocji — HTML dokładnie taki, jaki poszedł
+}
+
+export interface CampaignSummary {
+  id: string;
+  name: string;
+  status: CampaignStatus;
+  createdAt: string;
+  sentAt: string | null;
+  subjectA: string;
+  subjectB: string | null;
+  noProducts: boolean;
+  productCount: number;
+  recipientCount: number;
+  counts: CampaignCounts | null;
+  results: CampaignResults;
+  legacy: boolean;
+}
+
+export interface CampaignBatchResult {
+  status: CampaignStatus;
+  counts: CampaignCounts;
+  pending: number;
+  batch: Array<{ clientId: string; ok: boolean; error: string | null }>;
+}
+
+export interface CampaignPreviewInput {
+  clientId: string | null;
+  pdfTitle: string;
+  noProducts: boolean;
+  productIds: string[];
+  subject: string;
+  content: string;
+}
+
+const CAMPAIGNS_URL = `${API_URL}/api/campaigns`;
+
+const jsonRequest = async <T>(url: string, method: string, body: unknown, errMsg: string): Promise<T> => {
+  const headers = await getHeaders();
+  const response = await fetch(url, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!response.ok) await fail(response, errMsg);
+  return response.json();
+};
+
+const openPdfBlob = async (response: Response, errMsg: string) => {
+  if (!response.ok) await fail(response, errMsg);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+};
+
+export const getCampaigns = () =>
+  jsonRequest<CampaignSummary[]>(CAMPAIGNS_URL, 'GET', undefined, 'Nie udało się pobrać kampanii');
+
+export const getCampaign = (id: string) =>
+  jsonRequest<Campaign>(`${CAMPAIGNS_URL}/${id}`, 'GET', undefined, 'Nie udało się pobrać kampanii');
+
+export const createCampaign = (data: CampaignDraft) =>
+  jsonRequest<Campaign>(CAMPAIGNS_URL, 'POST', data, 'Nie udało się zapisać szkicu');
+
+export const updateCampaign = (id: string, data: CampaignDraft) =>
+  jsonRequest<Campaign>(`${CAMPAIGNS_URL}/${id}`, 'PUT', data, 'Nie udało się zapisać szkicu');
+
+export const deleteCampaign = (id: string) =>
+  jsonRequest<{ success: boolean }>(`${CAMPAIGNS_URL}/${id}`, 'DELETE', undefined, 'Nie udało się usunąć szkicu');
+
+export const duplicateCampaign = (id: string) =>
+  jsonRequest<Campaign>(`${CAMPAIGNS_URL}/${id}/duplicate`, 'POST', undefined, 'Nie udało się zduplikować kampanii');
+
+export const previewCampaignDraft = (data: CampaignPreviewInput) =>
+  jsonRequest<{ subject: string; html: string }>(`${CAMPAIGNS_URL}/preview`, 'POST', data, 'Nie udało się przygotować podglądu');
+
+export const previewSavedCampaign = (id: string, clientId: string, variant: CampaignVariant) =>
+  jsonRequest<{ subject: string; html: string }>(
+    `${CAMPAIGNS_URL}/${id}/preview?clientId=${encodeURIComponent(clientId)}&variant=${variant}`,
+    'GET', undefined, 'Nie udało się przygotować podglądu',
+  );
+
+export const openCampaignDraftPdf = async (data: CampaignPreviewInput): Promise<void> => {
+  const headers = await getHeaders();
+  await openPdfBlob(
+    await fetch(`${CAMPAIGNS_URL}/preview-pdf`, { method: 'POST', headers, body: JSON.stringify(data) }),
+    'Błąd generowania podglądu PDF',
+  );
+};
+
+export const openCampaignPdf = async (id: string): Promise<void> => {
+  const headers = await getHeaders();
+  await openPdfBlob(await fetch(`${CAMPAIGNS_URL}/${id}/pdf`, { headers }), 'Błąd generowania PDF kampanii');
+};
+
+export const startCampaign = (id: string) =>
+  jsonRequest<{ id: string; status: CampaignStatus; counts: CampaignCounts; pending: number }>(
+    `${CAMPAIGNS_URL}/${id}/start`, 'POST', undefined, 'Nie udało się rozpocząć wysyłki',
+  );
+
+export const sendCampaignBatch = (id: string) =>
+  jsonRequest<CampaignBatchResult>(`${CAMPAIGNS_URL}/${id}/send-batch`, 'POST', undefined, 'Błąd wysyłki partii');
+
 const TEMPLATES_URL = `${API_URL}/api/email-templates`;
 
 export const getEmailTemplates = async (): Promise<EmailTemplate[]> => {

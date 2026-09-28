@@ -10,7 +10,7 @@ import ThemeToggle from '../components/ThemeToggle';
 // TipTap (edytor notatek i szablonów) oraz dnd-kit (Kanban) nie siedzą w głównym
 // bundlu — to z nich brała się większość jego wagi.
 const ProductsPanel = lazy(() => import('../components/ProductsPanel'));
-const PromotionsPanel = lazy(() => import('../components/PromotionsPanel'));
+const CampaignsPanel = lazy(() => import('../components/CampaignsPanel'));
 const EmailTemplatesPanel = lazy(() => import('../components/EmailTemplatesPanel'));
 const NotesPanel = lazy(() => import('../components/NotesPanel'));
 const SuppliersPanel = lazy(() => import('../components/SuppliersPanel'));
@@ -39,7 +39,7 @@ const TABS: { id: ActiveTab; label: string }[] = [
   { id: 'calendar', label: 'Kalendarz' },
   { id: 'kanban', label: 'Kanban' },
   { id: 'products', label: 'Produkty' },
-  { id: 'promotions', label: 'Promocje' },
+  { id: 'promotions', label: 'Kampanie' },
   { id: 'email-templates', label: 'Szablony maili' },
   { id: 'notes', label: 'Notatki' },
   { id: 'suppliers', label: 'Dostawcy' },
@@ -305,7 +305,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
             {activeTab === 'calendar' && <CalendarPanel />}
             {activeTab === 'kanban' && <KanbanPanel />}
             {activeTab === 'products' && <ProductsPanel />}
-            {activeTab === 'promotions' && <PromotionsPanel />}
+            {activeTab === 'promotions' && <CampaignsPanel />}
             {activeTab === 'email-templates' && <EmailTemplatesPanel />}
             {activeTab === 'notes' && <NotesPanel />}
             {activeTab === 'suppliers' && <SuppliersPanel />}
