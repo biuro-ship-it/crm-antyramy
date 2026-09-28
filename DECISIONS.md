@@ -37,3 +37,10 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - Nowe pola klienta: `salutation`, `tags` (małe litery, bez duplikatów), `noMarketing`, `lastCampaignAt` (ustawia tylko wysyłka kampanii, poza schematem PUT).
 - Edycja na karcie klienta przez **`PATCH /api/clients/:id/marketing`**, żeby nie nadpisywać reszty klienta.
 - **Poprawiony błąd:** `files`, `fakturowniaInvoices`, `fakturowniaSyncedAt` miały w schemacie `.default()`, a formularz „Edytuj dane” ich nie wysyła — każdy zapis formularza czyścił pliki i migawkę faktur klienta. Teraz mają samo `.optional()` (brak klucza w PUT = bez zmian). Ta sama zasada dla nowych pól.
+
+## 2026-09-28 — commit 2: podpis w Administracji
+
+- Dokument **`settings/emailSignature`** `{ greeting, name, website, phone, email }`; brak dokumentu = domyślny podpis. **Puste pole = pominięte w stopce** (nie wraca do domyślnego), żeby dało się np. usunąć stronę.
+- Podpis składa jedna funkcja `buildSignatureHtml` (`backend/src/services/emailSignature.ts`), używana przez maile z szablonów, obecne Promocje i (następnie) Kampanie.
+- Błąd odczytu ustawień nie blokuje wysyłki — używany jest podpis domyślny.
+- Pola escapowane do HTML; telefon dostaje link `tel:+48…`, strona bez `https://` dostaje go w linku.

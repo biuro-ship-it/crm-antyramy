@@ -1,4 +1,4 @@
-import { EMAIL_SIGNATURE_HTML } from './emailSignature';
+import { buildSignatureHtml, DEFAULT_SIGNATURE } from './emailSignature';
 
 // HTML maila promocyjnego. Wydzielony z routes/promotions.ts, bo korzysta z niego
 // też skrypt odtwarzający archiwum (scripts/backfill-promotions.ts) — stare
@@ -14,6 +14,7 @@ export const buildPromotionEmailHtml = (
   title: string,
   content: string,
   products: PromotionEmailProduct[],
+  signatureHtml: string = buildSignatureHtml(DEFAULT_SIGNATURE),
 ): string => {
   const productListHtml = products.map(p => `
       <tr>
@@ -67,7 +68,7 @@ export const buildPromotionEmailHtml = (
         <!-- Footer -->
         <tr><td style="background:#f8f9fa;padding:20px 36px;border-top:1px solid #eee">
           <p style="margin:0;font-size:12px;color:#888">
-            ${EMAIL_SIGNATURE_HTML}
+            ${signatureHtml}
           </p>
         </td></tr>
 

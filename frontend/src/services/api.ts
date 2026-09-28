@@ -954,3 +954,28 @@ export const saveColorLabels = async (data: ColorLabels): Promise<ColorLabels> =
   if (!res.ok) await fail(res, 'Błąd zapisu etykiet');
   return res.json();
 };
+
+// Podpis w stopce maili (kampanie, szablony). Puste pole = pominięte w stopce.
+export interface EmailSignature {
+  greeting: string;
+  name: string;
+  website: string;
+  phone: string;
+  email: string;
+}
+
+export const getEmailSignature = async (): Promise<EmailSignature> => {
+  const headers = await getHeaders();
+  const res = await fetch(`${SETTINGS_URL}/emailSignature`, { headers });
+  if (!res.ok) await fail(res, 'Błąd pobierania podpisu');
+  return res.json();
+};
+
+export const saveEmailSignature = async (data: EmailSignature): Promise<EmailSignature> => {
+  const headers = await getHeaders();
+  const res = await fetch(`${SETTINGS_URL}/emailSignature`, {
+    method: 'PUT', headers, body: JSON.stringify(data),
+  });
+  if (!res.ok) await fail(res, 'Błąd zapisu podpisu');
+  return res.json();
+};

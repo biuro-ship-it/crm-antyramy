@@ -3,6 +3,7 @@ import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { z } from 'zod';
+import { SIGNATURE_DOC, getSignature } from '../services/emailSignature';
 
 const router = Router();
 router.use(authenticate);
@@ -46,6 +47,34 @@ router.put('/colorLabels', async (req: AuthenticatedRequest, res: Response) => {
     if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
     console.error('[settings] PUT /colorLabels błąd:', err);
     res.status(500).json({ error: 'Błąd zapisu etykiet kolorów' });
+  }
+});
+
+// Podpis w stopce maili — puste pole = pominięte w stopce
+const SignatureSchema = z.object({
+  greeting: z.string().trim().max(60),
+  name:     z.string().trim().max(80),
+  website:  z.string().trim().max(120),
+  phone:    z.string().trim().max(40),
+  email:    z.string().trim().max(120),
+});
+
+router.get('/emailSignature', async (_req: AuthenticatedRequest, res: Response) => {
+  res.json(await getSignature());
+});
+
+router.put('/emailSignature', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = SignatureSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  try {
+    await db.doc(SIGNATURE_DOC).set(parsed.data);
+    res.json(parsed.data);
+  } catch (err) {
+    console.error('[settings] PUT /emailSignature błąd:', err);
+    res.status(500).json({ error: 'Błąd zapisu podpisu' });
   }
 });
 

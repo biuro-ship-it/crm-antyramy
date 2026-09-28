@@ -6,6 +6,7 @@ import { AuthenticatedRequest } from '../types';
 import { generatePromotionPdf } from '../services/pdf';
 import { sendBulkEmails } from '../services/gmail';
 import { buildPromotionEmailHtml } from '../services/promotionEmail';
+import { getSignatureHtml } from '../services/emailSignature';
 import { todayISO, recomputeLastContact } from '../utils/date';
 
 const router = Router();
@@ -69,7 +70,7 @@ router.post('/send', authenticate, async (req: AuthenticatedRequest, res: Respon
     // Generuj PDF
     const pdfBuffer = await generatePromotionPdf(title, content, products);
 
-    const htmlBody = buildPromotionEmailHtml(title, content, products);
+    const htmlBody = buildPromotionEmailHtml(title, content, products, await getSignatureHtml());
 
     const today = todayISO();
 

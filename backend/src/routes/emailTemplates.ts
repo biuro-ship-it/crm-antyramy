@@ -4,7 +4,7 @@ import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest, EmailTemplate, EmailTemplateVersion } from '../types';
 import { sendEmail } from '../services/gmail';
-import { EMAIL_SIGNATURE_HTML } from '../services/emailSignature';
+import { getSignatureHtml } from '../services/emailSignature';
 
 const router = Router();
 
@@ -144,6 +144,7 @@ router.post('/:id/send', authenticate, async (req: AuthenticatedRequest, res: Re
   }
 
   const { to, subject, body } = parsed.data;
+  const signatureHtml = await getSignatureHtml();
 
   const htmlBody = `<!DOCTYPE html>
 <html lang="pl">
@@ -164,7 +165,7 @@ router.post('/:id/send', authenticate, async (req: AuthenticatedRequest, res: Re
 
         <tr><td style="background:#f8f9fa;padding:20px 36px;border-top:1px solid #eee">
           <p style="margin:0;font-size:12px;color:#888">
-            ${EMAIL_SIGNATURE_HTML}
+            ${signatureHtml}
           </p>
         </td></tr>
 
