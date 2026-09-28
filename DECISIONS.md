@@ -44,3 +44,14 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - Podpis składa jedna funkcja `buildSignatureHtml` (`backend/src/services/emailSignature.ts`), używana przez maile z szablonów, obecne Promocje i (następnie) Kampanie.
 - Błąd odczytu ustawień nie blokuje wysyłki — używany jest podpis domyślny.
 - Pola escapowane do HTML; telefon dostaje link `tel:+48…`, strona bez `https://` dostaje go w linku.
+
+## 2026-09-28 — commit 3: backend kampanii
+
+- **Trasy `/api/campaigns`:** lista, odczyt, szkic (POST/PUT/DELETE — zmiany i usuwanie tylko w stanie `draft`), `duplicate`, podglądy (`POST /preview`, `POST /preview-pdf` z edytora bez zapisu; `GET /:id/preview`, `GET /:id/pdf` dla zapisanej), `start`, `send-batch`.
+- **`start` nic nie wysyła** — waliduje, zamraża `productsSnapshot` i listę odbiorców (bieżące dane klientów), pomija wypisanych (`skippedNoMarketing`) i bez e-maila (`skippedNoEmail`). Maile wychodzą wyłącznie w `send-batch`.
+- **Wynik każdego maila zapisywany od razu po wysyłce** (transakcja per mail), a nie na końcu partii — przerwane żądanie nie powoduje ponownej wysyłki do już obsłużonych. Blokada `sendLockUntil` (120 s, przedłużana co mail) chroni przed równoległą wysyłką z dwóch okien.
+- `send-batch` sprawdza klienta tuż przed mailem: usunięty lub świeżo wypisany → `failed` z opisem, bez maila.
+- **Placeholdery** rozwijane per odbiorca (temat bez escapowania — zwykły tekst; treść z escapowaniem wartości). **PDF wspólny** dla wszystkich — placeholdery w nim rozwinięte do tekstów zastępczych (np. „Dzień dobry”). PDF generowany raz na partię (bez plików tymczasowych na serwerze).
+- Historia kontaktów: wpis „Wysłano kampanię: {nazwa} (wariant X)” z rozwiniętą treścią, produktami i `campaignId`; `lastCampaignAt` i `recomputeLastContact` jak dotąd. Błąd zapisu historii nie cofa wysyłki.
+- `sendEmail` zwraca `{ id, threadId }` z Gmail API (dotąd `void`; stare wywołania bez zmian).
+- W bez-produktowej kampanii tytuł PDF (jeśli podany) nadal jest nagłówkiem maila; pusty tytuł = bez nagłówka.

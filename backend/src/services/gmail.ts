@@ -86,12 +86,20 @@ export const buildRawMessage = (options: SendEmailOptions, sender: string): stri
   return encodeBase64Url(raw);
 };
 
-export const sendEmail = async (options: SendEmailOptions): Promise<void> => {
+export interface SentEmailIds {
+  id: string | null;
+  threadId: string | null;
+}
+
+// Zwraca id wiadomości i wątku z Gmaila — kampanie zapisują je, żeby później
+// sprawdzać odpowiedzi w wątku. Dotychczasowe wywołania mogą wynik ignorować.
+export const sendEmail = async (options: SendEmailOptions): Promise<SentEmailIds> => {
   const gmail = getGmailClient();
   const sender = process.env.GMAIL_SENDER || 'biuro@antyramy.eu';
 
   const raw = buildRawMessage(options, sender);
-  await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+  const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+  return { id: res.data.id ?? null, threadId: res.data.threadId ?? null };
 };
 
 export const sendBulkEmails = async (

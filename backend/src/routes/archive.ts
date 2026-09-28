@@ -25,6 +25,7 @@ const COLLECTIONS = [
   { name: 'suppliers',      subcollections: ['interactions'] },
   { name: 'emailTemplates', subcollections: [] },
   { name: 'promotions',     subcollections: [] },
+  { name: 'campaigns',      subcollections: [] },
 ] as const;
 
 async function exportCollection(
