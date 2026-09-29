@@ -49,13 +49,37 @@ Idempotentna (`migratedFrom`). Przeniesione kampanie mają znaczek „z Promocji
 11. **Kampanie z Promocji** (po migracji): 3 pozycje z podglądem oryginalnego maila i PDF.
 12. **Archiwum → Excel:** arkusz „Kampanie”.
 
-## Etap 2 — do zrobienia (osobny plan)
+## Etap 2 — zrobione (2026-09-29)
 
-Wymaga nowego uprawnienia Gmail **`gmail.readonly`**: wygenerować nowy refresh token (`backend/scripts/get-gmail-token.js` z dodanym scope) i podmienić `GMAIL_REFRESH_TOKEN` w `.env` na serwerze.
+| # | Punkt specyfikacji | Gdzie |
+|---|---|---|
+| 11 | „Sprawdź odpowiedzi” (przycisk w raporcie + raz dziennie): odpowiedź w wątku Gmail od adresu odbiorcy; „NIE” → prośba o wypis + „Oznacz jako wypisany” (bez automatu); wpis w historii kontaktów | `services/campaignResults.ts`, `services/campaignMeasure.ts`, `POST /api/campaigns/:id/check-replies` |
+| 12 | Przypisanie zamówień w oknie N dni (Administracja, domyślnie 14) do **ostatniej** kampanii przed zamówieniem; „do potwierdzenia” → ✓ / ✕ | `attributeOrders`, `POST /recompute-orders`, `PATCH /:id/orders` |
+| 13 | „Utwórz follow-upy” → „Telefon: {kampania}” +2 dni robocze; szybki wynik zamówił / oddzwonić / nie teraz / nie odebrał (+ notatka → historia; oddzwonić i nie odebrał → kolejny telefon) | `services/campaignFollowups.ts`, `FollowUpOutcome.tsx`, Kalendarz i lista zadań |
+| 14 | Raport kampanii: wysłano, błędy, odpowiedzi A vs B (liczba i %), prośby o wypis, zamówienia, wartość netto, z maila / po telefonie, odbiorcy ze statusem | `CampaignDetails.tsx` |
+| 15 | Ranking: tabela sortowalna, wykres wartości zamówień, „który temat wygrał” | `CampaignRanking.tsx` |
 
-- 11: „Sprawdź odpowiedzi” po `gmailThreadId`; odpowiedź „NIE” → `unsubscribeRequest` + przycisk „Oznacz jako wypisany” (bez automatu).
-- 12: przypisanie zamówień w ciągu N dni (konfigurowalne), potwierdzanie ręczne.
-- 13: „Utwórz follow-upy” (+2 dni robocze) z szybkim wynikiem rozmowy.
-- 14–15: raport kampanii (A vs B, zamówienia, wartość) i ranking z wykresem.
+### Uprawnienie Gmail (zrobione 2026-09-29)
+Token z `gmail.readonly` wygenerowany (`node backend/scripts/get-gmail-token.js` — zapisuje token w `backend/.env`, nie na ekran) i przeniesiony na serwer (`public_nodejs/.env`, kopia `.env.bak`). Po ponownym generowaniu tokenu: przenieść linię `GMAIL_REFRESH_TOKEN` na serwer i zrestartować aplikację (`devil www restart crm.antyramy.eu`).
 
-Pola pod Etap 2 są już w modelu: `recipients[].gmailThreadId`, `results { repliesA, repliesB, orders, orderValueNet, byPhone }`.
+### Automat dzienny
+- Skrypt: `backend/src/scripts/campaign-daily.ts` → `dist/scripts/campaign-daily.js`. Kampanie wysłane w ostatnich 30 dniach: sprawdza odpowiedzi, potem przelicza zamówienia we wszystkich. **Nic nie wysyła, nie pobiera faktur z Fakturowni.**
+- Cron na s61 (6:45, przed zadaniami Ramiarza o 7:00):
+  `45 6 * * * cd /usr/home/Pluszek/domains/crm.antyramy.eu/public_nodejs && /usr/local/bin/node20 dist/scripts/campaign-daily.js >> /usr/home/Pluszek/domains/crm.antyramy.eu/logs/campaign-daily.log 2>&1`
+- Log: `/usr/home/Pluszek/domains/crm.antyramy.eu/logs/campaign-daily.log`. Kod wyjścia 2 = brak uprawnienia do czytania poczty (wygenerować token).
+
+### Ograniczenia
+- Kampanie przeniesione z Promocji nie mają wątków Gmail — odpowiedzi dla nich nie są mierzone (w rankingu „—”); zamówienia tak.
+- Odpowiedź z innego adresu niż ten, na który poszedł mail, nie zostanie wykryta.
+- Dni robocze bez świąt. Zamówienia z faktur liczą się dopiero po „hurtowej aktualizacji z Fakturowni”.
+
+## Do przetestowania ręcznie (Etap 2)
+
+1. **Administracja → Kampanie:** okno przypisania (np. 14) — zapis i odświeżenie.
+2. **Kampania testowa na 2 Twoje adresy** (A i B) → z jednego odpisz normalnie („Poproszę cennik”), z drugiego „NIE”.
+3. W raporcie **„📬 Sprawdź odpowiedzi”** → 1 odpowiedź (💬 z fragmentem), 1 prośba o wypis (🚫) → „Oznacz jako wypisany” → karta klienta ma zaznaczony wypis; w historii kontaktów obu klientów nowe wpisy.
+4. **„📞 Utwórz follow-upy”** (dla klienta bez odpowiedzi) → zadanie „Telefon: …” w Kalendarzu na +2 dni robocze i w Google Calendar; ponowne kliknięcie nie dubluje.
+5. W Kalendarzu przy zadaniu **„📞 Wynik”** → „oddzwonić” z notatką → nowe zadanie za 2 dni robocze, wpis w historii; potem „zamówił” → w raporcie „rozmowy zamówił: 1”.
+6. **Zamówienie:** dopisz klientowi testowemu zamówienie z dzisiejszą datą → „Przelicz zamówienia” → 🧾 „do potwierdzenia” → ✓ (licznik bez zmian, zielone) → ✕ (znika z sumy) → ✓.
+7. **Ranking:** tabela sortuje się po kliknięciu nagłówków; wykres pokazuje kampanie z zamówieniami (podpowiedź po najechaniu, klik otwiera raport); przy kampanii A/B werdykt („za mało danych” poniżej 10 maili na wariant).
+8. **Automat:** następnego dnia rano sprawdź log `logs/campaign-daily.log` na serwerze (albo poproś mnie).

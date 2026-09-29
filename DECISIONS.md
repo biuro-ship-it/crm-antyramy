@@ -118,3 +118,9 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **Tabela sortowalna:** data, kampania + produkty, temat A/B, % odpowiedzi, zamówienia, wartość netto; klik w wiersz otwiera raport. **% odpowiedzi = (odpowiedzi A + B) / wysłane**; dla kampanii przeniesionych z Promocji „—” (brak wątków Gmail — nie mierzymy, zamiast pokazywać fałszywe 0%).
 - **Wykres słupkowy** wartości zamówień per kampania (chronologicznie): SVG bez nowej biblioteki, jedna seria — bez legendy, podpis wartości tylko przy najwyższym słupku, reszta w podpowiedzi i w tabeli. Kolor `#2a78d6` (jasny motyw) / `#3987e5` (ciemny) — sprawdzony walidatorem palety (kontrast ≥ 3:1 na tłach aplikacji `#ffffff` i `#17171b`). Tekst w kolorach tekstu, nie serii.
 - **„Który temat wygrał”:** % odpowiedzi i liczba w każdym wariancie; zwycięzca = wyższy %; **poniżej 10 wysłanych w którymkolwiek wariancie — „za mało danych”**, równe wyniki — „remis”. Bez testów istotności statystycznej (przy tej skali i tak rozstrzygałyby rzadko) — próg 10 to świadome uproszczenie.
+
+## 2026-09-29 — commit 5: automat dzienny
+
+- `scripts/campaign-daily.ts`: kampanie `sent` z ostatnich **30 dni** → `checkReplies`, potem `recomputeOrders` (wszystkie). Filtr daty w kodzie (zapytanie status + sentAt wymagałoby indeksu złożonego — zbędny przy tej skali).
+- Brak uprawnienia do czytania poczty przerywa sprawdzanie odpowiedzi (kod wyjścia 2), ale przeliczenie zamówień i tak się wykonuje.
+- Cron na s61 o **6:45** (przed istniejącymi zadaniami Ramiarza o 7:00–7:20), log w `domains/crm.antyramy.eu/logs/campaign-daily.log`. Ustawiany ręcznie w crontabie konta Pluszek (nie przez deploy).
