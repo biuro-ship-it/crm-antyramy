@@ -5,6 +5,7 @@ import {
 } from '../services/api';
 import CampaignEditor from './CampaignEditor';
 import CampaignDetails from './CampaignDetails';
+import CampaignRanking from './CampaignRanking';
 
 type View =
   | { mode: 'list' }
@@ -33,6 +34,7 @@ const CampaignsPanel: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [listMode, setListMode] = useState<'list' | 'ranking'>('list');
 
   const loadList = () => getCampaigns().then(setCampaigns).catch(e => setError((e as Error).message));
   const loadClients = () => getClients().then(setClients).catch(e => setError((e as Error).message));
@@ -110,11 +112,27 @@ const CampaignsPanel: React.FC = () => {
         <button type="button" onClick={() => setView({ mode: 'edit', campaign: null })} className="btn-primary">+ Nowa kampania</button>
       </div>
 
+      <div className="flex gap-2 mb-6">
+        {([
+          { id: 'list' as const, label: 'Lista' },
+          { id: 'ranking' as const, label: 'Ranking' },
+        ]).map(m => (
+          <button key={m.id} type="button" onClick={() => setListMode(m.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
+              listMode === m.id ? 'bg-primary text-on-primary' : 'border border-hairline text-ink hover:bg-surface-soft'
+            }`}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+
       {error && (
         <div className="bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 rounded-lg px-4 py-3 text-sm text-red-700 dark:text-red-300 mb-4">{error}</div>
       )}
 
-      {campaigns.length === 0 ? (
+      {listMode === 'ranking' ? (
+        <CampaignRanking campaigns={campaigns} onOpen={id => setView({ mode: 'details', id })} />
+      ) : campaigns.length === 0 ? (
         <div className="text-center py-16 text-ink font-light">
           <p className="font-medium">Brak kampanii</p>
           <p className="text-sm mt-1">Utwórz pierwszą przyciskiem „Nowa kampania”.</p>

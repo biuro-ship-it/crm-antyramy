@@ -111,3 +111,10 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - `POST /api/followups/:id/outcome` (zamówił / oddzwonić / nie teraz / nie odebrał + notatka): zamyka zadanie (usuwa wydarzenie z Google Calendar), wpis w historii kontaktów kanałem `telefon`, zapis `callOutcome` u odbiorcy i przeliczenie `results`. „Oddzwonić” i „nie odebrał” tworzą kolejne zadanie +2 dni robocze z tym samym tytułem.
 - W Kalendarzu i na liście „Do wykonania na dziś” zadania z kampanii mają przycisk „📞 Wynik” (okno szybkiego wyniku) zamiast „zrobione”; zwykłe zadania bez zmian.
 - Raport: przycisk „📞 Utwórz follow-upy (N)” z potwierdzeniem, znaczki „telefon zaplanowany” / wynik rozmowy przy odbiorcy.
+
+## 2026-09-29 — commit 4: ranking
+
+- Przełącznik „Lista | Ranking” w zakładce Kampanie. Ranking liczony na froncie z listy kampanii (`GET /api/campaigns` zwraca `results`, `sentA/sentB`, nazwy produktów) — bez osobnego endpointu.
+- **Tabela sortowalna:** data, kampania + produkty, temat A/B, % odpowiedzi, zamówienia, wartość netto; klik w wiersz otwiera raport. **% odpowiedzi = (odpowiedzi A + B) / wysłane**; dla kampanii przeniesionych z Promocji „—” (brak wątków Gmail — nie mierzymy, zamiast pokazywać fałszywe 0%).
+- **Wykres słupkowy** wartości zamówień per kampania (chronologicznie): SVG bez nowej biblioteki, jedna seria — bez legendy, podpis wartości tylko przy najwyższym słupku, reszta w podpowiedzi i w tabeli. Kolor `#2a78d6` (jasny motyw) / `#3987e5` (ciemny) — sprawdzony walidatorem palety (kontrast ≥ 3:1 na tłach aplikacji `#ffffff` i `#17171b`). Tekst w kolorach tekstu, nie serii.
+- **„Który temat wygrał”:** % odpowiedzi i liczba w każdym wariancie; zwycięzca = wyższy %; **poniżej 10 wysłanych w którymkolwiek wariancie — „za mało danych”**, równe wyniki — „remis”. Bez testów istotności statystycznej (przy tej skali i tak rozstrzygałyby rzadko) — próg 10 to świadome uproszczenie.
