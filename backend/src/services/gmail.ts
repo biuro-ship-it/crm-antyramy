@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { parseGmailMessage, ThreadMessage } from './campaignResults';
 
 export const getGmailClient = () => {
   const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } = process.env;
@@ -100,6 +101,22 @@ export const sendEmail = async (options: SendEmailOptions): Promise<SentEmailIds
   const raw = buildRawMessage(options, sender);
   const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
   return { id: res.data.id ?? null, threadId: res.data.threadId ?? null };
+};
+
+export const GMAIL_READ_SCOPE_ERROR =
+  'Brak uprawnienia do czytania poczty — wygeneruj nowy token Gmail (node scripts/get-gmail-token.js, patrz HANDOVER.md)';
+
+// Wiadomości wątku (kampanie: wykrywanie odpowiedzi). Wymaga scope gmail.readonly.
+export const getThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
+  const gmail = getGmailClient();
+  try {
+    const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'full' });
+    return (res.data.messages ?? []).map(parseGmailMessage);
+  } catch (err) {
+    const e = err as { code?: number; message?: string };
+    if (e.code === 403 || /insufficient|scope/i.test(e.message ?? '')) throw new Error(GMAIL_READ_SCOPE_ERROR);
+    throw err;
+  }
 };
 
 export const sendBulkEmails = async (

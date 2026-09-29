@@ -8,6 +8,7 @@ backend/dist/
 # Zmienne środowiskowe — NIGDY nie commituj tych plików!
 .env
 **/.env
+**/.env.bak
 **/serviceAccountKey.json
 serviceAccountKey.json
 **/gmail_credentials.json

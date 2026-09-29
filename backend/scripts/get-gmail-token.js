@@ -2,6 +2,10 @@
  * Jednorazowy skrypt do wygenerowania Gmail refresh_token.
  * Uruchom: node scripts/get-gmail-token.js
  * Wymaga: gmail_credentials.json w katalogu backend/
+ *
+ * Nowy refresh token zapisuje się od razu w backend/.env (poprzednia wersja
+ * pliku → .env.bak) — nie wypisujemy go na ekran, żeby nie trafił do logów/czatu.
+ * Na serwer trzeba go przenieść osobno (patrz HANDOVER.md).
  */
 
 const { google } = require('googleapis');
@@ -14,8 +18,21 @@ const { exec } = require('child_process');
 const CREDENTIALS_PATH = path.join(__dirname, '..', 'gmail_credentials.json');
 const SCOPES = [
   'https://www.googleapis.com/auth/gmail.send',
-  'https://www.googleapis.com/auth/calendar.events', // DODANE: integracja z Google Calendar
+  'https://www.googleapis.com/auth/calendar.events', // integracja z Google Calendar
+  'https://www.googleapis.com/auth/gmail.readonly',  // kampanie: wykrywanie odpowiedzi w wątkach
 ];
+const ENV_PATH = path.join(__dirname, '..', '.env');
+
+// Podmienia (albo dopisuje) GMAIL_REFRESH_TOKEN w backend/.env
+const writeRefreshToken = (token) => {
+  const current = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '';
+  if (current) fs.writeFileSync(`${ENV_PATH}.bak`, current);
+  const line = `GMAIL_REFRESH_TOKEN=${token}`;
+  const next = /^GMAIL_REFRESH_TOKEN=.*$/m.test(current)
+    ? current.replace(/^GMAIL_REFRESH_TOKEN=.*$/m, line)
+    : `${current.replace(/\s*$/, '')}\n${line}\n`;
+  fs.writeFileSync(ENV_PATH, next);
+};
 const REDIRECT_PORT = 3456;
 const REDIRECT_URI = `http://localhost:${REDIRECT_PORT}/callback`;
 
@@ -60,11 +77,11 @@ const server = http.createServer(async (req, res) => {
     res.end('<h2 style="font-family:sans-serif;color:green">OK — mozesz zamknac te karte.</h2>');
     server.close();
 
-    console.log('\n✅ Gotowe! Dodaj do backend/.env:\n');
-    console.log(`GMAIL_CLIENT_ID=${client_id}`);
-    console.log(`GMAIL_CLIENT_SECRET=${client_secret}`);
-    console.log(`GMAIL_REFRESH_TOKEN=${tokens.refresh_token}`);
-    console.log(`GMAIL_SENDER=biuro@antyramy.eu\n`);
+    if (tokens.refresh_token) {
+      writeRefreshToken(tokens.refresh_token);
+      console.log('\n✅ Gotowe! Nowy GMAIL_REFRESH_TOKEN zapisany w backend/.env (poprzedni plik: .env.bak).');
+      console.log(`   Uprawnienia: ${SCOPES.map(s => s.split('/').pop()).join(', ')}\n`);
+    }
 
     if (!tokens.refresh_token) {
       console.warn('⚠️  Brak refresh_token — jeśli to nie pierwsza autoryzacja,');

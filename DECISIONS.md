@@ -73,3 +73,23 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - `lastCampaignAt` klientów ustawiany z przeniesionych wysyłek (tylko gdy późniejszy) — ochrona przed zmęczeniem obejmuje też wysyłki sprzed Kampanii.
 - Usunięte: trasa `/api/promotions`, `PromotionsPanel`, `PromotionsArchive`, `promotionEmail.ts`, jednorazowy skrypt `backfill-promotions.ts` (zrobił swoje 2026-09-27). Kolekcja `promotions` zostaje w bazie i w kopii zapasowej.
 - Eksport Excel: arkusz „Promocje” zastąpiony arkuszem „Kampanie”.
+
+---
+
+# Etap 2 — pomiar wyników
+
+## 2026-09-29 — założenia (zaakceptowane przez Krzyśka)
+
+- **Sprawdzanie odpowiedzi i przeliczanie zamówień:** przycisk w raporcie + automat raz dziennie (cron na mydevil). Automat **tylko czyta i liczy** — nic nie wysyła. **Bez automatycznej synchronizacji Fakturowni** — faktury dochodzą do zamówień po ręcznej „hurtowej aktualizacji z Fakturowni”.
+- **Zamówienie w oknie kilku kampanii → ostatnia kampania przed zamówieniem.** Każde zamówienie liczone raz, suma w rankingu zgadza się ze sprzedażą.
+- **Telefon kontrolny:** „oddzwonić” i „nie odebrał” tworzą kolejne zadanie za 2 dni robocze; „zamówił” i „nie teraz” zamykają temat.
+- **Uprawnienie `gmail.readonly`** dopisane do skryptu tokenu. Skrypt zapisuje nowy token prosto do `backend/.env` (kopia → `.env.bak`, ignorowana przez git) zamiast wypisywać go na ekran — token nie trafia do logów ani czatu.
+
+## 2026-09-29 — commit 1: reguły pomiaru (`services/campaignResults.ts`)
+
+- **Odpowiedź** = pierwsza wiadomość w wątku kampanii **od adresu odbiorcy**, późniejsza niż wysyłka. Pomijane: nasze własne wiadomości i komunikaty systemowe (mailer-daemon, postmaster, no-reply). Odpowiedź z innego adresu tej samej firmy nie zostanie wykryta — do oznaczenia ręcznie.
+- **Tekst odpowiedzi** bez cytatu: ucinany od nagłówka cytatu (Gmail PL „W dniu … napisał(a):”, EN „On … wrote:”, „-----Original Message-----”, „Od:/From:”, separator Outlooka, „Wysłane z iPhone’a”) i od separatora podpisu `-- `; linie `>` pomijane. HTML: `<blockquote>` usuwany.
+- **„NIE” = prośba o wypis:** sam „NIE/nie” z interpunkcją albo tekst zaczynający się od słowa „NIE” krótszy niż 30 znaków (np. „Nie, dziękujemy”). „Nieźle”, „Niestety…” — nie (granica słowa z obsługą polskich liter). Prośba o wypis nie liczy się jako odpowiedź na ofertę.
+- **Przypisanie zamówień:** źródło = `client.orders` (w tym `fv-*` z Fakturowni — bez podwójnego liczenia faktur). Okno `[dzień wysyłki, dzień wysyłki + N]` włącznie; tylko odbiorcy ze statusem `sent`; zamówienia bez kwoty pomijane. Statusy: `auto` (liczone, „do potwierdzenia”), `confirmed`, `rejected` (nie liczone). Przeliczenie zachowuje ręczne decyzje, dopóki zamówienie istnieje.
+- **Wyniki:** zamówienie odbiorcy z rozmową „zamówił” liczy się jako „po telefonie”, pozostałe jako „z maila”; `byPhone` = liczba rozmów „zamówił” (także gdy zamówienia jeszcze nie ma w CRM).
+- **Dni robocze** bez sobót i niedzieli; **święta nieuwzględnione** (zadanie może wypaść w święto — do przesunięcia ręcznie).
