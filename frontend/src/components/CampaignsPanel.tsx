@@ -92,6 +92,8 @@ const CampaignsPanel: React.FC = () => {
     return (
       <CampaignDetails
         campaignId={view.id}
+        clients={clients}
+        onClientsChanged={loadClients}
         onBack={backToList}
         onEdit={c => { loadList(); setView({ mode: 'edit', campaign: c }); }}
       />

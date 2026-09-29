@@ -652,6 +652,14 @@ export interface CampaignCounts {
 }
 export interface CampaignResults {
   repliesA: number; repliesB: number; orders: number; orderValueNet: number; byPhone: number;
+  unsubscribeRequests: number; ordersFromMail: number; ordersFromPhone: number;
+}
+
+export type AttributionStatus = 'auto' | 'confirmed' | 'rejected';
+export type CallOutcome = 'ordered' | 'callback' | 'not_now' | 'no_answer';
+
+export interface AttributedOrder {
+  orderId: string; amount: number; date: string; status: AttributionStatus;
 }
 
 export interface CampaignRecipient {
@@ -665,6 +673,16 @@ export interface CampaignRecipient {
   gmailMessageId?: string | null;
   gmailThreadId?: string | null;
   sentAt?: string | null;
+  // Etap 2 — pomiar
+  replied?: boolean;
+  repliedAt?: string | null;
+  replySnippet?: string;
+  unsubscribeRequest?: boolean;
+  orders?: AttributedOrder[];
+  followupId?: string | null;
+  callOutcome?: CallOutcome | null;
+  callNote?: string;
+  calledAt?: string | null;
 }
 
 export interface CampaignDraft {
@@ -691,6 +709,8 @@ export interface Campaign extends Omit<CampaignDraft, 'recipients'> {
   sentBy: string | null;
   legacy?: boolean;
   htmlBody?: string; // tylko kampanie przeniesione z Promocji — HTML dokładnie taki, jaki poszedł
+  repliesCheckedAt?: string;
+  ordersComputedAt?: string;
 }
 
 export interface CampaignSummary {
@@ -707,6 +727,9 @@ export interface CampaignSummary {
   counts: CampaignCounts | null;
   results: CampaignResults;
   legacy: boolean;
+  sentA: number;
+  sentB: number;
+  productNames: string[];
 }
 
 export interface CampaignBatchResult {
@@ -789,6 +812,27 @@ export const startCampaign = (id: string) =>
 
 export const sendCampaignBatch = (id: string) =>
   jsonRequest<CampaignBatchResult>(`${CAMPAIGNS_URL}/${id}/send-batch`, 'POST', undefined, 'Błąd wysyłki partii');
+
+export interface ReplyCheckSummary {
+  checked: number; newReplies: number; newUnsubscribeRequests: number; noThread: number; errors: number;
+}
+
+export const checkCampaignReplies = (id: string) =>
+  jsonRequest<{ replies: ReplyCheckSummary; orders: { campaigns: number; changed: number } }>(
+    `${CAMPAIGNS_URL}/${id}/check-replies`, 'POST', undefined, 'Nie udało się sprawdzić odpowiedzi',
+  );
+
+export const recomputeCampaignOrders = () =>
+  jsonRequest<{ campaigns: number; changed: number }>(`${CAMPAIGNS_URL}/recompute-orders`, 'POST', undefined, 'Nie udało się przeliczyć zamówień');
+
+export const setCampaignOrderStatus = (id: string, clientId: string, orderId: string, status: AttributionStatus) =>
+  jsonRequest<Campaign>(`${CAMPAIGNS_URL}/${id}/orders`, 'PATCH', { clientId, orderId, status }, 'Nie udało się zapisać decyzji');
+
+export const getCampaignSettings = () =>
+  jsonRequest<{ attributionDays: number }>(`${API_URL}/api/settings/campaigns`, 'GET', undefined, 'Błąd pobierania ustawień kampanii');
+
+export const saveCampaignSettings = (attributionDays: number) =>
+  jsonRequest<{ attributionDays: number }>(`${API_URL}/api/settings/campaigns`, 'PUT', { attributionDays }, 'Błąd zapisu ustawień kampanii');
 
 const TEMPLATES_URL = `${API_URL}/api/email-templates`;
 

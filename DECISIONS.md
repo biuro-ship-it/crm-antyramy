@@ -93,3 +93,13 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **Przypisanie zamówień:** źródło = `client.orders` (w tym `fv-*` z Fakturowni — bez podwójnego liczenia faktur). Okno `[dzień wysyłki, dzień wysyłki + N]` włącznie; tylko odbiorcy ze statusem `sent`; zamówienia bez kwoty pomijane. Statusy: `auto` (liczone, „do potwierdzenia”), `confirmed`, `rejected` (nie liczone). Przeliczenie zachowuje ręczne decyzje, dopóki zamówienie istnieje.
 - **Wyniki:** zamówienie odbiorcy z rozmową „zamówił” liczy się jako „po telefonie”, pozostałe jako „z maila”; `byPhone` = liczba rozmów „zamówił” (także gdy zamówienia jeszcze nie ma w CRM).
 - **Dni robocze** bez sobót i niedzieli; **święta nieuwzględnione** (zadanie może wypaść w święto — do przesunięcia ręcznie).
+
+## 2026-09-29 — commit 2: sprawdzanie odpowiedzi, zamówienia, raport
+
+- `POST /api/campaigns/:id/check-replies` sprawdza wątki odbiorców `sent` bez wykrytej odpowiedzi, potem przelicza zamówienia. Przy **pierwszym** wykryciu wpis w historii kontaktów klienta („Odpowiedź na kampanię: …” / „Prośba o wypis (odpowiedź NIE) — kampania: …”, autor „kampanie (automatycznie)”). Już wykrytych nie sprawdza ponownie.
+- **Kampanie przeniesione z Promocji nie mają `gmailThreadId`** — odpowiedzi dla nich się nie sprawdzi (raport pokazuje liczbę „bez wątku Gmail”); przypisanie zamówień działa.
+- `POST /recompute-orders` liczy wszystkie wysłane kampanie naraz (reguła „ostatnia kampania”); zapis per kampania w transakcji — nie nadpisuje statusów wysyłki trwającej równolegle.
+- `PATCH /:id/orders` — ręczna decyzja ✓/✕; `results` przeliczane przy każdej zmianie.
+- **Okno przypisania** w `settings/campaigns.attributionDays` (domyślnie 14, zakres 1–90), edytowalne w Administracji; zmiana działa od następnego przeliczenia.
+- Raport w szczegółach kampanii: kafelki wysyłki i wyników (odpowiedzi A/B z %, prośby o wypis, zamówienia, wartość, z maila / po telefonie), przyciski „Sprawdź odpowiedzi” i „Przelicz zamówienia” z datą ostatniego wykonania, filtr odbiorców (odpowiedzieli / wypis / z zamówieniem / błędy), przy prośbie o wypis przycisk „Oznacz jako wypisany” (po potwierdzeniu, bez automatu).
+- Pierwsze przeliczenie na produkcji (2026-09-29): kampania „Oferta ramki sosna 1.5 cm” — 2 zamówienia w oknie (1 664,55 zł netto), „do potwierdzenia”.

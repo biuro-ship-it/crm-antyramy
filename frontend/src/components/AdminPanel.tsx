@@ -8,6 +8,7 @@ import {
   clientTotal, clientYearlyAvg, clientMonthlyAvg, clientMinOrder, clientMaxOrder, zl,
 } from '../utils/sales';
 import SignatureSettings from './SignatureSettings';
+import CampaignSettings from './CampaignSettings';
 
 type SalesSortKey = 'total' | 'yearlyAvg' | 'monthlyAvg' | 'minOrder' | 'maxOrder';
 
@@ -129,7 +130,7 @@ export default function AdminPanel() {
     <div className="p-6 max-w-4xl mx-auto space-y-8">
       <div>
         <h1 className="page-title">Administracja</h1>
-        <p className="text-body-sm font-light mt-2">Etykiety kolorów, podpis w mailach i analityka systemu</p>
+        <p className="text-body-sm font-light mt-2">Etykiety kolorów, podpis w mailach, kampanie i analityka systemu</p>
       </div>
 
       {/* ── ETYKIETY KOLORÓW ── */}
@@ -207,6 +208,9 @@ export default function AdminPanel() {
 
       {/* ── PODPIS W MAILACH ── */}
       <SignatureSettings />
+
+      {/* ── KAMPANIE ── */}
+      <CampaignSettings />
 
       {/* ── ANALITYKA ── */}
       <section className="card-padded space-y-6">

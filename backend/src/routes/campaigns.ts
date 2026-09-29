@@ -12,6 +12,8 @@ import {
 } from '../services/campaignRender';
 import { todayISO, recomputeLastContact } from '../utils/date';
 import { isNotFound } from '../utils/firestore';
+import { checkReplies, recomputeOrders, setOrderStatus } from '../services/campaignMeasure';
+import { GMAIL_READ_SCOPE_ERROR } from '../services/gmail';
 
 // Kampanie — następca Promocji. Przebieg: szkic → start (zamrożenie odbiorców
 // i produktów) → partie po 10 wysyłane na kliknięcie z przeglądarki → wysłana.
@@ -36,7 +38,7 @@ interface CampaignDoc {
   // Szkic trzyma tylko { clientId, variant }; start uzupełnia resztę pól
   recipients: Array<Partial<CampaignRecipient> & { clientId: string; variant: Variant }>;
   counts: CampaignCounts | null;
-  results: { repliesA: number; repliesB: number; orders: number; orderValueNet: number; byPhone: number };
+  results: typeof EMPTY_RESULTS;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -46,7 +48,10 @@ interface CampaignDoc {
   legacy?: boolean;
 }
 
-const EMPTY_RESULTS = { repliesA: 0, repliesB: 0, orders: 0, orderValueNet: 0, byPhone: 0 };
+const EMPTY_RESULTS = {
+  repliesA: 0, repliesB: 0, orders: 0, orderValueNet: 0, byPhone: 0,
+  unsubscribeRequests: 0, ordersFromMail: 0, ordersFromPhone: 0,
+};
 
 // ─── Schematy ───────────────────────────────────────────────────────────────
 
@@ -165,8 +170,12 @@ router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
         productCount: (c.productsSnapshot ?? c.productIds ?? []).length,
         recipientCount: (c.recipients ?? []).length,
         counts: c.counts,
-        results: c.results ?? EMPTY_RESULTS,
+        results: { ...EMPTY_RESULTS, ...(c.results ?? {}) },
         legacy: !!c.legacy,
+        // Ranking: wysłane per wariant i nazwy produktów
+        sentA: (c.recipients ?? []).filter(r => r.status === 'sent' && r.variant !== 'B').length,
+        sentB: (c.recipients ?? []).filter(r => r.status === 'sent' && r.variant === 'B').length,
+        productNames: (c.productsSnapshot ?? []).map(p => p.name),
       };
     }));
   } catch (err) {
@@ -552,6 +561,55 @@ router.post('/:id/send-batch', async (req: AuthenticatedRequest, res: Response) 
       await ref.update({ sendLockUntil: null }).catch(() => undefined);
     }
     handleError(res, err, 'POST /:id/send-batch', 'Błąd wysyłki');
+  }
+});
+
+// ─── Pomiar wyników (Etap 2) ────────────────────────────────────────────────
+
+// POST /api/campaigns/recompute-orders — przelicza przypisanie zamówień we wszystkich kampaniach
+router.post('/recompute-orders', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json(await recomputeOrders());
+  } catch (err) {
+    handleError(res, err, 'POST /recompute-orders', 'Błąd przeliczania zamówień');
+  }
+});
+
+// POST /api/campaigns/:id/check-replies — odpowiedzi z Gmaila + przeliczenie zamówień
+router.post('/:id/check-replies', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const replies = await checkReplies(req.params.id);
+    const orders = await recomputeOrders();
+    res.json({ replies, orders });
+  } catch (err) {
+    if ((err as Error).message === GMAIL_READ_SCOPE_ERROR) {
+      res.status(400).json({ error: GMAIL_READ_SCOPE_ERROR });
+      return;
+    }
+    handleError(res, err, 'POST /:id/check-replies', 'Błąd sprawdzania odpowiedzi');
+  }
+});
+
+// PATCH /api/campaigns/:id/orders — ręczna decyzja o przypisanym zamówieniu
+const OrderStatusSchema = z.object({
+  clientId: z.string().min(1),
+  orderId: z.string().min(1),
+  status: z.enum(['auto', 'confirmed', 'rejected']),
+});
+
+router.patch('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = OrderStatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  try {
+    const { clientId, orderId, status } = parsed.data;
+    await setOrderStatus(req.params.id, clientId, orderId, status);
+    const snap = await db.collection(COLLECTION).doc(req.params.id).get();
+    res.json({ id: snap.id, ...snap.data() });
+  } catch (err) {
+    handleError(res, err, 'PATCH /:id/orders', 'Błąd zapisu decyzji');
   }
 });
 

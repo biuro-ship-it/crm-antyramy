@@ -4,6 +4,7 @@ import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
 import { z } from 'zod';
 import { SIGNATURE_DOC, getSignature } from '../services/emailSignature';
+import { CAMPAIGN_SETTINGS_DOC, getAttributionDays } from '../services/campaignMeasure';
 
 const router = Router();
 router.use(authenticate);
@@ -75,6 +76,35 @@ router.put('/emailSignature', async (req: AuthenticatedRequest, res: Response) =
   } catch (err) {
     console.error('[settings] PUT /emailSignature błąd:', err);
     res.status(500).json({ error: 'Błąd zapisu podpisu' });
+  }
+});
+
+// Ustawienia kampanii: okno przypisania zamówień (dni)
+const CampaignSettingsSchema = z.object({
+  attributionDays: z.number().int().min(1).max(90),
+});
+
+router.get('/campaigns', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json({ attributionDays: await getAttributionDays() });
+  } catch (err) {
+    console.error('[settings] GET /campaigns błąd:', err);
+    res.status(500).json({ error: 'Błąd pobierania ustawień kampanii' });
+  }
+});
+
+router.put('/campaigns', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = CampaignSettingsSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Okno przypisania: liczba dni od 1 do 90' });
+    return;
+  }
+  try {
+    await db.doc(CAMPAIGN_SETTINGS_DOC).set(parsed.data, { merge: true });
+    res.json(parsed.data);
+  } catch (err) {
+    console.error('[settings] PUT /campaigns błąd:', err);
+    res.status(500).json({ error: 'Błąd zapisu ustawień kampanii' });
   }
 });
 
