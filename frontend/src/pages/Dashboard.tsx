@@ -4,6 +4,7 @@ import ClientForm from '../components/ClientForm';
 import ClientList, { ClientListView, emptyClientListView } from '../components/ClientList';
 import ClientCard from '../components/ClientCard';
 import MobileNav from '../components/MobileNav';
+import FollowUpOutcome from '../components/FollowUpOutcome';
 import ThemeToggle from '../components/ThemeToggle';
 
 // Panele poza zakładką „Klienci" ładujemy dopiero przy wejściu w nie. Dzięki temu
@@ -57,6 +58,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   const [viewClient, setViewClient] = useState<Client | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [tasks, setTasks] = useState<FollowUp[]>([]);
+  // Telefon kontrolny po kampanii → okno szybkiego wyniku zamiast „zrobione”
+  const [outcomeFor, setOutcomeFor] = useState<FollowUp | null>(null);
   // Filtry i numer strony listy klientów — trzymane tutaj, żeby przetrwały
   // wejście w kartę klienta / formularz edycji i powrót na listę.
   const [clientListView, setClientListView] = useState<ClientListView>(emptyClientListView);
@@ -104,6 +107,8 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
   };
 
   const handleCompleteTask = async (taskId: string) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (task?.campaignId) { setOutcomeFor(task); return; }
     try {
       await updateFollowUpStatus(taskId, 'zrealizowane');
       loadTasks();
@@ -270,7 +275,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
                     onClick={() => handleCompleteTask(task.id!)}
                     className="btn-secondary w-full mt-4"
                   >
-                    Oznacz jako zrobione
+                    {task.campaignId ? '📞 Wynik rozmowy' : 'Oznacz jako zrobione'}
                   </button>
                 </div>
               ))}
@@ -348,6 +353,14 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSignOut }) => {
           </>
         )}
       </main>
+
+      {outcomeFor && (
+        <FollowUpOutcome
+          followup={outcomeFor}
+          onClose={() => setOutcomeFor(null)}
+          onDone={() => { setOutcomeFor(null); loadTasks(); }}
+        />
+      )}
 
       <MobileNav
         activeTab={activeTab}

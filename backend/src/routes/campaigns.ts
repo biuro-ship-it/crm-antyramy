@@ -14,6 +14,7 @@ import { todayISO, recomputeLastContact } from '../utils/date';
 import { isNotFound } from '../utils/firestore';
 import { checkReplies, recomputeOrders, setOrderStatus } from '../services/campaignMeasure';
 import { GMAIL_READ_SCOPE_ERROR } from '../services/gmail';
+import { createCampaignFollowups } from '../services/campaignFollowups';
 
 // Kampanie — następca Promocji. Przebieg: szkic → start (zamrożenie odbiorców
 // i produktów) → partie po 10 wysyłane na kliknięcie z przeglądarki → wysłana.
@@ -587,6 +588,15 @@ router.post('/:id/check-replies', async (req: AuthenticatedRequest, res: Respons
       return;
     }
     handleError(res, err, 'POST /:id/check-replies', 'Błąd sprawdzania odpowiedzi');
+  }
+});
+
+// POST /api/campaigns/:id/followups — telefony kontrolne dla odbiorców bez odpowiedzi
+router.post('/:id/followups', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json(await createCampaignFollowups(req.params.id));
+  } catch (err) {
+    handleError(res, err, 'POST /:id/followups', 'Błąd tworzenia follow-upów');
   }
 });
 

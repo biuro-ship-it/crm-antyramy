@@ -3,7 +3,8 @@ import { z } from 'zod';
 import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
-import { createEvent, deleteEvent } from '../services/calendar';
+import { createFollowUp, setFollowUpStatus } from '../services/followupService';
+import { recordCallOutcome } from '../services/campaignFollowups';
 import { todayISO } from '../utils/date';
 
 const router = Router();
@@ -70,33 +71,8 @@ router.post('/client/:clientId', async (req: AuthenticatedRequest, res: Response
     return;
   }
   try {
-    const now = new Date().toISOString();
-    const data: Record<string, unknown> = {
-      ...parsed.data,
-      clientId,
-      status: 'zaplanowane',
-      createdAt: now,
-    };
-    const docRef = await db.collection(COLLECTION).add(data);
-
-    // Sync z Google Calendar — NIE może blokować zapisu follow-upa (try/catch).
-    try {
-      const eventId = await createEvent({
-        summary: `📞 ${parsed.data.clientName}`,
-        description: parsed.data.reminderText,
-        date: parsed.data.dueDate,
-      });
-      await docRef.update({ googleEventId: eventId, syncedAt: new Date().toISOString() });
-      data.googleEventId = eventId;
-      data.syncedAt = new Date().toISOString();
-    } catch (syncErr) {
-      const msg = (syncErr as Error).message;
-      console.error('[followups] sync Google Calendar nieudany:', msg);
-      await docRef.update({ syncError: msg }).catch(() => undefined);
-      data.syncError = msg;
-    }
-
-    res.status(201).json({ id: docRef.id, ...data });
+    const created = await createFollowUp({ ...parsed.data, clientId });
+    res.status(201).json(created);
   } catch (err) {
     console.error('[followups] POST /client/:clientId błąd:', err);
     res.status(500).json({ error: 'Błąd dodawania przypomnienia' });
@@ -115,32 +91,33 @@ router.patch('/:id/status', async (req: AuthenticatedRequest, res: Response) => 
     return;
   }
   try {
-    const docRef = db.collection(COLLECTION).doc(id);
-    const snap = await docRef.get();
-    const existing = snap.data() as { googleEventId?: string } | undefined;
-
-    const updateData: Record<string, string> = {
-      status: parsed.data.status,
-      updatedAt: new Date().toISOString(),
-    };
-    if (parsed.data.status === 'zrealizowane') {
-      updateData.completedAt = new Date().toISOString();
-    }
-    await docRef.update(updateData);
-
-    // Zrealizowane → usuń wydarzenie z kalendarza (już nie potrzeba przypomnienia).
-    if (parsed.data.status === 'zrealizowane' && existing?.googleEventId) {
-      try {
-        await deleteEvent(existing.googleEventId);
-      } catch (syncErr) {
-        console.error('[followups] usuwanie wydarzenia Google nieudane:', (syncErr as Error).message);
-      }
-    }
-
+    const updateData = await setFollowUpStatus(id, parsed.data.status);
     res.status(200).json({ id, ...updateData });
   } catch (err) {
     console.error('[followups] PATCH /:id/status błąd:', err);
     res.status(500).json({ error: 'Błąd zmiany statusu zadania' });
+  }
+});
+
+// POST /api/followups/:id/outcome — szybki wynik telefonu (kampanie): zamyka zadanie,
+// wpis w historii, wynik w kampanii; „oddzwonić” / „nie odebrał” → kolejny telefon.
+const OutcomeSchema = z.object({
+  outcome: z.enum(['ordered', 'callback', 'not_now', 'no_answer']),
+  note: z.string().max(2000).default(''),
+});
+
+router.post('/:id/outcome', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = OutcomeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: 'Nieprawidłowy wynik rozmowy' });
+    return;
+  }
+  try {
+    const result = await recordCallOutcome(req.params.id, parsed.data.outcome, parsed.data.note.trim(), req.user?.email || 'system');
+    res.json(result);
+  } catch (err) {
+    console.error('[followups] POST /:id/outcome błąd:', err);
+    res.status(400).json({ error: (err as Error).message || 'Błąd zapisu wyniku rozmowy' });
   }
 });
 

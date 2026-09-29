@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
+import FollowUpOutcome from './FollowUpOutcome';
 import {
   getFollowUpsRange, createFollowUp, updateFollowUpStatus, getClients,
   FollowUp, Client,
@@ -123,7 +124,7 @@ function DayView({
                         onClick={() => onComplete(f.id)}
                         className="text-xs font-semibold px-2.5 py-1 bg-ink text-canvas rounded-lg opacity-70 hover:opacity-100 transition"
                       >
-                        ✓ Zrobione
+                        {f.campaignId ? '📞 Wynik' : '✓ Zrobione'}
                       </button>
                     )}
                   </div>
@@ -202,6 +203,9 @@ export default function CalendarPanel() {
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [cursor, setCursor] = useState(new Date());
   const [followups, setFollowups] = useState<FollowUp[]>([]);
+  // Telefon kontrolny po kampanii → zamiast „zrobione” okno szybkiego wyniku
+  const [outcomeFor, setOutcomeFor] = useState<FollowUp | null>(null);
+  const [outcomeInfo, setOutcomeInfo] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -288,6 +292,8 @@ export default function CalendarPanel() {
   };
 
   const handleComplete = async (id: string) => {
+    const f = followups.find(x => x.id === id);
+    if (f?.campaignId) { setOutcomeFor(f); return; }
     try {
       await updateFollowUpStatus(id, 'zrealizowane');
       load();
@@ -459,7 +465,7 @@ export default function CalendarPanel() {
                             onClick={e => { e.stopPropagation(); handleComplete(f.id); }}
                             className="mt-1 text-[10px] opacity-60 hover:opacity-100 underline text-left pl-2.5"
                           >
-                            ✓ Oznacz jako zrobione
+                            {f.campaignId ? '📞 Wynik rozmowy' : '✓ Oznacz jako zrobione'}
                           </button>
                         )}
                       </div>
@@ -541,7 +547,7 @@ export default function CalendarPanel() {
                             onClick={() => handleComplete(f.id)}
                             className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-ink text-canvas opacity-70 hover:opacity-100 shrink-0"
                           >
-                            ✓ Zrobione
+                            {f.campaignId ? '📞 Wynik' : '✓ Zrobione'}
                           </button>
                         ) : (
                           <span className="text-xs font-semibold opacity-60 shrink-0">{s.label}</span>
@@ -601,6 +607,19 @@ export default function CalendarPanel() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {outcomeFor && (
+        <FollowUpOutcome
+          followup={outcomeFor}
+          onClose={() => setOutcomeFor(null)}
+          onDone={info => { setOutcomeFor(null); setOutcomeInfo(info); load(); setTimeout(() => setOutcomeInfo(''), 5000); }}
+        />
+      )}
+      {outcomeInfo && (
+        <div className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-40 bg-ink text-canvas text-sm px-4 py-2.5 rounded-xl shadow-lg">
+          {outcomeInfo}
         </div>
       )}
     </div>

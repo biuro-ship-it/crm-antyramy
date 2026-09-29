@@ -3,6 +3,7 @@ import {
   Campaign, CampaignRecipient, CampaignVariant, Client, AttributionStatus, CallOutcome,
   getCampaign, previewSavedCampaign, openCampaignPdf, duplicateCampaign,
   checkCampaignReplies, recomputeCampaignOrders, setCampaignOrderStatus, updateClientMarketing,
+  createCampaignFollowups,
 } from '../services/api';
 import CampaignSendRunner from './CampaignSendRunner';
 import { zl } from '../utils/sales';
@@ -52,7 +53,7 @@ const CampaignDetails: React.FC<CampaignDetailsProps> = ({ campaignId, clients, 
   const [info, setInfo] = useState('');
   const [previewFor, setPreviewFor] = useState<{ clientId: string; variant: CampaignVariant } | null>(null);
   const [preview, setPreview] = useState<{ subject: string; html: string } | null>(null);
-  const [busy, setBusy] = useState<'' | 'pdf' | 'dup' | 'replies' | 'orders'>('');
+  const [busy, setBusy] = useState<'' | 'pdf' | 'dup' | 'replies' | 'orders' | 'followups'>('');
   const [resuming, setResuming] = useState(false);
   const [filter, setFilter] = useState<RecipientFilter>('all');
 
@@ -102,6 +103,14 @@ const CampaignDetails: React.FC<CampaignDetailsProps> = ({ campaignId, clients, 
     setInfo(`Zamówienia przeliczone (zmiany w ${r.changed} z ${r.campaigns} kampanii).`);
     load();
   });
+  const handleFollowups = (n: number) => {
+    if (!window.confirm(`Utworzyć ${n} ${n === 1 ? 'zadanie' : 'zadań'} „Telefon: ${campaign?.name}” na za 2 dni robocze (Kalendarz + Google Calendar)?`)) return;
+    run('followups', async () => {
+      const r = await createCampaignFollowups(campaignId);
+      setInfo(`Utworzono ${r.created} ${r.created === 1 ? 'telefon' : 'telefonów'} na ${r.dueDate}. Wynik rozmowy zapiszesz przy zadaniu w Kalendarzu.`);
+      load();
+    });
+  };
   const handleOrderStatus = (clientId: string, orderId: string, status: AttributionStatus) =>
     run('orders', async () => setCampaign(await setCampaignOrderStatus(campaignId, clientId, orderId, status)));
   const handleMarkUnsubscribed = (r: CampaignRecipient) => {
@@ -126,6 +135,9 @@ const CampaignDetails: React.FC<CampaignDetailsProps> = ({ campaignId, clients, 
   const sentB = c.recipients.filter(r => r.status === 'sent' && r.variant === 'B').length;
   const products = c.productsSnapshot ?? [];
   const isSentLike = c.status !== 'draft';
+  // Kandydaci do telefonu kontrolnego — ta sama reguła co na backendzie
+  const followupCandidates = c.recipients.filter(r =>
+    r.status === 'sent' && !r.replied && !r.unsubscribeRequest && !r.followupId && !clientsById.get(r.clientId)?.noMarketing).length;
 
   const visibleRecipients = c.recipients.filter(r => {
     switch (filter) {
@@ -222,6 +234,11 @@ const CampaignDetails: React.FC<CampaignDetailsProps> = ({ campaignId, clients, 
               <button type="button" onClick={handleRecompute} disabled={!!busy} className="btn-secondary text-sm disabled:opacity-50">
                 {busy === 'orders' ? 'Liczę…' : 'Przelicz zamówienia'}
               </button>
+              <button type="button" onClick={() => handleFollowups(followupCandidates)} disabled={!!busy || followupCandidates === 0}
+                title={followupCandidates === 0 ? 'Brak odbiorców bez odpowiedzi i bez zaplanowanego telefonu' : ''}
+                className="btn-secondary text-sm disabled:opacity-50">
+                {busy === 'followups' ? 'Tworzę…' : `📞 Utwórz follow-upy (${followupCandidates})`}
+              </button>
             </div>
           </div>
           <div className={`grid grid-cols-2 ${hasB ? 'sm:grid-cols-6' : 'sm:grid-cols-5'} gap-2 mb-6`}>
@@ -303,7 +320,7 @@ const CampaignDetails: React.FC<CampaignDetailsProps> = ({ campaignId, clients, 
                     </span>
                   </button>
 
-                  {(r.replied || r.unsubscribeRequest || r.callOutcome || orders.length > 0) && (
+                  {(r.replied || r.unsubscribeRequest || r.callOutcome || r.followupId || orders.length > 0) && (
                     <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
                       {r.replied && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full badge-mint" title={r.replySnippet || ''}>
@@ -321,6 +338,9 @@ const CampaignDetails: React.FC<CampaignDetailsProps> = ({ campaignId, clients, 
                             </button>
                           )}
                         </span>
+                      )}
+                      {r.followupId && !r.callOutcome && (
+                        <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface-soft text-ink">📅 telefon zaplanowany</span>
                       )}
                       {r.callOutcome && (
                         <span className="text-[11px] px-2 py-0.5 rounded-full bg-surface-soft text-ink" title={r.callNote || ''}>

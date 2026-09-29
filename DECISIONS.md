@@ -103,3 +103,11 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **Okno przypisania** w `settings/campaigns.attributionDays` (domyślnie 14, zakres 1–90), edytowalne w Administracji; zmiana działa od następnego przeliczenia.
 - Raport w szczegółach kampanii: kafelki wysyłki i wyników (odpowiedzi A/B z %, prośby o wypis, zamówienia, wartość, z maila / po telefonie), przyciski „Sprawdź odpowiedzi” i „Przelicz zamówienia” z datą ostatniego wykonania, filtr odbiorców (odpowiedzieli / wypis / z zamówieniem / błędy), przy prośbie o wypis przycisk „Oznacz jako wypisany” (po potwierdzeniu, bez automatu).
 - Pierwsze przeliczenie na produkcji (2026-09-29): kampania „Oferta ramki sosna 1.5 cm” — 2 zamówienia w oknie (1 664,55 zł netto), „do potwierdzenia”.
+
+## 2026-09-29 — commit 3: telefony kontrolne
+
+- Tworzenie follow-upu wydzielone do `services/followupService.ts` (tworzenie + Google Calendar, zmiana statusu + usunięcie wydarzenia). Trasy `/api/followups` zachowują się jak dotąd.
+- `POST /api/campaigns/:id/followups`: zadanie „Telefon: {kampania}” na **+2 dni robocze od dnia kliknięcia** dla odbiorców `sent` bez odpowiedzi, bez prośby o wypis, bez wypisu na karcie i bez zadania z tej kampanii (`recipients[].followupId`). Ponowne kliknięcie nie dubluje zadań.
+- `POST /api/followups/:id/outcome` (zamówił / oddzwonić / nie teraz / nie odebrał + notatka): zamyka zadanie (usuwa wydarzenie z Google Calendar), wpis w historii kontaktów kanałem `telefon`, zapis `callOutcome` u odbiorcy i przeliczenie `results`. „Oddzwonić” i „nie odebrał” tworzą kolejne zadanie +2 dni robocze z tym samym tytułem.
+- W Kalendarzu i na liście „Do wykonania na dziś” zadania z kampanii mają przycisk „📞 Wynik” (okno szybkiego wyniku) zamiast „zrobione”; zwykłe zadania bez zmian.
+- Raport: przycisk „📞 Utwórz follow-upy (N)” z potwierdzeniem, znaczki „telefon zaplanowany” / wynik rozmowy przy odbiorcy.

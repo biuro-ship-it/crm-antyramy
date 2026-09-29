@@ -175,6 +175,9 @@ export interface FollowUp {
   googleEventId?: string;
   syncedAt?: string;
   syncError?: string;
+  campaignId?: string;            // telefon kontrolny po kampanii
+  outcome?: string;
+  outcomeNote?: string;
 }
 
 export type KanbanColumn = 'todo' | 'doing' | 'done';
@@ -642,6 +645,18 @@ export const updateFollowUpStatus = async (id: string, status: 'zrealizowane' | 
   if (!response.ok) await fail(response, 'Błąd zmiany statusu zadania');
 };
 
+// Szybki wynik telefonu (zadania z kampanii)
+export const recordFollowUpOutcome = async (
+  id: string,
+  outcome: 'ordered' | 'callback' | 'not_now' | 'no_answer',
+  note: string,
+): Promise<{ nextFollowupId: string | null; nextDueDate: string | null }> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${FOLLOWUPS_URL}/${id}/outcome`, { method: 'POST', headers, body: JSON.stringify({ outcome, note }) });
+  if (!response.ok) await fail(response, 'Nie udało się zapisać wyniku rozmowy');
+  return response.json();
+};
+
 // ─── KAMPANIE ────────────────────────────────────────────────────────────────
 
 export type CampaignStatus = 'draft' | 'sending' | 'sent';
@@ -827,6 +842,11 @@ export const recomputeCampaignOrders = () =>
 
 export const setCampaignOrderStatus = (id: string, clientId: string, orderId: string, status: AttributionStatus) =>
   jsonRequest<Campaign>(`${CAMPAIGNS_URL}/${id}/orders`, 'PATCH', { clientId, orderId, status }, 'Nie udało się zapisać decyzji');
+
+export const createCampaignFollowups = (id: string) =>
+  jsonRequest<{ created: number; skipped: number; dueDate: string }>(
+    `${CAMPAIGNS_URL}/${id}/followups`, 'POST', undefined, 'Nie udało się utworzyć follow-upów',
+  );
 
 export const getCampaignSettings = () =>
   jsonRequest<{ attributionDays: number }>(`${API_URL}/api/settings/campaigns`, 'GET', undefined, 'Błąd pobierania ustawień kampanii');
