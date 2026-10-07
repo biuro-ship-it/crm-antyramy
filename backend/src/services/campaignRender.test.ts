@@ -1,5 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   renderPlaceholders, buildCampaignEmailHtml, renderForClient, splitAB,
   pickPendingBatch, applyBatchResults, variantContent, UNSUBSCRIBE_TEXT,
@@ -77,6 +79,67 @@ test('renderForClient: temat i treść z placeholderami', () => {
   assert.equal(r.subject, 'Panie Marku, nowość');
   assert.ok(r.html.includes('Panie Marku,<br>mamy ofertę dla Foto &amp; Rama'));
   assert.equal(r.plainContent, 'Panie Marku,\nmamy ofertę dla Foto & Rama');
+});
+
+// ─── Kolaż (heroImageUrl) ───────────────────────────────────────────────────
+
+// Wzorce HTML zapisane z kodu SPRZED dodania kolażu (2026-10-07) — te same dane wejściowe
+const fixture = (name: string) =>
+  fs.readFileSync(path.join(__dirname, '__fixtures__', name), 'utf-8').replace(/\r\n/g, '\n');
+const fixtureInputs = {
+  withProducts: {
+    variant: { subject: '{zwrot|Dzień dobry} — nowa listwa', content: '{zwrot|Dzień dobry},\n\noferta dla {firma} <b>!</b>' },
+    title: 'Nowa listwa "Dąb"',
+    products: [{ id: 'p1', name: 'Rama <A4>', code: 'R1', priceNetto: 9.99, imageUrl: 'https://crm.antyramy.eu/uploads/produkt-1.jpg' }],
+    signatureHtml: 'Pozdrawiam<br>PODPIS',
+    client: { salutation: 'Panie Marku', companyName: 'Foto & Rama', address: { city: 'Kraków' } },
+  },
+  noProducts: {
+    variant: { subject: 'Temat', content: 'Sam tekst' },
+    title: '', products: null, signatureHtml: '', client: null,
+  },
+};
+
+test('mail bez kolażu: HTML identyczny jak przed zmianą (wzorzec)', () => {
+  for (const hero of [undefined, null, '']) {
+    assert.equal(renderForClient({ ...fixtureInputs.withProducts, heroImageUrl: hero }).html, fixture('campaign-email-with-products.html'));
+    assert.equal(renderForClient({ ...fixtureInputs.noProducts, heroImageUrl: hero }).html, fixture('campaign-email-no-products.html'));
+  }
+});
+
+const HERO = 'https://crm.antyramy.eu/uploads/kolaz-1.jpg';
+
+test('mail z kolażem: <img> 600 px między tytułem a treścią, alt z tytułu', () => {
+  const html = renderForClient({ ...fixtureInputs.withProducts, heroImageUrl: HERO }).html;
+  const img = `<img src="${HERO}" width="600" alt="Oferta tygodnia - Nowa listwa &quot;Dąb&quot;" style="display:block;width:100%;max-width:600px;height:auto;border:0;">`;
+  assert.ok(html.includes(img), html);
+  assert.equal(html.split('<img').length - 1, 1);
+  const iTitle = html.indexOf('</h1>');
+  const iImg = html.indexOf('<img');
+  const iContent = html.indexOf('Panie Marku,');
+  assert.ok(iTitle < iImg && iImg < iContent);
+  // Poza blokiem kolażu — reszta jak dawniej
+  assert.equal(html.replace(/\n {8}<tr><td style="padding:0 0 24px">[\s\S]*?<\/td><\/tr>/, ''), fixture('campaign-email-with-products.html'));
+});
+
+test('mail z kolażem bez tytułu: alt z tematu po placeholderach', () => {
+  const html = renderForClient({
+    variant: { subject: '{zwrot|Dzień dobry}, nowa rama', content: 'x' },
+    title: '  ', products: null, signatureHtml: '', heroImageUrl: HERO,
+    client: { salutation: 'Pani Ewo' },
+  }).html;
+  assert.ok(html.includes('alt="Oferta tygodnia - Pani Ewo, nowa rama"'));
+});
+
+test('mail z kolażem: URL i alt escapowane', () => {
+  const html = buildCampaignEmailHtml({
+    title: 'x', contentHtml: 'y', products: null, signatureHtml: '',
+    heroImageUrl: 'https://crm.antyramy.eu/uploads/kolaz-1.jpg?a=1&b="><script>alert(1)</script>',
+    heroAlt: 'Oferta tygodnia - Rama "Dąb" <A4> & więcej',
+  });
+  assert.ok(html.includes('src="https://crm.antyramy.eu/uploads/kolaz-1.jpg?a=1&amp;b=&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"'));
+  assert.ok(html.includes('alt="Oferta tygodnia - Rama &quot;Dąb&quot; &lt;A4&gt; &amp; więcej"'));
+  assert.ok(!html.includes('<script>'));
 });
 
 test('splitAB: po równo, każdy dokładnie raz', () => {

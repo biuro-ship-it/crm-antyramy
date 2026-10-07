@@ -763,6 +763,7 @@ export interface CampaignPreviewInput {
   productIds: string[];
   subject: string;
   content: string;
+  heroImageUrl?: string | null; // kolaż w podglądzie maila (PDF go nie zawiera)
 }
 
 const CAMPAIGNS_URL = `${API_URL}/api/campaigns`;

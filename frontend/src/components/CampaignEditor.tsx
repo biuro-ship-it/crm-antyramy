@@ -199,13 +199,13 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
     if (step !== 3) return;
     const t = setTimeout(() => {
       previewCampaignDraft({
-        clientId: previewClient || null, pdfTitle, noProducts, productIds, subject: pv.subject, content: pv.content,
+        clientId: previewClient || null, pdfTitle, noProducts, productIds, subject: pv.subject, content: pv.content, heroImageUrl,
       })
         .then(p => { setPreview(p); setPreviewError(''); })
         .catch(e => setPreviewError((e as Error).message));
     }, 500);
     return () => clearTimeout(t);
-  }, [step, previewClient, pdfTitle, noProducts, productIds, pv.subject, pv.content]);
+  }, [step, previewClient, pdfTitle, noProducts, productIds, pv.subject, pv.content, heroImageUrl]);
 
   const handlePdf = async () => {
     setPdfLoading(true);

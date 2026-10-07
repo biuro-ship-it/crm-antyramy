@@ -15,6 +15,7 @@ import { isNotFound } from '../utils/firestore';
 import { checkReplies, recomputeOrders, setOrderStatus } from '../services/campaignMeasure';
 import { GMAIL_READ_SCOPE_ERROR } from '../services/gmail';
 import { createCampaignFollowups } from '../services/campaignFollowups';
+import { heroUrlPolicy, resolveHeroImageInput, planHeroImageChange, releaseCollageFile } from '../services/collageFiles';
 
 // Kampanie — następca Promocji. Przebieg: szkic → start (zamrożenie odbiorców
 // i produktów) → partie po 10 wysyłane na kliknięcie z przeglądarki → wysłana.
@@ -47,6 +48,7 @@ interface CampaignDoc {
   sentBy: string | null;
   sendLockUntil: number | null;
   legacy?: boolean;
+  heroImageUrl?: string | null; // kolaż nad treścią maila (null / brak = bez obrazka)
 }
 
 const EMPTY_RESULTS = {
@@ -70,6 +72,8 @@ const DraftSchema = z.object({
     clientId: z.string().min(1),
     variant: z.enum(['A', 'B']),
   })).max(2000).default([]),
+  // Brak klucza = bez zmian (zapis z innego kroku / starszy frontend), null lub '' = usunięcie
+  heroImageUrl: z.string().max(500).nullable().optional(),
 });
 
 const PreviewSchema = z.object({
@@ -79,6 +83,7 @@ const PreviewSchema = z.object({
   productIds: z.array(z.string()).default([]),
   subject: z.string().default(''),
   content: z.string().default(''),
+  heroImageUrl: z.string().max(500).nullable().optional(),
 });
 
 // ─── Pomocnicze ─────────────────────────────────────────────────────────────
@@ -137,6 +142,34 @@ const recordResult = async (ref: FirebaseFirestore.DocumentReference, result: Ba
 class HttpError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
+
+// heroImageUrl z żądania → adres kanoniczny / null / undefined; zły adres = 400.
+// Host z nagłówka Host (bez portu) — na serwerze zawsze crm.antyramy.eu.
+const resolveHero = (req: AuthenticatedRequest, input: string | null | undefined) => {
+  const hostname = (req.get('host') ?? '').replace(/:\d+$/, '');
+  const r = resolveHeroImageInput(input, heroUrlPolicy(hostname));
+  if (!r.ok) throw new HttpError(400, r.error);
+  return r.value;
+};
+
+// Adresy, które mogą wskazywać ten sam plik: kolaże pozostałych kampanii (każdy status) i zdjęcia produktów
+const collageUsage = (excludeCampaignId: string) => async () => {
+  const [campaigns, products] = await Promise.all([
+    db.collection(COLLECTION).select('heroImageUrl').get(),
+    db.collection('products').select('imageUrl').get(),
+  ]);
+  return [
+    ...campaigns.docs.filter(d => d.id !== excludeCampaignId).map(d => d.get('heroImageUrl') as string | null | undefined),
+    ...products.docs.map(d => d.get('imageUrl') as string | null | undefined),
+  ];
+};
+
+// Zwolnienie pliku po zapisie — nigdy nie przerywa odpowiedzi (wynik tylko w logu)
+const releaseCollage = async (url: string | null, campaignId: string, status: string) => {
+  if (!url) return;
+  const outcome = await releaseCollageFile({ url, ownerStatus: status, otherUrls: collageUsage(campaignId) });
+  console.log(`[campaigns] kolaż ${url} kampanii ${campaignId}: ${outcome}`);
+};
 
 const handleError = (res: Response, err: unknown, where: string, fallback: string) => {
   if (err instanceof HttpError) {
@@ -206,6 +239,7 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
     const now = new Date().toISOString();
     const doc: CampaignDoc = {
       ...parsed.data,
+      heroImageUrl: resolveHero(req, parsed.data.heroImageUrl) ?? null,
       status: 'draft',
       productsSnapshot: null,
       counts: null,
@@ -232,15 +266,23 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
     return;
   }
   try {
+    const { heroImageUrl: heroInput, ...fields } = parsed.data;
+    const hero = resolveHero(req, heroInput);
     const ref = db.collection(COLLECTION).doc(req.params.id);
+    let toRelease: string | null = null;
     const updated = await db.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (!snap.exists) throw new HttpError(404, 'Kampania nie istnieje');
-      if ((snap.data() as CampaignDoc).status !== 'draft') throw new HttpError(409, 'Kampania jest w wysyłce albo wysłana — zmiany niemożliwe');
-      const data = { ...parsed.data, updatedAt: new Date().toISOString() };
+      const current = snap.data() as CampaignDoc;
+      if (current.status !== 'draft') throw new HttpError(409, 'Kampania jest w wysyłce albo wysłana — zmiany niemożliwe');
+      const change = planHeroImageChange(current.heroImageUrl, hero);
+      toRelease = change.release;
+      const data = { ...fields, ...(change.set ? { heroImageUrl: change.next } : {}), updatedAt: new Date().toISOString() };
       tx.update(ref, data);
-      return { ...snap.data(), ...data };
+      return { ...current, ...data };
     });
+    // Po zapisie: stary plik kolażu kasowany, jeśli nikt inny go nie używa
+    await releaseCollage(toRelease, req.params.id, 'draft');
     res.json({ id: req.params.id, ...updated });
   } catch (err) {
     handleError(res, err, 'PUT /:id', 'Błąd zapisu kampanii');
@@ -251,12 +293,15 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const ref = db.collection(COLLECTION).doc(req.params.id);
-    await db.runTransaction(async tx => {
+    const hero = await db.runTransaction(async tx => {
       const snap = await tx.get(ref);
       if (!snap.exists) throw new HttpError(404, 'Kampania nie istnieje');
-      if ((snap.data() as CampaignDoc).status !== 'draft') throw new HttpError(409, 'Można usunąć tylko szkic');
+      const c = snap.data() as CampaignDoc;
+      if (c.status !== 'draft') throw new HttpError(409, 'Można usunąć tylko szkic');
       tx.delete(ref);
+      return c.heroImageUrl ?? null;
     });
+    await releaseCollage(hero, req.params.id, 'draft');
     res.json({ success: true });
   } catch (err) {
     handleError(res, err, 'DELETE /:id', 'Błąd usuwania kampanii');
@@ -282,6 +327,8 @@ router.post('/:id/duplicate', async (req: AuthenticatedRequest, res: Response) =
       productsSnapshot: null,
       variantA: src.variantA,
       variantB: src.variantB ?? null,
+      // Ten sam plik w obu kampaniach — usunięcie w jednej nie skasuje go (releaseCollageFile)
+      heroImageUrl: src.heroImageUrl ?? null,
       recipients: [],
       counts: null,
       results: EMPTY_RESULTS,
@@ -310,6 +357,7 @@ router.post('/preview', async (req: AuthenticatedRequest, res: Response) => {
   }
   try {
     const p = parsed.data;
+    const heroImageUrl = resolveHero(req, p.heroImageUrl) ?? null;
     const [client, products, signatureHtml] = await Promise.all([
       p.clientId ? loadClient(p.clientId) : Promise.resolve(null),
       p.noProducts ? Promise.resolve(null) : loadProducts(p.productIds),
@@ -317,7 +365,7 @@ router.post('/preview', async (req: AuthenticatedRequest, res: Response) => {
     ]);
     const { subject, html } = renderForClient({
       variant: { subject: p.subject, content: p.content },
-      title: p.pdfTitle, products, signatureHtml, client,
+      title: p.pdfTitle, products, signatureHtml, client, heroImageUrl,
     });
     res.json({ subject, html });
   } catch (err) {
@@ -357,7 +405,7 @@ router.get('/:id/preview', async (req: AuthenticatedRequest, res: Response) => {
     ]);
     const { subject, html } = renderForClient({
       variant: variantContent(c.variantA, c.variantB, variant),
-      title: c.pdfTitle, products, signatureHtml, client,
+      title: c.pdfTitle, products, signatureHtml, client, heroImageUrl: c.heroImageUrl ?? null,
     });
     res.json({ subject, html });
   } catch (err) {
@@ -490,7 +538,7 @@ router.post('/:id/send-batch', async (req: AuthenticatedRequest, res: Response) 
 
           const rendered = renderForClient({
             variant: variantContent(c.variantA, c.variantB, r.variant),
-            title: c.pdfTitle, products, signatureHtml, client,
+            title: c.pdfTitle, products, signatureHtml, client, heroImageUrl: c.heroImageUrl ?? null,
           });
           const ids = await sendEmail({
             to: r.email,

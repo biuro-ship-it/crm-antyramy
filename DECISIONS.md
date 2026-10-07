@@ -158,3 +158,20 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **Frontend nie kasuje plików kolażu.** Po „Zmień” / „Usuń” edytor tylko zapisuje szkic z nowym `heroImageUrl`; stary plik sprząta backend przy zapisie szkicu, po sprawdzeniu, czy nikt inny go nie używa (commit 3).
 - **Ostrzeżenie „kolaż z lokalnego serwera”**, gdy `heroImageUrl` zaczyna się od `http://localhost` / `127.0.0.1` / `[::1]` — taki obrazek nie wyświetli się odbiorcy. Bez zmiany sposobu budowania URL w `upload.ts` (propozycja `PUBLIC_BASE_URL` — otwarta).
 - **Telefon:** okno jako arkusz od dołu, jedna kolumna, pola 16:9 (od `sm` 4:3), przyciski w stopce obok siebie. Podgląd bez zaokrąglonych rogów — plik ma ostre rogi, a plakietka leży w samym rogu.
+
+## 2026-10-07 — commit 3: backend `heroImageUrl` (`services/collageFiles.ts`, `routes/campaigns.ts`)
+
+- **Walidacja adresu (bezpieczeństwo):** akceptowany wyłącznie `https://crm.antyramy.eu/uploads/kolaz-[A-Za-z0-9_-]+.jpg` — bez portu, loginu, zapytania i kotwicy. Odrzucane: obce hosty, inne prefiksy (`produkt-…`), podkatalogi, `..`, `\` i ich zakodowane postacie (`%2e`, `%2f`, `%5c`) — jeszcze przed parsowaniem URL. Nikt nie wstawi do maila cudzego obrazka (śledzenie, spam) ani nie wskaże pliku do skasowania spoza kolaży. Zły adres → 400.
+- **`http://crm.antyramy.eu/…` zapisywany jako `https://…`.** `upload.ts` buduje adres z protokołu żądania; nie dało się sprawdzić, czy Passenger przekazuje `https` (odczyt bazy produkcyjnej zablokowany). Własny host przez http to ten sam plik, a `.htaccess` i tak przekierowuje na https — kanonizacja zamiast odrzucania, żeby kolaż nie „zniknął” na produkcji.
+- **Localhost tylko w developmencie:** `NODE_ENV ≠ production` **oraz** żądanie przyszło na lokalny host (nagłówek `Host`). Drugi warunek to zabezpieczenie na wypadek, gdyby na serwerze NODE_ENV nie był ustawiony — tam host to zawsze `crm.antyramy.eu`, więc adres z localhost i tak jest odrzucany.
+- **Pole w zapisie szkicu:** brak klucza = bez zmian (zapis z innego kroku, starsza wersja PWA w pamięci telefonu), `null` / `''` = usunięcie, tekst = walidacja. Ta sama zasada co `files` u klienta (2026-09-27).
+- **Kasowanie pliku** (`releaseCollageFile`) po zapisie szkicu ze zmienionym/usuniętym kolażem i po usunięciu szkicu:
+  - nazwa pliku tylko z bezpiecznego parsera (`kolaz-*.jpg`, `basename` = nazwa), katalog stały (`public/uploads`);
+  - **plik zostaje, jeśli używa go inna kampania (dowolny status) albo produkt** — porównanie po **nazwie pliku**, nie po pełnym adresie (żeby `http://`/localhost nie ominęły ochrony);
+  - kampania inna niż szkic nigdy nie kasuje pliku;
+  - błąd (brak pliku, Firestore niedostępny) → ostrzeżenie w logu, zapis kampanii przechodzi; gdy nie da się sprawdzić użycia — plik zostaje.
+  - Skan użycia czyta `heroImageUrl` wszystkich kampanii i `imageUrl` produktów (`select`) — przy tej skali (dziesiątki dokumentów) prościej i pewniej niż osobne pole/indeks.
+- **Duplikat kopiuje `heroImageUrl`** — oba szkice wskazują ten sam plik; dzięki regule wyżej usunięcie kolażu w jednej kampanii go nie skasuje.
+- **Mail:** blok `<img width="600">` w komórce **bez bocznego paddingu** (kolaż na całą szerokość karty 600 px) — Outlook bierze szerokość z atrybutu `width`, w komórce z paddingiem 36 px obrazek wystawałby poza kartę. Alt: „Oferta tygodnia - {tytuł oferty}”, a gdy tytuł pusty — temat po placeholderach. Bez kolażu HTML **identyczny** jak przed zmianą — test porównuje z wzorcem zapisanym z kodu sprzed zmiany (`services/__fixtures__/`).
+- Podgląd maila w edytorze (`POST /preview`) dostaje `heroImageUrl` — ta sama walidacja co zapis.
+- **Ograniczenie:** plik wgrany, a potem nieprzypisany (np. nieudany zapis szkicu po uploadzie, zamknięta karta w trakcie) zostaje w `public/uploads` jako sierota — bez automatycznego sprzątania.

@@ -88,14 +88,17 @@ export const variantContent = (a: VariantContent, b: VariantB | null, variant: V
 /**
  * Mail kampanii. `contentHtml` to treść już po placeholderach (HTML — jak w dotychczasowych
  * Promocjach, nowe linie zamieniane na <br>). `products` null/[] = bez tabeli i zdania o PDF.
+ * `heroImageUrl` — kolaż między tytułem a treścią; brak = mail dokładnie jak przed kolażami.
  */
 export const buildCampaignEmailHtml = (opts: {
   title: string;
   contentHtml: string;
   products: CampaignProduct[] | null;
   signatureHtml: string;
+  heroImageUrl?: string | null;
+  heroAlt?: string;
 }): string => {
-  const { title, contentHtml, products, signatureHtml } = opts;
+  const { title, contentHtml, products, signatureHtml, heroImageUrl, heroAlt = '' } = opts;
   const hasProducts = !!products && products.length > 0;
 
   const productRows = hasProducts ? products!.map(p => `
@@ -111,6 +114,13 @@ export const buildCampaignEmailHtml = (opts: {
           <div style="width:40px;height:3px;background:#1a56db;margin-top:12px;border-radius:2px"></div>
         </td></tr>` : `
         <tr><td style="padding:16px 36px 0"></td></tr>`;
+
+  // Kolaż na całą szerokość karty (600 px): Outlook bierze szerokość z atrybutu width,
+  // więc komórka bez bocznego paddingu — inaczej obrazek wystawałby poza kartę.
+  const heroBlock = heroImageUrl ? `
+        <tr><td style="padding:0 0 24px">
+          <img src="${escapeHtml(heroImageUrl)}" width="600" alt="${escapeHtml(heroAlt)}" style="display:block;width:100%;max-width:600px;height:auto;border:0;">
+        </td></tr>` : '';
 
   const productsBlock = hasProducts ? `
         <tr><td style="padding:0 36px 32px">
@@ -138,7 +148,7 @@ export const buildCampaignEmailHtml = (opts: {
           <div style="color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px">Antyramy</div>
           <div style="color:rgba(255,255,255,0.7);font-size:12px;margin-top:2px">Ramy i antyramy</div>
         </td></tr>
-${titleBlock}
+${titleBlock}${heroBlock}
 
         <tr><td style="padding:0 36px 24px;color:#333;font-size:15px;line-height:1.7">
           ${contentHtml.replace(/\n/g, '<br>')}
@@ -159,6 +169,8 @@ ${productsBlock}
 </html>`;
 };
 
+export const HERO_ALT_PREFIX = 'Oferta tygodnia - ';
+
 /** Temat i HTML dla konkretnego klienta — to samo w podglądzie i w wysyłce. */
 export const renderForClient = (opts: {
   variant: VariantContent;
@@ -166,15 +178,20 @@ export const renderForClient = (opts: {
   products: CampaignProduct[] | null;
   signatureHtml: string;
   client: PlaceholderClient | null;
+  heroImageUrl?: string | null;
 }): { subject: string; html: string; plainContent: string } => {
-  const { variant, title, products, signatureHtml, client } = opts;
+  const { variant, title, products, signatureHtml, client, heroImageUrl } = opts;
+  const subject = renderPlaceholders(variant.subject, client, { html: false });
   return {
-    subject: renderPlaceholders(variant.subject, client, { html: false }),
+    subject,
     html: buildCampaignEmailHtml({
       title,
       contentHtml: renderPlaceholders(variant.content, client, { html: true }),
       products,
       signatureHtml,
+      heroImageUrl,
+      // alt: tytuł oferty, a gdy pusty — temat maila (escapowany w szablonie)
+      heroAlt: `${HERO_ALT_PREFIX}${title.trim() || subject}`.trim(),
     }),
     plainContent: renderPlaceholders(variant.content, client, { html: false }),
   };
