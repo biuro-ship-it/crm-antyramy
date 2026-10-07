@@ -83,6 +83,19 @@ export const assertSupportedImage = (file: { type: string }): void => {
 const toKB = (bytes: number) => Math.round(bytes / 1024);
 
 /**
+ * Adres pliku wgranego z lokalnego backendu (upload.ts składa URL z hosta żądania).
+ * Taki obrazek nie wyświetli się odbiorcy maila — kolaże robimy na produkcji.
+ */
+export const isLocalUploadUrl = (url: string): boolean =>
+  /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?(\/|$)/i.test(url.trim());
+
+export const COLLAGE_ABORTED = 'Generowanie kolażu przerwane';
+export const isCollageAborted = (e: unknown) => e instanceof Error && e.message === COLLAGE_ABORTED;
+const throwIfAborted = (signal?: AbortSignal) => {
+  if (signal?.aborted) throw new Error(COLLAGE_ABORTED);
+};
+
+/**
  * Pierwsza jakość z `steps`, przy której plik mieści się w `maxBytes`.
  * Gdy żadna — najmniejszy wynik z `overLimit: true` (bez błędu, UI pokazuje rozmiar).
  */
@@ -90,9 +103,11 @@ export const fitJpegQuality = async (
   encode: (quality: number) => Promise<Blob>,
   maxBytes = COLLAGE_MAX_BYTES,
   steps = JPEG_QUALITY_STEPS,
+  signal?: AbortSignal,
 ): Promise<CollageResult> => {
   let best: { blob: Blob; quality: number } | null = null;
   for (const quality of steps) {
+    throwIfAborted(signal);
     const blob = await encode(quality);
     if (blob.size <= maxBytes) return { blob, quality, sizeKB: toKB(blob.size), overLimit: false };
     if (!best || blob.size < best.blob.size) best = { blob, quality };
@@ -178,8 +193,16 @@ const canvasToJpeg = (canvas: HTMLCanvasElement, quality: number): Promise<Blob>
     );
   });
 
-/** Kolaż z 3 zdjęć: [0] = duże po lewej, [1] i [2] = małe po prawej (góra, dół). */
-export const createCollage = async (files: [File, File, File]): Promise<CollageResult> => {
+/**
+ * Kolaż z 3 zdjęć: [0] = duże po lewej, [1] i [2] = małe po prawej (góra, dół).
+ * `signal` przerywa pracę między etapami (dekodowanie, kolejne jakości JPG) —
+ * przerwane wywołanie rzuca błąd rozpoznawany przez isCollageAborted().
+ */
+export const createCollage = async (
+  files: [File, File, File],
+  opts: { signal?: AbortSignal } = {},
+): Promise<CollageResult> => {
+  const { signal } = opts;
   if (files.length !== 3) throw new Error('Kolaż wymaga dokładnie 3 zdjęć.');
   files.forEach(assertSupportedImage);
 
@@ -193,8 +216,12 @@ export const createCollage = async (files: [File, File, File]): Promise<CollageR
   const decoded: DecodedImage[] = [];
   try {
     // Po kolei, nie równolegle — mniejsze zużycie pamięci na telefonie przy dużych zdjęciach
-    for (const file of files) decoded.push(await decodeImage(file));
+    for (const file of files) {
+      throwIfAborted(signal);
+      decoded.push(await decodeImage(file));
+    }
     await fontReady;
+    throwIfAborted(signal);
 
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, COLLAGE_WIDTH, COLLAGE_HEIGHT);
@@ -212,5 +239,5 @@ export const createCollage = async (files: [File, File, File]): Promise<CollageR
     decoded.forEach(d => d.release());
   }
 
-  return fitJpegQuality(q => canvasToJpeg(canvas, q));
+  return fitJpegQuality(q => canvasToJpeg(canvas, q), COLLAGE_MAX_BYTES, JPEG_QUALITY_STEPS, signal);
 };

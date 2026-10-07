@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeCollageLayout, computeCoverCrop, spacedTextWidth, assertSupportedImage, fitJpegQuality,
-  Rect, UNSUPPORTED_FORMAT_ERROR, JPEG_QUALITY_STEPS, COLLAGE_MAX_BYTES,
+  Rect, UNSUPPORTED_FORMAT_ERROR, isCollageAborted, isLocalUploadUrl, JPEG_QUALITY_STEPS, COLLAGE_MAX_BYTES,
 } from './collage';
 
 const overlaps = (a: Rect, b: Rect) =>
@@ -150,7 +150,32 @@ describe('fitJpegQuality', () => {
     expect(calls).toHaveLength(JPEG_QUALITY_STEPS.length);
   });
 
+  it('przerwanie sygnałem zatrzymuje kodowanie kolejnych jakości', async () => {
+    const calls: number[] = [];
+    const ctrl = new AbortController();
+    const encode = async (q: number) => {
+      if (calls.length === 1) ctrl.abort();
+      return fakeEncode(calls)(q);
+    };
+    const err = await fitJpegQuality(encode, COLLAGE_MAX_BYTES, JPEG_QUALITY_STEPS, ctrl.signal).catch(e => e);
+    expect(isCollageAborted(err)).toBe(true);
+    expect(calls).toEqual([0.9, 0.85]);
+  });
+
   it('domyślny limit to 250 KB', () => {
     expect(COLLAGE_MAX_BYTES).toBe(256000);
+  });
+});
+
+describe('isLocalUploadUrl', () => {
+  it('adresy lokalnego backendu', () => {
+    expect(isLocalUploadUrl('http://localhost:4000/uploads/kolaz-1.jpg')).toBe(true);
+    expect(isLocalUploadUrl('http://127.0.0.1:4000/uploads/kolaz-1.jpg')).toBe(true);
+    expect(isLocalUploadUrl('http://[::1]:4000/uploads/kolaz-1.jpg')).toBe(true);
+  });
+
+  it('produkcja i domeny tylko podobne do localhost — nie', () => {
+    expect(isLocalUploadUrl('https://crm.antyramy.eu/uploads/kolaz-1.jpg')).toBe(false);
+    expect(isLocalUploadUrl('https://localhost.example.com/uploads/x.jpg')).toBe(false);
   });
 });

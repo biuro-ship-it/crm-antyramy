@@ -5,11 +5,13 @@ import {
 } from '../services/api';
 import RecipientFilters from './RecipientFilters';
 import CampaignSendRunner from './CampaignSendRunner';
+import CollageDialog from './CollageDialog';
 import {
   EMPTY_FILTER, RecipientFilter, matchesFilter, canReceive, recentlyCampaigned, salutationPreview,
 } from '../utils/campaignFilters';
 import { endsWithSignature, SIGNATURE_WARNING } from '../utils/signatureCheck';
 import { parseCampaignJson } from '../utils/campaignImport';
+import { isLocalUploadUrl } from '../utils/collage';
 
 interface CampaignEditorProps {
   campaign: Campaign | null;              // null = nowa kampania
@@ -54,6 +56,8 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
   const [subjectB, setSubjectB] = useState(campaign?.variantB?.subject ?? '');
   const [separateB, setSeparateB] = useState(campaign?.variantB?.content != null);
   const [contentB, setContentB] = useState(campaign?.variantB?.content ?? '');
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(campaign?.heroImageUrl ?? null);
+  const [showCollage, setShowCollage] = useState(false);
 
   // Odbiorcy: zaznaczeni + przypisany wariant
   const [selected, setSelected] = useState<Set<string>>(new Set((campaign?.recipients ?? []).map(r => r.clientId)));
@@ -98,13 +102,15 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
     variantA: { subject: subjectA, content: contentA },
     variantB: abTest ? { subject: subjectB, content: separateB ? contentB : null } : null,
     recipients: [...selected].map(id => ({ clientId: id, variant: abTest ? (variants[id] ?? 'A') : 'A' })),
+    heroImageUrl,
   });
 
-  const save = async (): Promise<string | null> => {
+  // `overrides` — wartości ustawione w tym samym kliknięciu (stan Reacta jeszcze ich nie ma)
+  const save = async (overrides: Partial<CampaignDraft> = {}): Promise<string | null> => {
     setSaving(true);
     setError('');
     try {
-      const d = draft();
+      const d = { ...draft(), ...overrides };
       const saved = campaignId ? await updateCampaign(campaignId, d) : await createCampaign(d);
       setCampaignId(saved.id);
       if (!name.trim()) setName(d.name);
@@ -120,6 +126,20 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
 
   const handleSaveClick = async () => {
     if (await save()) { setInfo('Szkic zapisany.'); setTimeout(() => setInfo(''), 2500); }
+  };
+
+  // ─── Kolaż ── (plik po zmianie / usunięciu sprząta backend przy zapisie szkicu)
+  const handleCollageSaved = async (url: string) => {
+    setHeroImageUrl(url);
+    setDirty(true);
+    setShowCollage(false);
+    if (await save({ heroImageUrl: url })) { setInfo('Kolaż zapisany w szkicu.'); setTimeout(() => setInfo(''), 2500); }
+  };
+  const removeCollage = async () => {
+    if (!window.confirm('Usunąć kolaż z kampanii?')) return;
+    setHeroImageUrl(null);
+    setDirty(true);
+    await save({ heroImageUrl: null });
   };
 
   const handleClose = () => {
@@ -503,6 +523,29 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
             )}
 
             <div>
+              <label className={labelCls}>Kolaż nad treścią</label>
+              {heroImageUrl ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <img src={heroImageUrl} alt="Kolaż" className="w-40 aspect-[3/2] object-cover rounded-lg border border-hairline shadow-soft" />
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setShowCollage(true)} disabled={saving} className="btn-secondary text-sm">Zmień</button>
+                    <button type="button" onClick={removeCollage} disabled={saving} className="btn-danger text-sm">Usuń</button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={() => setShowCollage(true)} className="btn-secondary text-sm">🖼 Utwórz kolaż</button>
+                  <span className="text-xs text-ink font-light">3 zdjęcia ramki → jeden obraz w mailu (opcjonalnie)</span>
+                </div>
+              )}
+              {heroImageUrl && isLocalUploadUrl(heroImageUrl) && (
+                <div className="mt-2">
+                  <Alert tone="warn">Kolaż wgrany z lokalnego serwera ({new URL(heroImageUrl).host}) — nie wyświetli się w mailu u odbiorcy. Utwórz go ponownie na crm.antyramy.eu.</Alert>
+                </div>
+              )}
+            </div>
+
+            <div>
               <label className={labelCls}>Treść maila {abTest && separateB && '(A)'}</label>
               <textarea
                 ref={contentRef}
@@ -572,6 +615,8 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
           </div>
         </div>
       )}
+
+      {showCollage && <CollageDialog onClose={() => setShowCollage(false)} onSave={handleCollageSaved} />}
 
       {/* ===== KROK 4 — WYSYŁKA ===== */}
       {step === 4 && (

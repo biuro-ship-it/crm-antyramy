@@ -147,3 +147,14 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **Font:** `document.fonts.load('700 34px Inter')` z limitem 3 s (wolna sieć nie blokuje kolażu), potem `document.fonts.ready`; font canvasu to `700 34px Inter, sans-serif`.
 - **Jakość JPG:** od 0,90 co 0,05 w dół do 0,50, pierwszy wynik ≤ 250 KB. Gdy nawet 0,50 jest większe — zwracany najmniejszy wynik z `overLimit: true` (UI pokaże rozmiar), bez błędu.
 - Gdy `createImageBitmap` z opcjami nie działa (starsze przeglądarki), zdjęcie dekodowane przez `<img>` — przeglądarki też obracają je wg EXIF.
+
+## 2026-10-07 — commit 2: okno „Utwórz kolaż” (`CollageDialog.tsx`)
+
+- **Podgląd = zapisywany plik.** Okno trzyma jeden wynik `createCollage()`; ten sam `Blob` jest wyświetlany i wysyłany przy „Zapisz”. Brak osobnej atrapy.
+- **Podgląd 350 ms po ostatniej zmianie** (zdjęcia, kolejność). `createCollage` przyjmuje `AbortSignal` — poprzednie generowanie jest przerywane między etapami (dekodowanie, kolejne jakości JPG), a nie tylko ignorowane. Stary podgląd zostaje widoczny (przygaszony) do czasu nowego — bez migotania; „Zapisz” nieaktywne w trakcie.
+- **Kolejność:** pole 1 = duże zdjęcie; „Ustaw jako duże” zamienia wskazane pole z polem 1. „Wybierz zdjęcia” (wiele naraz, galeria w telefonie) wypełnia najpierw puste pola.
+- **`overLimit`** → żółte ostrzeżenie z rozmiarem, zapis dozwolony (limit uploadu 5 MB).
+- **Upload `POST /api/upload?kind=kolaz`** → plik `kolaz-<czas>-<los>.jpg`. Prefiks wybierany ze stałej listy (`kolaz` albo domyślnie `produkt`) — wartość z zapytania nie trafia do nazwy pliku. Pozostałe uploady bez zmian.
+- **Frontend nie kasuje plików kolażu.** Po „Zmień” / „Usuń” edytor tylko zapisuje szkic z nowym `heroImageUrl`; stary plik sprząta backend przy zapisie szkicu, po sprawdzeniu, czy nikt inny go nie używa (commit 3).
+- **Ostrzeżenie „kolaż z lokalnego serwera”**, gdy `heroImageUrl` zaczyna się od `http://localhost` / `127.0.0.1` / `[::1]` — taki obrazek nie wyświetli się odbiorcy. Bez zmiany sposobu budowania URL w `upload.ts` (propozycja `PUBLIC_BASE_URL` — otwarta).
+- **Telefon:** okno jako arkusz od dołu, jedna kolumna, pola 16:9 (od `sm` 4:3), przyciski w stopce obok siebie. Podgląd bez zaokrąglonych rogów — plik ma ostre rogi, a plakietka leży w samym rogu.

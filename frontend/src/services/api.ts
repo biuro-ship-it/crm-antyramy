@@ -552,12 +552,13 @@ export const updateClientInteraction = async (clientId: string, interactionId: s
   return response.json();
 };
 
-export const uploadImage = async (file: File): Promise<string> => {
+// kind 'kolaz' → plik `kolaz-…` zamiast `produkt-…` (kolaż kampanii, patrz upload.ts)
+export const uploadImage = async (file: File, kind?: 'kolaz'): Promise<string> => {
   const auth = getAuth();
   const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
   const formData = new FormData();
   formData.append('image', file);
-  const response = await fetch(`${API_URL}/api/upload`, {
+  const response = await fetch(`${API_URL}/api/upload${kind ? `?kind=${kind}` : ''}`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}` },
     body: formData,
@@ -568,7 +569,7 @@ export const uploadImage = async (file: File): Promise<string> => {
 };
 
 // Upload dokumentu klienta (PDF / obraz / DOCX) — ten sam endpoint co uploadImage.
-export const uploadFile = uploadImage;
+export const uploadFile = (file: File) => uploadImage(file);
 
 /**
  * Usuwa plik z `public/uploads` na serwerze. Przyjmuje pełny URL (taki, jaki
@@ -708,6 +709,7 @@ export interface CampaignDraft {
   variantA: { subject: string; content: string };
   variantB: { subject: string; content: string | null } | null; // content null = wspólna z A
   recipients: Array<{ clientId: string; variant: CampaignVariant }>;
+  heroImageUrl?: string | null; // kolaż nad treścią maila (null / brak = bez obrazka)
 }
 
 export interface Campaign extends Omit<CampaignDraft, 'recipients'> {

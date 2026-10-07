@@ -22,10 +22,13 @@ const storage = multer.diskStorage({
   destination: (_req, _file, cb) => {
     cb(null, UPLOAD_DIR);
   },
-  filename: (_req, file, cb) => {
+  filename: (req, file, cb) => {
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
     const ext = path.extname(file.originalname).toLowerCase();
-    cb(null, `produkt-${uniqueSuffix}${ext}`);
+    // ?kind=kolaz → kolaz-…; cokolwiek innego (lub brak) → produkt-… jak dotąd.
+    // Stała lista prefiksów — wartość z zapytania nigdy nie trafia do nazwy pliku.
+    const prefix = req.query.kind === 'kolaz' ? 'kolaz' : 'produkt';
+    cb(null, `${prefix}-${uniqueSuffix}${ext}`);
   },
 });
 const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
