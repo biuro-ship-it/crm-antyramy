@@ -124,3 +124,26 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - `scripts/campaign-daily.ts`: kampanie `sent` z ostatnich **30 dni** → `checkReplies`, potem `recomputeOrders` (wszystkie). Filtr daty w kodzie (zapytanie status + sentAt wymagałoby indeksu złożonego — zbędny przy tej skali).
 - Brak uprawnienia do czytania poczty przerywa sprawdzanie odpowiedzi (kod wyjścia 2), ale przeliczenie zamówień i tak się wykonuje.
 - Cron na s61 o **6:45** (przed istniejącymi zadaniami Ramiarza o 7:00–7:20), log w `domains/crm.antyramy.eu/logs/campaign-daily.log`. Ustawiany ręcznie w crontabie konta Pluszek (nie przez deploy).
+
+---
+
+# Kolaż z 3 zdjęć do kampanii
+
+## 2026-10-07 — założenia (zaakceptowane przez Krzyśka)
+
+- **Kampanie, nie Promocje.** Moduł Promocje nie istnieje od 2026-09-28 — kolaż dochodzi do edytora Kampanii (krok 3 „Treść”).
+- **Kolaż 1200×800 px, JPG, maks. ok. 250 KB.** W mailu wyświetlany w szerokości 600 px (retina). Układ: duże zdjęcie po lewej (60% szerokości po odjęciu odstępu), dwa mniejsze jedno nad drugim po prawej, białe odstępy 6 px, przycięcie „cover” wyśrodkowane.
+- **Plakietka „OFERTA TYGODNIA”** w lewym górnym rogu dużego zdjęcia: tło `#1a56db` (kolor nagłówka maila kampanii), biały tekst, Inter Bold. Brak Intera (np. offline) → zwykły font bezszeryfowy, bez błędu.
+- **Kolaż w mailu jako zwykły `<img src=URL>`** (bez inline CID). Plik leży w `public/uploads` i jest publiczny jak zdjęcia produktów. Świadomie przyjęte: Outlook domyślnie blokuje obrazy zewnętrzne do kliknięcia „Pokaż obrazy”. CID — ewentualnie później, osobne zadanie.
+- **Kolaż nie trafia do PDF** — PDF bez zmian.
+- **Kolaż robiony w przeglądarce (Canvas), bez nowych bibliotek.** Powody: mydevil to FreeBSD, `sharp` nie ma tam gotowych binarek (ryzyko nieudanego `npm install` przy deployu); na serwer idzie tylko gotowy plik ~250 KB, więc limit uploadu 5 MB nie przeszkadza przy zdjęciach z telefonu. Orientacja z EXIF: `createImageBitmap(..., { imageOrientation: 'from-image' })`.
+- **Wejście tylko JPG/PNG.** HEIC/HEIF i inne → komunikat z instrukcją dla iPhone'a (Ustawienia > Aparat > Formaty > Najbardziej zgodne).
+
+## 2026-10-07 — commit 1: logika kolażu (`frontend/src/utils/collage.ts`)
+
+- Układ i przycięcie to **czyste funkcje** (`computeCollageLayout`, `computeCoverCrop`, `fitJpegQuality`) — testowane w vitest bez przeglądarki; rysowanie i eksport w `createCollage`.
+- **Zaokrąglenia:** szerokość dużego = `round((W − gap) × 0,6)`, prawa kolumna dostaje resztę; górne małe = `round((H − gap) / 2)`, dolne resztę — suma z odstępem zawsze równa 1200×800, bez szczelin i nakładania.
+- **Odstęp między literami plakietki rysowany ręcznie** (znak po znaku, szerokość z `measureText`) zamiast `ctx.letterSpacing` — ta właściwość nie działa w starszym Safari, a plakietka ma wyglądać tak samo na telefonie i komputerze. Wysokość plakietki z rzeczywistego obrysu wielkich liter (`actualBoundingBoxAscent/Descent`), żeby tekst był optycznie na środku.
+- **Font:** `document.fonts.load('700 34px Inter')` z limitem 3 s (wolna sieć nie blokuje kolażu), potem `document.fonts.ready`; font canvasu to `700 34px Inter, sans-serif`.
+- **Jakość JPG:** od 0,90 co 0,05 w dół do 0,50, pierwszy wynik ≤ 250 KB. Gdy nawet 0,50 jest większe — zwracany najmniejszy wynik z `overLimit: true` (UI pokaże rozmiar), bez błędu.
+- Gdy `createImageBitmap` z opcjami nie działa (starsze przeglądarki), zdjęcie dekodowane przez `<img>` — przeglądarki też obracają je wg EXIF.
