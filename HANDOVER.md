@@ -1,6 +1,43 @@
 # HANDOVER — moduł Kampanie (CRM_ANTYRAMY)
 
-Stan na 2026-09-28. Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md).
+Stan na 2026-10-07. Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
+
+## Kolaż z 3 zdjęć — zrobione 2026-10-07 (commity lokalne, NIE wdrożone)
+
+Przycisk „🖼 Utwórz kolaż” w kroku 3 edytora kampanii → 3 zdjęcia → JPG 1200×800 (≤ ~250 KB) z plakietką „OFERTA TYGODNIA” → `<img>` 600 px w mailu między tytułem a treścią. Kolaż rysowany w przeglądarce (Canvas), bez nowych bibliotek; nie trafia do PDF.
+
+| Co | Gdzie |
+|---|---|
+| Układ, przycięcie, plakietka, dobór jakości JPG, przerywanie generowania | `frontend/src/utils/collage.ts` (+ `collage.test.ts`) |
+| Okno „Utwórz kolaż” (3 pola, „Ustaw jako duże”, podgląd = zapisywany plik, KB i jakość, ostrzeżenia) | `frontend/src/components/CollageDialog.tsx` |
+| Sekcja „Kolaż nad treścią” (Utwórz / Zmień / Usuń, ostrzeżenie o localhost), kolaż w podglądzie maila | `frontend/src/components/CampaignEditor.tsx`, `services/api.ts` |
+| Upload `POST /api/upload?kind=kolaz` → `kolaz-<czas>-<los>.jpg` | `backend/src/routes/upload.ts` |
+| Walidacja `heroImageUrl`, zapis częściowy, bezpieczne kasowanie pliku (współdzielenie) | `backend/src/services/collageFiles.ts` (+ `collageFiles.test.ts`) |
+| Pole `heroImageUrl` w szkicu, duplikacie, usuwaniu, podglądach i wysyłce | `backend/src/routes/campaigns.ts` |
+| Blok `<img>` w mailu; wzorzec HTML sprzed zmiany | `backend/src/services/campaignRender.ts`, `services/__fixtures__/` |
+
+**Zasady plików:** kolaż zmieniony/usunięty w szkicu albo usunięty szkic → plik kasowany, chyba że ten sam plik ma inna kampania (dowolny status) lub produkt; wysłana kampania nigdy nie kasuje swojego kolażu. Adresy spoza `https://crm.antyramy.eu/uploads/kolaz-*.jpg` są odrzucane (400).
+
+### Sprawdzone automatycznie / lokalnie
+- Testy: backend 58, frontend 57; `npm run build` frontendu bez błędów.
+- W Chrome (strona testowa z prawdziwym `CollageDialog`, bez logowania): orientacja z EXIF (plik z obrotem 6), plakietka w pełnej rozdzielczości, szybkie zamiany kolejności bez wyścigu, ostrzeżenie > 250 KB, błąd HEIC, szerokość 390 px.
+- **Niesprawdzone:** prawdziwy upload i zapis w zalogowanej aplikacji, prawdziwy iPhone/Safari i zdjęcia z aparatu, wygląd w Gmailu/Outlooku.
+
+### Testy ręczne na produkcji (po deployu)
+1. **Kolaż z telefonu:** Kampanie → szkic → krok 3 → „Utwórz kolaż” → „Wybierz zdjęcia” z galerii: 1 poziome + 2 pionowe zdjęcia **z aparatu** (nie zrzuty). Wszystkie stoją prosto (nie obrócone o 90°), przycięcie bez czarnych pasów; „Ustaw jako duże” zmienia podgląd. To samo z komputera (przeciągnięcie pliku na pole).
+2. **Plakietka na iPhonie/Safari:** czytelna, proporcjonalna do zdjęcia, litery „OFERTA TYGODNIA” kompletne i równo rozstawione (odstępy między literami), tekst na środku niebieskiego prostokąta, prostokąt w samym rogu. Polskich znaków w plakietce nie ma — tylko litery i odstępy.
+3. **Rozmiar:** pod podglądem rozmiar w KB i jakość JPG — zwykle ≤ 250 KB; przy > 250 KB żółte ostrzeżenie, a „Zapisz kolaż” nadal działa. Po zapisie: miniatura w kroku 3, w podglądzie maila obrazek pod tytułem; adres obrazka (prawy klik → kopiuj adres) zaczyna się od `https://crm.antyramy.eu/uploads/kolaz-`. Brak żółtego ostrzeżenia o localhost.
+4. **Wysyłka testowa** tylko do klienta testowego z własnym adresem: w **Gmailu** kolaż od razu, na pełną szerokość karty, nad treścią; w **Outlooku** (desktop i/lub web) — po „Pokaż obrazy” kolaż nie wystaje poza kartę 600 px; tekst alternatywny przed pokazaniem obrazów: „Oferta tygodnia - {tytuł}”. PDF w załączniku bez kolażu.
+5. **Duplikat:** wysłana (albo dowolna) kampania z kolażem → „Duplikuj kampanię” → w kopii kolaż jest → w kopii „Usuń” → zapis → oryginał nadal pokazuje kolaż (szczegóły → podgląd), a plik otwiera się pod swoim adresem. Potem w kopii nowy kolaż i „Zmień” — oryginał bez zmian.
+6. **Kampania bez kolażu** (nowa i stara wysłana): podgląd i mail wyglądają jak dotąd.
+7. **Zapis z innego kroku:** szkic z kolażem → zmień coś w kroku 1 → „Zapisz szkic” → odśwież stronę → kolaż nadal jest.
+8. (opcjonalnie) Usunięcie szkicu z kolażem → plik `kolaz-…` znika z `public_nodejs/public/uploads/` (log: `[campaigns] kolaż … deleted`).
+
+### Otwarte
+- Inline CID dla Outlooka — osobne zadanie (decyzja 2026-10-07).
+- Pliki-sieroty (upload bez zapisanego szkicu) nie są sprzątane automatycznie.
+- Protokół adresów uploadu na produkcji niesprawdzony (backend i tak zapisuje kolaż jako `https://`) — potwierdza test 3.
+
 
 ## Etap 1 — zrobione
 
