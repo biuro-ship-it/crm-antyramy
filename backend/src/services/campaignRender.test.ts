@@ -5,6 +5,7 @@ import * as path from 'path';
 import {
   renderPlaceholders, buildCampaignEmailHtml, renderForClient, splitAB,
   pickPendingBatch, applyBatchResults, variantContent, UNSUBSCRIBE_TEXT,
+  campaignContentError, testSubject,
   CampaignRecipient, CampaignCounts,
 } from './campaignRender';
 
@@ -176,4 +177,23 @@ test('applyBatchResults: nanosi wyniki, nie cofa rozliczonych, liczy', () => {
   assert.equal(out.recipients[2].error, 'Brak skrzynki');
   assert.equal(out.pending, 1);
   assert.deepEqual(out.counts, { total: 4, sent: 2, failed: 1, skippedNoEmail: 1, skippedNoMarketing: 2 });
+});
+
+// ─── Walidacja treści i wysyłka testowa ─────────────────────────────────────
+
+test('campaignContentError: komplet treści przechodzi, braki dają komunikat', () => {
+  const a = { subject: 'Temat', content: 'Treść' };
+  assert.equal(campaignContentError({ variantA: a, variantB: null }), null);
+  assert.equal(campaignContentError({ variantA: a, variantB: { subject: 'B', content: null } }), null);
+  assert.match(campaignContentError({ variantA: { subject: '  ', content: 'x' }, variantB: null })!, /temat maila/);
+  assert.match(campaignContentError({ variantA: { subject: 'x', content: ' \n' }, variantB: null })!, /treść maila/);
+  assert.match(campaignContentError({ variantA: a, variantB: { subject: '', content: null } })!, /temat wariantu B/);
+  assert.match(campaignContentError({ variantA: a, variantB: { subject: 'B', content: '  ' } })!, /treść wariantu B/);
+  assert.match(campaignContentError({})!, /temat maila/);
+});
+
+test('testSubject: znacznik [TEST], przy A/B z literą wariantu', () => {
+  assert.equal(testSubject('Nowa oferta', null), '[TEST] Nowa oferta');
+  assert.equal(testSubject('Nowa oferta', 'A'), '[TEST A] Nowa oferta');
+  assert.equal(testSubject('Inny temat', 'B'), '[TEST B] Inny temat');
 });

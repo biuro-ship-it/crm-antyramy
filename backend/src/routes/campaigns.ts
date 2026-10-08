@@ -9,6 +9,7 @@ import { getSignatureHtml } from '../services/emailSignature';
 import {
   CampaignProduct, CampaignRecipient, CampaignCounts, BatchResult, Variant, VariantB, VariantContent,
   renderForClient, renderPlaceholders, variantContent, pickPendingBatch, applyBatchResults,
+  campaignContentError, testSubject,
 } from '../services/campaignRender';
 import { todayISO, recomputeLastContact } from '../utils/date';
 import { isNotFound } from '../utils/firestore';
@@ -27,6 +28,8 @@ router.use(authenticate);
 const COLLECTION = 'campaigns';
 const LOCK_MS = 120_000;      // blokada partii (druga karta nie wyśle równolegle)
 const SEND_DELAY_MS = 200;    // jak w sendBulkEmails — ochrona przed limitem Gmail API
+// Wysyłka testowa idzie zawsze tutaj — adres nigdy nie pochodzi z żądania
+const CAMPAIGN_TEST_EMAIL = 'info@pluszek.pl';
 
 interface CampaignDoc {
   name: string;
@@ -85,6 +88,8 @@ const PreviewSchema = z.object({
   content: z.string().default(''),
   heroImageUrl: z.string().max(500).nullable().optional(),
 });
+
+const SendTestSchema = z.object({ clientId: z.string().nullable().default(null) });
 
 // ─── Pomocnicze ─────────────────────────────────────────────────────────────
 
@@ -439,15 +444,15 @@ router.post('/:id/start', async (req: AuthenticatedRequest, res: Response) => {
     const c0 = snap0.data() as CampaignDoc;
 
     // Walidacja treści
-    if (!c0.variantA?.subject?.trim()) throw new HttpError(400, 'Uzupełnij temat maila (wariant A)');
-    if (!c0.variantA?.content?.trim()) throw new HttpError(400, 'Uzupełnij treść maila');
-    if (c0.variantB && !c0.variantB.subject?.trim()) throw new HttpError(400, 'Uzupełnij temat wariantu B albo go usuń');
-    if (c0.variantB && c0.variantB.content !== null && !c0.variantB.content.trim()) throw new HttpError(400, 'Uzupełnij treść wariantu B albo użyj wspólnej');
+    const contentError = campaignContentError(c0);
+    if (contentError) throw new HttpError(400, contentError);
     if ((c0.recipients ?? []).length === 0) throw new HttpError(400, 'Wybierz odbiorców');
 
+    // Edytor zapisuje noProducts = brak wybranych produktów; tu zostaje zabezpieczenie
+    // na produkty usunięte z katalogu po zapisie szkicu.
     const products = c0.noProducts ? null : await loadProducts(c0.productIds ?? []);
     if (!c0.noProducts && (!products || products.length === 0)) {
-      throw new HttpError(400, 'Wybierz produkty albo zaznacz „bez tabeli i PDF”');
+      throw new HttpError(400, 'Wybrane produkty nie istnieją już w katalogu — wybierz je ponownie (krok 1)');
     }
 
     // Odbiorcy: bieżące dane klientów, bez wypisanych i bez e-maila
@@ -495,6 +500,54 @@ router.post('/:id/start', async (req: AuthenticatedRequest, res: Response) => {
     res.json({ id: ref.id, status: result.status, counts: result.counts, pending: recipients.length });
   } catch (err) {
     handleError(res, err, 'POST /:id/start', 'Błąd startu wysyłki');
+  }
+});
+
+// POST /api/campaigns/:id/send-test — mail testowy ze szkicu na CAMPAIGN_TEST_EMAIL.
+// Wygląda jak mail do odbiorcy (ten sam render, PDF, kolaż), temat ze znacznikiem [TEST].
+// Niczego nie zapisuje: status, odbiorcy i historia klientów zostają bez zmian.
+router.post('/:id/send-test', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = SendTestSchema.safeParse(req.body ?? {});
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+    return;
+  }
+  try {
+    const snap = await db.collection(COLLECTION).doc(req.params.id).get();
+    if (!snap.exists) throw new HttpError(404, 'Kampania nie istnieje');
+    const c = snap.data() as CampaignDoc;
+    if (c.status !== 'draft') throw new HttpError(409, 'Test można wysłać tylko ze szkicu');
+    const contentError = campaignContentError(c);
+    if (contentError) throw new HttpError(400, contentError);
+
+    const products = await campaignProducts(c);
+    if (!c.noProducts && (!products || products.length === 0)) {
+      throw new HttpError(400, 'Wybrane produkty nie istnieją już w katalogu — wybierz je ponownie (krok 1)');
+    }
+    const [client, signatureHtml, pdf] = await Promise.all([
+      parsed.data.clientId ? loadClient(parsed.data.clientId) : Promise.resolve(null),
+      getSignatureHtml(),
+      products && products.length ? buildPdf(c, products) : Promise.resolve(null),
+    ]);
+    const pdfName = `oferta-antyramy-${todayISO()}.pdf`;
+
+    const variants: Variant[] = c.variantB ? ['A', 'B'] : ['A'];
+    for (const [i, variant] of variants.entries()) {
+      if (i > 0) await new Promise(resolve => setTimeout(resolve, SEND_DELAY_MS));
+      const rendered = renderForClient({
+        variant: variantContent(c.variantA, c.variantB, variant),
+        title: c.pdfTitle, products, signatureHtml, client, heroImageUrl: c.heroImageUrl ?? null,
+      });
+      await sendEmail({
+        to: CAMPAIGN_TEST_EMAIL,
+        subject: testSubject(rendered.subject, c.variantB ? variant : null),
+        htmlBody: rendered.html,
+        ...(pdf ? { pdfBuffer: pdf, pdfFilename: pdfName } : {}),
+      });
+    }
+    res.json({ to: CAMPAIGN_TEST_EMAIL, sent: variants.length });
+  } catch (err) {
+    handleError(res, err, 'POST /:id/send-test', 'Błąd wysyłki testowej');
   }
 });
 

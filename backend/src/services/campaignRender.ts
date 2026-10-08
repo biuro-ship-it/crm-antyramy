@@ -197,6 +197,21 @@ export const renderForClient = (opts: {
   };
 };
 
+// ─── Walidacja treści i wysyłka testowa ─────────────────────────────────────
+
+/** Temat i treść gotowe do wysyłki? Komunikat błędu albo null. Wspólne dla startu i wysyłki testowej. */
+export const campaignContentError = (c: { variantA?: Partial<VariantContent> | null; variantB?: Partial<VariantB> | null }): string | null => {
+  if (!c.variantA?.subject?.trim()) return 'Uzupełnij temat maila (wariant A)';
+  if (!c.variantA?.content?.trim()) return 'Uzupełnij treść maila';
+  if (c.variantB && !c.variantB.subject?.trim()) return 'Uzupełnij temat wariantu B albo go usuń';
+  if (c.variantB && c.variantB.content != null && !c.variantB.content.trim()) return 'Uzupełnij treść wariantu B albo użyj wspólnej';
+  return null;
+};
+
+/** Temat maila testowego: „[TEST] …”, przy teście A/B „[TEST A] …” / „[TEST B] …”. */
+export const testSubject = (subject: string, variant: Variant | null): string =>
+  `[TEST${variant ? ` ${variant}` : ''}] ${subject}`;
+
 // ─── A/B i partie wysyłki ───────────────────────────────────────────────────
 
 /** Losowo po równo (przy nieparzystej liczbie A ma o jeden więcej). */
