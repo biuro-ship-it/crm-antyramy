@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Campaign, CampaignDraft, CampaignVariant, Client, Product,
   createCampaign, updateCampaign, previewCampaignDraft, openCampaignDraftPdf, startCampaign,
+  sendCampaignTest, CAMPAIGN_TEST_EMAIL,
 } from '../services/api';
 import RecipientFilters from './RecipientFilters';
 import CampaignSendRunner from './CampaignSendRunner';
@@ -12,6 +13,7 @@ import {
 import { endsWithSignature, SIGNATURE_WARNING } from '../utils/signatureCheck';
 import { parseCampaignJson } from '../utils/campaignImport';
 import { isLocalUploadUrl } from '../utils/collage';
+import { contentError, recipientsError, contentFingerprint } from '../utils/campaignSend';
 
 interface CampaignEditorProps {
   campaign: Campaign | null;              // null = nowa kampania
@@ -48,8 +50,9 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
   // Treść
   const [name, setName] = useState(campaign?.name ?? '');
   const [pdfTitle, setPdfTitle] = useState(campaign?.pdfTitle ?? '');
-  const [noProducts, setNoProducts] = useState(campaign?.noProducts ?? false);
   const [productIds, setProductIds] = useState<string[]>(campaign?.productIds ?? []);
+  // Bez wybranych produktów mail idzie bez tabeli i PDF (sam tekst, ewentualnie z kolażem)
+  const noProducts = productIds.length === 0;
   const [subjectA, setSubjectA] = useState(campaign?.variantA.subject ?? 'Nowa oferta — Antyramy');
   const [contentA, setContentA] = useState(campaign?.variantA.content ?? '{zwrot|Dzień dobry},\n\n');
   const [abTest, setAbTest] = useState(!!campaign?.variantB);
@@ -75,6 +78,10 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
   const [jsonText, setJsonText] = useState('');
   const [jsonWarnings, setJsonWarnings] = useState<string[]>([]);
   const [sending, setSending] = useState<{ total: number } | null>(null);
+  // Wysyłka testowa: odcisk treści, dla której poszedł test (zmiana treści = test od nowa)
+  const [testing, setTesting] = useState(false);
+  const [testedFingerprint, setTestedFingerprint] = useState<string | null>(null);
+  const [testNote, setTestNote] = useState('');
 
   // Podgląd
   const [previewClientId, setPreviewClientId] = useState<string>('');
@@ -98,7 +105,7 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
     name: name.trim() || 'Kampania bez nazwy',
     pdfTitle,
     noProducts,
-    productIds: noProducts ? [] : productIds,
+    productIds,
     variantA: { subject: subjectA, content: contentA },
     variantB: abTest ? { subject: subjectB, content: separateB ? contentB : null } : null,
     recipients: [...selected].map(id => ({ clientId: id, variant: abTest ? (variants[id] ?? 'A') : 'A' })),
@@ -196,7 +203,7 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
     ? { subject: subjectB, content: separateB ? contentB : contentA }
     : { subject: subjectA, content: contentA };
   useEffect(() => {
-    if (step !== 3) return;
+    if (step !== 2 && step !== 4) return;
     const t = setTimeout(() => {
       previewCampaignDraft({
         clientId: previewClient || null, pdfTitle, noProducts, productIds, subject: pv.subject, content: pv.content, heroImageUrl,
@@ -227,7 +234,7 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
       if (r.subjectA !== null) setSubjectA(r.subjectA);
       if (r.content !== null) setContentA(r.content);
       if (r.subjectB) { setAbTest(true); setSubjectB(r.subjectB); }
-      if (r.productIds !== null) { setProductIds(r.productIds); setNoProducts(r.productIds.length === 0 ? noProducts : false); }
+      if (r.productIds !== null) setProductIds(r.productIds);
       if (r.filter) { setFilter(r.filter); setSelected(new Set(r.recipientIds)); }
       if (!name.trim() && r.pdfTitle) setName(r.pdfTitle);
       setJsonWarnings(r.warnings);
@@ -241,19 +248,32 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
   };
 
   // ─── Wysyłka ──
-  const validation = (): string | null => {
-    if (!noProducts && productIds.length === 0) return 'Wybierz produkty albo zaznacz „bez tabeli i PDF” (krok 1).';
-    if (!subjectA.trim()) return 'Uzupełnij temat maila (krok 3).';
-    if (!contentA.trim()) return 'Uzupełnij treść maila (krok 3).';
-    if (abTest && !subjectB.trim()) return 'Uzupełnij temat B albo wyłącz test A/B (krok 3).';
-    if (abTest && separateB && !contentB.trim()) return 'Uzupełnij treść B albo użyj wspólnej (krok 3).';
-    if (sendable.length === 0) return 'Wybierz odbiorców (krok 2).';
-    return null;
+  const currentDraft = draft();
+  const validation = contentError(currentDraft) ?? recipientsError(sendable.length);
+  // „Wyślij do wszystkich” dopiero po teście dokładnie tej wersji maila
+  const tested = testedFingerprint !== null && testedFingerprint === contentFingerprint(currentDraft);
+
+  const handleTest = async () => {
+    const v = contentError(currentDraft);
+    if (v) { setError(v); return; }
+    setTesting(true);
+    try {
+      const id = await save();
+      if (!id) return;
+      const res = await sendCampaignTest(id, previewClient || null);
+      setTestedFingerprint(contentFingerprint(currentDraft));
+      const time = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+      setTestNote(`${res.to}, ${time}${res.sent > 1 ? ` — ${res.sent} maile (A i B)` : ''}`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setTesting(false);
+    }
   };
 
   const handleSend = async () => {
-    const v = validation();
-    if (v) { setError(v); return; }
+    if (validation) { setError(validation); return; }
+    if (!tested) { setError(`Najpierw wyślij test na ${CAMPAIGN_TEST_EMAIL} i sprawdź go w skrzynce.`); return; }
     const abInfo = abTest ? ` (A: ${sendable.length - countB}, B: ${countB})` : '';
     if (!window.confirm(`Wysłać kampanię „${name.trim() || 'bez nazwy'}” do ${sendable.length} odbiorców${abInfo}?`)) return;
     const id = await save();
@@ -285,11 +305,47 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
   }
 
   const steps = [
-    { n: 1 as Step, label: 'Produkty', sub: noProducts ? 'bez produktów' : `${productIds.length} wybranych` },
-    { n: 2 as Step, label: 'Odbiorcy', sub: `${sendable.length} z e-mailem` },
-    { n: 3 as Step, label: 'Treść', sub: abTest ? 'test A/B' : '' },
-    { n: 4 as Step, label: 'Wysyłka', sub: '' },
+    { n: 1 as Step, label: 'Produkty i kolaż', sub: [noProducts ? '' : `produkty: ${productIds.length}`, heroImageUrl ? 'kolaż' : ''].filter(Boolean).join(' · ') || 'sam tekst' },
+    { n: 2 as Step, label: 'Treść', sub: abTest ? 'test A/B' : '' },
+    { n: 3 as Step, label: 'Odbiorcy', sub: `${sendable.length} z e-mailem` },
+    { n: 4 as Step, label: 'Wysyłka', sub: tested ? 'test wysłany' : '' },
   ];
+
+  // Podgląd maila — ten sam blok obok treści (krok 2) i przed wysyłką (krok 4)
+  const previewBlock = (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2 items-center">
+        <select
+          value={previewClient}
+          onChange={e => setPreviewClientId(e.target.value)}
+          className="flex-1 min-w-0 border border-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ink bg-canvas"
+        >
+          {sendable.length === 0 && <option value="">(bez odbiorcy — teksty zastępcze)</option>}
+          {sendable.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
+        </select>
+        {abTest && (
+          <div className="flex rounded-lg border border-hairline overflow-hidden text-sm">
+            {(['A', 'B'] as const).map(v => (
+              <button key={v} type="button" onClick={() => setPreviewVariant(v)}
+                className={`px-3 py-2 ${previewVariant === v ? 'bg-primary text-on-primary' : 'text-ink hover:bg-surface-soft'}`}>{v}</button>
+            ))}
+          </div>
+        )}
+        {!noProducts && (
+          <button type="button" onClick={handlePdf} disabled={pdfLoading} className="btn-secondary text-sm disabled:opacity-40">
+            {pdfLoading ? 'Generuję…' : 'Podgląd PDF'}
+          </button>
+        )}
+      </div>
+      {previewError && <Alert tone="error">{previewError}</Alert>}
+      {preview && (
+        <>
+          <p className="text-sm text-ink"><span className="font-light">Temat:</span> <strong>{preview.subject || '—'}</strong></p>
+          <iframe title="Podgląd maila" srcDoc={preview.html} sandbox="" className="w-full h-[36rem] rounded-lg border border-hairline bg-white" />
+        </>
+      )}
+    </div>
+  );
 
   return (
     <div className="max-w-6xl mx-auto">
@@ -365,58 +421,153 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
         ))}
       </div>
 
-      {/* ===== KROK 1 — PRODUKTY ===== */}
+      {/* ===== KROK 1 — PRODUKTY I KOLAŻ ===== */}
       {step === 1 && (
         <div className="space-y-6">
-          <label className="flex items-center gap-3 cursor-pointer w-fit">
-            <input type="checkbox" checked={noProducts} onChange={e => touch(setNoProducts)(e.target.checked)} className="rounded border-hairline" />
-            <span className="text-sm text-ink font-semibold">Bez tabeli i PDF</span>
-            <span className="text-xs text-ink font-light">(sam tekst maila)</span>
-          </label>
-
           <div>
             <label className={labelCls}>Tytuł oferty (nagłówek maila i PDF)</label>
             <input type="text" value={pdfTitle} onChange={e => touch(setPdfTitle)(e.target.value)} placeholder="np. Nowa listwa dębowa" className={inputCls} />
           </div>
 
-          {!noProducts && (products.length === 0 ? (
-            <p className="text-center py-12 text-ink font-light">Brak produktów w katalogu — dodaj je w zakładce Produkty.</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {products.map(p => {
-                const sel = productIds.includes(p.id);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => touch(setProductIds)(sel ? productIds.filter(x => x !== p.id) : [...productIds, p.id])}
-                    className={`text-left rounded-xl border-2 overflow-hidden transition-all ${sel ? 'border-ink' : 'border-hairline'}`}
-                  >
-                    <div className="aspect-square bg-surface-soft overflow-hidden relative">
-                      {p.imageUrl
-                        ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center text-ink font-light opacity-50 text-xs">brak zdjęcia</div>}
-                      {sel && <div className="absolute top-2 right-2 w-6 h-6 bg-primary text-on-primary rounded-full flex items-center justify-center text-xs">✓</div>}
-                    </div>
-                    <div className="p-3">
-                      <p className="font-semibold text-ink text-sm leading-tight line-clamp-2">{p.name}</p>
-                      {p.code && <p className="text-xs text-ink font-light mt-0.5">{p.code}</p>}
-                      {p.priceNetto > 0 && <p className="text-sm font-bold text-ink mt-1">{p.priceNetto.toFixed(2)} zł</p>}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          <div>
+            <label className={labelCls}>Kolaż nad treścią</label>
+            {heroImageUrl ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <img src={heroImageUrl} alt="Kolaż" className="w-40 aspect-[3/2] object-cover rounded-lg border border-hairline shadow-soft" />
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowCollage(true)} disabled={saving} className="btn-secondary text-sm">Zmień</button>
+                  <button type="button" onClick={removeCollage} disabled={saving} className="btn-danger text-sm">Usuń</button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3">
+                <button type="button" onClick={() => setShowCollage(true)} className="btn-secondary text-sm">🖼 Utwórz kolaż</button>
+                <span className="text-xs text-ink font-light">3 zdjęcia ramki → jeden obraz w mailu (opcjonalnie)</span>
+              </div>
+            )}
+            {heroImageUrl && isLocalUploadUrl(heroImageUrl) && (
+              <div className="mt-2">
+                <Alert tone="warn">Kolaż wgrany z lokalnego serwera ({new URL(heroImageUrl).host}) — nie wyświetli się w mailu u odbiorcy. Utwórz go ponownie na crm.antyramy.eu.</Alert>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className={labelCls}>Produkty z katalogu</label>
+            <p className="text-xs text-ink font-light mb-3">
+              Opcjonalnie — zaznaczone trafiają do tabeli w mailu i do PDF w załączniku. Bez produktów mail idzie bez tabeli i PDF.
+            </p>
+            {products.length === 0 ? (
+              <p className="py-6 text-sm text-ink font-light">Brak produktów w katalogu — dodaj je w zakładce Produkty.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {products.map(p => {
+                  const sel = productIds.includes(p.id);
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => touch(setProductIds)(sel ? productIds.filter(x => x !== p.id) : [...productIds, p.id])}
+                      className={`text-left rounded-xl border-2 overflow-hidden transition-all ${sel ? 'border-ink' : 'border-hairline'}`}
+                    >
+                      <div className="aspect-square bg-surface-soft overflow-hidden relative">
+                        {p.imageUrl
+                          ? <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                          : <div className="w-full h-full flex items-center justify-center text-ink font-light opacity-50 text-xs">brak zdjęcia</div>}
+                        {sel && <div className="absolute top-2 right-2 w-6 h-6 bg-primary text-on-primary rounded-full flex items-center justify-center text-xs">✓</div>}
+                      </div>
+                      <div className="p-3">
+                        <p className="font-semibold text-ink text-sm leading-tight line-clamp-2">{p.name}</p>
+                        {p.code && <p className="text-xs text-ink font-light mt-0.5">{p.code}</p>}
+                        {p.priceNetto > 0 && <p className="text-sm font-bold text-ink mt-1">{p.priceNetto.toFixed(2)} zł</p>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <div className="flex justify-end">
-            <button type="button" onClick={() => setStep(2)} className="btn-primary">Dalej: odbiorcy</button>
+            <button type="button" onClick={() => setStep(2)} className="btn-primary">Dalej: treść</button>
           </div>
         </div>
       )}
 
-      {/* ===== KROK 2 — ODBIORCY ===== */}
+      {/* ===== KROK 2 — TREŚĆ ===== */}
       {step === 2 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="space-y-5">
+            <div>
+              <label className={labelCls}>Temat maila {abTest && '(A)'}</label>
+              <input type="text" value={subjectA} onChange={e => touch(setSubjectA)(e.target.value)} className={inputCls} />
+            </div>
+
+            <label className="flex items-center gap-3 cursor-pointer w-fit">
+              <input type="checkbox" checked={abTest} onChange={e => touch(setAbTest)(e.target.checked)} className="rounded border-hairline" />
+              <span className="text-sm text-ink font-semibold">Test A/B (drugi temat)</span>
+            </label>
+
+            {abTest && (
+              <div className="space-y-3 pl-4 border-l-2 border-hairline">
+                <div>
+                  <label className={labelCls}>Temat maila (B)</label>
+                  <input type="text" value={subjectB} onChange={e => touch(setSubjectB)(e.target.value)} className={inputCls} />
+                </div>
+                <label className="flex items-center gap-3 cursor-pointer w-fit">
+                  <input type="checkbox" checked={separateB} onChange={e => touch(setSeparateB)(e.target.checked)} className="rounded border-hairline" />
+                  <span className="text-sm text-ink">Osobna treść dla B</span>
+                </label>
+                {countB === 0 && sendable.length > 1 && (
+                  <Alert tone="warn">
+                    Odbiorcy nie są podzieleni — wszyscy dostaną wariant A.{' '}
+                    <button type="button" onClick={splitAB} className="font-semibold underline">Podziel losowo</button>
+                  </Alert>
+                )}
+              </div>
+            )}
+
+            <div>
+              <label className={labelCls}>Treść maila {abTest && separateB && '(A)'}</label>
+              <textarea
+                ref={contentRef}
+                rows={11}
+                value={contentA}
+                onChange={e => touch(setContentA)(e.target.value)}
+                className={`${inputCls} resize-y font-sans`}
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {PLACEHOLDERS.map(p => (
+                  <button key={p.token} type="button" onClick={() => insertPlaceholder(p.token)} title={p.hint}
+                    className="text-xs px-2 py-0.5 rounded-md border border-hairline font-mono text-ink hover:bg-surface-soft">
+                    {p.token}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-ink font-light mt-1">Kliknij, żeby wstawić w miejscu kursora. Działają też w temacie. Podpis i tekst wypisu dodają się automatycznie.</p>
+            </div>
+
+            {abTest && separateB && (
+              <div>
+                <label className={labelCls}>Treść maila (B)</label>
+                <textarea rows={8} value={contentB} onChange={e => touch(setContentB)(e.target.value)} className={`${inputCls} resize-y font-sans`} />
+              </div>
+            )}
+
+            {signatureWarn && <Alert tone="warn">{SIGNATURE_WARNING}</Alert>}
+
+            <div className="flex justify-between">
+              <button type="button" onClick={() => setStep(1)} className="btn-secondary">Wstecz</button>
+              <button type="button" onClick={() => setStep(3)} className="btn-primary">Dalej: odbiorcy</button>
+            </div>
+          </div>
+
+          {previewBlock}
+        </div>
+      )}
+
+      {/* ===== KROK 3 — ODBIORCY ===== */}
+      {step === 3 && (
         <div>
           <RecipientFilters filter={filter} onChange={setFilter} clients={clients} colorLabels={colorLabels} />
 
@@ -483,178 +634,84 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
           </div>
 
           <div className="flex justify-between">
-            <button type="button" onClick={() => setStep(1)} className="btn-secondary">Wstecz</button>
-            <button type="button" onClick={() => setStep(3)} className="btn-primary">Dalej: treść</button>
+            <button type="button" onClick={() => setStep(2)} className="btn-secondary">Wstecz</button>
+            <button type="button" onClick={() => setStep(4)} className="btn-primary">Dalej: wysyłka</button>
           </div>
         </div>
       )}
 
-      {/* ===== KROK 3 — TREŚĆ ===== */}
-      {step === 3 && (
+      {/* ===== KROK 4 — WYSYŁKA ===== */}
+      {step === 4 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-5">
-            <div>
-              <label className={labelCls}>Temat maila {abTest && '(A)'}</label>
-              <input type="text" value={subjectA} onChange={e => touch(setSubjectA)(e.target.value)} className={inputCls} />
-            </div>
-
-            <label className="flex items-center gap-3 cursor-pointer w-fit">
-              <input type="checkbox" checked={abTest} onChange={e => touch(setAbTest)(e.target.checked)} className="rounded border-hairline" />
-              <span className="text-sm text-ink font-semibold">Test A/B (drugi temat)</span>
-            </label>
-
-            {abTest && (
-              <div className="space-y-3 pl-4 border-l-2 border-hairline">
-                <div>
-                  <label className={labelCls}>Temat maila (B)</label>
-                  <input type="text" value={subjectB} onChange={e => touch(setSubjectB)(e.target.value)} className={inputCls} />
-                </div>
-                <label className="flex items-center gap-3 cursor-pointer w-fit">
-                  <input type="checkbox" checked={separateB} onChange={e => touch(setSeparateB)(e.target.checked)} className="rounded border-hairline" />
-                  <span className="text-sm text-ink">Osobna treść dla B</span>
-                </label>
-                {countB === 0 && sendable.length > 1 && (
-                  <Alert tone="warn">
-                    Odbiorcy nie są podzieleni — wszyscy dostaną wariant A.{' '}
-                    <button type="button" onClick={splitAB} className="font-semibold underline">Podziel losowo</button>
-                  </Alert>
-                )}
-              </div>
-            )}
-
-            <div>
-              <label className={labelCls}>Kolaż nad treścią</label>
-              {heroImageUrl ? (
-                <div className="flex flex-wrap items-center gap-3">
-                  <img src={heroImageUrl} alt="Kolaż" className="w-40 aspect-[3/2] object-cover rounded-lg border border-hairline shadow-soft" />
-                  <div className="flex gap-2">
-                    <button type="button" onClick={() => setShowCollage(true)} disabled={saving} className="btn-secondary text-sm">Zmień</button>
-                    <button type="button" onClick={removeCollage} disabled={saving} className="btn-danger text-sm">Usuń</button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-wrap items-center gap-3">
-                  <button type="button" onClick={() => setShowCollage(true)} className="btn-secondary text-sm">🖼 Utwórz kolaż</button>
-                  <span className="text-xs text-ink font-light">3 zdjęcia ramki → jeden obraz w mailu (opcjonalnie)</span>
-                </div>
-              )}
-              {heroImageUrl && isLocalUploadUrl(heroImageUrl) && (
-                <div className="mt-2">
-                  <Alert tone="warn">Kolaż wgrany z lokalnego serwera ({new URL(heroImageUrl).host}) — nie wyświetli się w mailu u odbiorcy. Utwórz go ponownie na crm.antyramy.eu.</Alert>
-                </div>
+            <div className="bg-surface-soft rounded-xl border border-hairline p-5 space-y-2 text-sm text-ink">
+              <p><span className="font-light">Kampania:</span> <strong>{name || '—'}</strong></p>
+              <p><span className="font-light">Temat:</span> <strong>{subjectA || '—'}</strong>{abTest && <> · <span className="font-light">B:</span> <strong>{subjectB || '—'}</strong></>}</p>
+              <p><span className="font-light">Produkty:</span> {noProducts ? 'brak — mail bez tabeli i PDF' : `${productIds.length} (tabela w mailu + PDF)`}</p>
+              <p><span className="font-light">Kolaż:</span> {heroImageUrl ? 'tak' : 'nie'}</p>
+              <p><span className="font-light">Odbiorcy:</span> <strong>{sendable.length}</strong>{abTest && ` (A: ${sendable.length - countB}, B: ${countB})`}</p>
+              {selectedClients.length !== sendable.length && (
+                <p className="text-amber-700 dark:text-amber-400">{selectedClients.length - sendable.length} zaznaczonych bez e-maila lub wypisanych — zostaną pominięci.</p>
               )}
             </div>
 
-            <div>
-              <label className={labelCls}>Treść maila {abTest && separateB && '(A)'}</label>
-              <textarea
-                ref={contentRef}
-                rows={11}
-                value={contentA}
-                onChange={e => touch(setContentA)(e.target.value)}
-                className={`${inputCls} resize-y font-sans`}
-              />
-              <div className="flex flex-wrap gap-1.5 mt-2">
-                {PLACEHOLDERS.map(p => (
-                  <button key={p.token} type="button" onClick={() => insertPlaceholder(p.token)} title={p.hint}
-                    className="text-xs px-2 py-0.5 rounded-md border border-hairline font-mono text-ink hover:bg-surface-soft">
-                    {p.token}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-ink font-light mt-1">Kliknij, żeby wstawić w miejscu kursora. Działają też w temacie. Podpis i tekst wypisu dodają się automatycznie.</p>
-            </div>
-
-            {abTest && separateB && (
-              <div>
-                <label className={labelCls}>Treść maila (B)</label>
-                <textarea rows={8} value={contentB} onChange={e => touch(setContentB)(e.target.value)} className={`${inputCls} resize-y font-sans`} />
-              </div>
+            {recent.length > 0 && (
+              <Alert tone="warn">
+                <p><strong>{recent.length}</strong> {recent.length === 1 ? 'odbiorca dostał' : 'odbiorców dostało'} kampanię w ostatnich 7 dniach: {recent.slice(0, 8).map(c => c.companyName).join(', ')}{recent.length > 8 ? '…' : ''}</p>
+                <button type="button" onClick={unselectRecent} className="mt-2 font-semibold underline">Odznacz ich</button>
+              </Alert>
             )}
 
+            {noProducts && !heroImageUrl && <Alert tone="warn">Mail bez produktów i bez kolażu — pójdzie sam tekst.</Alert>}
+            {abTest && countB === 0 && sendable.length > 1 && (
+              <Alert tone="warn">
+                Odbiorcy nie są podzieleni — wszyscy dostaną wariant A.{' '}
+                <button type="button" onClick={splitAB} className="font-semibold underline">Podziel losowo</button>
+              </Alert>
+            )}
             {signatureWarn && <Alert tone="warn">{SIGNATURE_WARNING}</Alert>}
+            {validation && <Alert tone="warn">{validation}</Alert>}
 
-            <div className="flex justify-between">
-              <button type="button" onClick={() => setStep(2)} className="btn-secondary">Wstecz</button>
-              <button type="button" onClick={() => setStep(4)} className="btn-primary">Dalej: wysyłka</button>
-            </div>
-          </div>
-
-          {/* Podgląd */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap gap-2 items-center">
-              <select
-                value={previewClient}
-                onChange={e => setPreviewClientId(e.target.value)}
-                className="flex-1 min-w-0 border border-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ink bg-canvas"
-              >
-                {sendable.length === 0 && <option value="">(bez odbiorcy — teksty zastępcze)</option>}
-                {sendable.map(c => <option key={c.id} value={c.id}>{c.companyName}</option>)}
-              </select>
-              {abTest && (
-                <div className="flex rounded-lg border border-hairline overflow-hidden text-sm">
-                  {(['A', 'B'] as const).map(v => (
-                    <button key={v} type="button" onClick={() => setPreviewVariant(v)}
-                      className={`px-3 py-2 ${previewVariant === v ? 'bg-primary text-on-primary' : 'text-ink hover:bg-surface-soft'}`}>{v}</button>
-                  ))}
-                </div>
-              )}
-              {!noProducts && (
-                <button type="button" onClick={handlePdf} disabled={pdfLoading || productIds.length === 0} className="btn-secondary text-sm disabled:opacity-40">
-                  {pdfLoading ? 'Generuję…' : 'Podgląd PDF'}
+            {/* Najpierw test, potem wszyscy */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleTest}
+                  disabled={saving || testing || !!contentError(currentDraft)}
+                  className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {testing ? 'Wysyłam test…' : `✉ 1. Wyślij test na ${CAMPAIGN_TEST_EMAIL}`}
                 </button>
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={saving || testing || !!validation || !tested}
+                  className="px-6 py-2.5 bg-primary text-on-primary text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
+                >
+                  2. Wyślij do {sendable.length} odbiorców
+                </button>
+              </div>
+              {tested ? (
+                <Alert tone="info">✓ Test tej wersji wysłany ({testNote}). Sprawdź go w skrzynce, potem wyślij do wszystkich.</Alert>
+              ) : testedFingerprint !== null ? (
+                <Alert tone="warn">Mail zmieniony po teście — wyślij test ponownie.</Alert>
+              ) : (
+                <p className="text-xs text-ink font-light">Wysyłka do wszystkich odblokuje się po wysłaniu testu. Test wygląda jak mail dla odbiorcy wybranego w podglądzie, z dopiskiem [TEST] w temacie.</p>
               )}
             </div>
-            {previewError && <Alert tone="error">{previewError}</Alert>}
-            {preview && (
-              <>
-                <p className="text-sm text-ink"><span className="font-light">Temat:</span> <strong>{preview.subject || '—'}</strong></p>
-                <iframe title="Podgląd maila" srcDoc={preview.html} sandbox="" className="w-full h-[36rem] rounded-lg border border-hairline bg-white" />
-              </>
-            )}
+
+            <div className="flex justify-between items-center gap-3">
+              <button type="button" onClick={() => setStep(3)} className="btn-secondary">Wstecz</button>
+              <p className="text-xs text-ink font-light text-right">Maile wychodzą partiami po 10 z Gmaila biuro@antyramy.eu.</p>
+            </div>
           </div>
+
+          {previewBlock}
         </div>
       )}
 
       {showCollage && <CollageDialog onClose={() => setShowCollage(false)} onSave={handleCollageSaved} />}
-
-      {/* ===== KROK 4 — WYSYŁKA ===== */}
-      {step === 4 && (
-        <div className="max-w-3xl space-y-5">
-          <div className="bg-surface-soft rounded-xl border border-hairline p-5 space-y-2 text-sm text-ink">
-            <p><span className="font-light">Kampania:</span> <strong>{name || '—'}</strong></p>
-            <p><span className="font-light">Temat:</span> <strong>{subjectA || '—'}</strong>{abTest && <> · <span className="font-light">B:</span> <strong>{subjectB || '—'}</strong></>}</p>
-            <p><span className="font-light">Produkty:</span> {noProducts ? 'bez tabeli i PDF' : `${productIds.length} (tabela w mailu + PDF)`}</p>
-            <p><span className="font-light">Odbiorcy:</span> <strong>{sendable.length}</strong>{abTest && ` (A: ${sendable.length - countB}, B: ${countB})`}</p>
-            {selectedClients.length !== sendable.length && (
-              <p className="text-amber-700 dark:text-amber-400">{selectedClients.length - sendable.length} zaznaczonych bez e-maila lub wypisanych — zostaną pominięci.</p>
-            )}
-          </div>
-
-          {recent.length > 0 && (
-            <Alert tone="warn">
-              <p><strong>{recent.length}</strong> {recent.length === 1 ? 'odbiorca dostał' : 'odbiorców dostało'} kampanię w ostatnich 7 dniach: {recent.slice(0, 8).map(c => c.companyName).join(', ')}{recent.length > 8 ? '…' : ''}</p>
-              <button type="button" onClick={unselectRecent} className="mt-2 font-semibold underline">Odznacz ich</button>
-            </Alert>
-          )}
-
-          {signatureWarn && <Alert tone="warn">{SIGNATURE_WARNING}</Alert>}
-          {validation() && <Alert tone="warn">{validation()}</Alert>}
-
-          <div className="flex justify-between">
-            <button type="button" onClick={() => setStep(3)} className="btn-secondary">Wstecz</button>
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={saving || !!validation()}
-              className="px-6 py-2.5 bg-primary text-on-primary text-sm font-semibold rounded-lg disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-colors"
-            >
-              Wyślij do {sendable.length} odbiorców
-            </button>
-          </div>
-          <p className="text-xs text-ink font-light">Przed wysyłką sprawdź podgląd w kroku 3. Maile wychodzą partiami po 10 z Gmaila biuro@antyramy.eu.</p>
-        </div>
-      )}
 
     </div>
   );

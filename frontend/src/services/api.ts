@@ -828,6 +828,13 @@ export const startCampaign = (id: string) =>
     `${CAMPAIGNS_URL}/${id}/start`, 'POST', undefined, 'Nie udało się rozpocząć wysyłki',
   );
 
+// Adres wysyłki testowej ustala backend (routes/campaigns.ts) — tu tylko do napisu na przycisku
+export const CAMPAIGN_TEST_EMAIL = 'info@pluszek.pl';
+
+// Mail testowy ze szkicu; clientId = odbiorca z podglądu (placeholdery), null = teksty zastępcze
+export const sendCampaignTest = (id: string, clientId: string | null) =>
+  jsonRequest<{ to: string; sent: number }>(`${CAMPAIGNS_URL}/${id}/send-test`, 'POST', { clientId }, 'Nie udało się wysłać maila testowego');
+
 export const sendCampaignBatch = (id: string) =>
   jsonRequest<CampaignBatchResult>(`${CAMPAIGNS_URL}/${id}/send-batch`, 'POST', undefined, 'Błąd wysyłki partii');
 
