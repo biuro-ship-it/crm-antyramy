@@ -200,3 +200,10 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **„Test aktualnej wersji” = odcisk treści** (`contentFingerprint` w `frontend/src/utils/campaignSend.ts`): tytuł, produkty, temat i treść A/B, kolaż. Nazwa kampanii i lista odbiorców nie wchodzą do odcisku — ich zmiana nie wymaga nowego testu.
 - **Blokada tylko w edytorze, w pamięci karty** — po odświeżeniu strony albo ponownym otwarciu szkicu test trzeba wysłać jeszcze raz. Świadome uproszczenie: backend nie pamięta testu i `start` go nie wymaga (jedyna droga do `start` to przycisk w edytorze).
 - Reguły „co musi być uzupełnione” wydzielone do czystych funkcji (`contentError`, `recipientsError`) z testami.
+
+## 2026-10-08 — commit 3: błąd wygasłego tokenu Gmail (lokalnie, niewdrożone)
+
+- **Powód:** pierwszy test na produkcji nie doszedł — Google odrzucił wysyłkę (`invalid_grant`, token z 2026-09-29 wygasł albo został cofnięty). Edytor pokazał samo „invalid_grant” u góry strony, poza ekranem przy przyciskach w kroku 4, więc wyglądało to jak „mail nie doszedł”.
+- **`sendEmail` zamienia `invalid_grant` na instrukcję** (`GMAIL_TOKEN_ERROR` w `services/gmail.ts`): token wygasł → wygeneruj nowy i przenieś na serwer. Rozpoznanie w `isInvalidGrant` (odpowiedź Google albo treść komunikatu), z testem. Pozostałe błędy Gmaila przechodzą bez zmian.
+- **Błędy testu i wysyłki pokazywane przy przyciskach** (osobny stan `sendError` w `CampaignEditor.tsx`), z dopiskiem „Test NIE został wysłany”. Błędy zapisu szkicu zostają u góry strony jak dotąd.
+- **Token Gmail odnowiony ręcznie** (skrypt `get-gmail-token.js`, linia `GMAIL_REFRESH_TOKEN` w `.env` na serwerze, restart). Przyczyna wygaśnięcia niepotwierdzona — podejrzenie: aplikacja OAuth w trybie „Testing” (tokeny na 7 dni). Do sprawdzenia w Google Cloud Console; bez zmiany w kodzie.

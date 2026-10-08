@@ -1,7 +1,7 @@
 # HANDOVER — moduł Kampanie (CRM_ANTYRAMY)
 
 **Ostatnia aktualizacja:** 2026-10-08
-**Wersja produkcyjna:** commit `81b8677` — https://crm.antyramy.eu (deploy 2026-10-08, `/health` = 200)
+**Wersja produkcyjna:** commit `81b8677` — https://crm.antyramy.eu (deploy 2026-10-08, `/health` = 200). Lokalnie czekają niewypchnięte commity: poprawka komunikatu błędu (`b0d5dc9`) + dokumentacja.
 
 Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
@@ -16,7 +16,7 @@ Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude:
 ### 🔧 W trakcie
 - **Token Gmail odnowiony 2026-10-08 ok. 21:20** (wygenerowany przez Krzyśka, przeniesiony na serwer, restart, Google przyjmuje go lokalnie i na serwerze). Prawdziwej wysyłki po odnowieniu jeszcze nie było — pierwszy test z CRM to potwierdzi.
 - **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
-- Lokalny, niewdrożony commit: czytelny komunikat o wygasłym tokenie i błąd testu pokazywany przy przyciskach w kroku 4 (wcześniej tylko u góry strony, jako samo „invalid_grant”).
+- Lokalny, niewdrożony commit `b0d5dc9`: czytelny komunikat o wygasłym tokenie Gmail i błąd testu / wysyłki pokazywany przy przyciskach w kroku 4 (na produkcji nadal tylko u góry strony, jako samo „invalid_grant”). Testy i build przechodzą (backend 62, frontend 66).
 
 ### 🐛 Znane problemy / ograniczenia
 - **Token Gmail może znów wygasnąć.** Token z 2026-09-29 przestał działać po 9 dniach (Google: „Token has been expired or revoked”; w `logs/error.log` na serwerze `GaxiosError: invalid_grant`) — nie działał wtedy ani test, ani wysyłka kampanii, ani Kalendarz Google (ten sam token). Prawdopodobna przyczyna (niepotwierdzona): aplikacja OAuth w Google Cloud ma status „Testing”, w którym tokeny wygasają po 7 dniach — do sprawdzenia w Google Cloud Console → „OAuth consent screen”; trwałe rozwiązanie to typ „Internal” (konto Workspace) albo „Publish app”. Jeśli nic się nie zmieni, kolejne wygaśnięcie ok. 2026-10-15. Naprawa: sekcja „Uprawnienie Gmail” niżej.
@@ -28,7 +28,7 @@ Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude:
 0. **Sprawdzić w Google Cloud Console status aplikacji OAuth** („Testing” → „Internal” albo „Publish app”), żeby token Gmail nie wygasał co 7 dni. Gdy poczta znów stanie: `node backend/scripts/get-gmail-token.js` → linia `GMAIL_REFRESH_TOKEN` do `public_nodejs/.env` na serwerze → `devil www restart crm.antyramy.eu`.
 1. Testy ręczne wysyłki testowej na produkcji (sekcja „Kolaż w kroku 1…”, punkty 1–7) — najpierw punkt 1–2: sam kolaż → test → mail `[TEST]` w info@pluszek.pl.
 2. Testy ręczne kolażu z telefonu i w Gmailu/Outlooku (sekcja „Kolaż z 3 zdjęć”, punkty 1–8).
-3. Wypchnąć lokalne commity dokumentacji (same pliki `.md`; push = deploy, bez wpływu na działanie).
+3. Wypchnąć lokalne commity (`! git push origin main` — push = deploy): poprawka komunikatu błędu `b0d5dc9` + dokumentacja. Po deployu sprawdzić `/health`.
 4. Opcjonalnie: adres testowy jako ustawienie w Administracji; kolaż ze zdjęć produktów z katalogu (odłożone 2026-10-08).
 
 ## Ważne do zapamiętania
@@ -38,7 +38,7 @@ Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude:
 - Kolaże i uploady testować tylko na produkcji (plik wgrany lokalnie nie wyświetli się w mailu).
 
 ## Historia sesji
-- **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`).
+- **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`). Wieczorem: test nie doszedł, bo wygasł token Gmail (`invalid_grant`) — token odnowiony i przeniesiony na serwer; lokalnie czytelniejszy komunikat błędu (`b0d5dc9`, niewdrożone).
 - **2026-10-07** — Kolaż z 3 zdjęć „Oferta tygodnia” (Canvas w przeglądarce, `heroImageUrl`, bezpieczne kasowanie plików). Wdrożone tego samego dnia (`2fbe062`).
 - **2026-09-29** — Etap 2: sprawdzanie odpowiedzi z Gmaila, przypisanie zamówień, follow-upy telefoniczne, raport, ranking, automat dzienny (cron 6:45).
 - **2026-09-28** — Etap 1: backend i ekran Kampanii, podpis w Administracji, migracja Promocji → Kampanie, usunięcie modułu Promocje.
