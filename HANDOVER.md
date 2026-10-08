@@ -1,6 +1,48 @@
 # HANDOVER — moduł Kampanie (CRM_ANTYRAMY)
 
-Stan na 2026-10-08. Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
+**Ostatnia aktualizacja:** 2026-10-08
+**Wersja produkcyjna:** commit `81b8677` — https://crm.antyramy.eu (deploy 2026-10-08, `/health` = 200)
+
+Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
+
+## Stan obecny
+
+### ✅ Działa (wdrożone)
+- Kampanie: edytor w 4 krokach (**Produkty i kolaż → Treść → Odbiorcy → Wysyłka**), szkice, duplikat, import JSON, test A/B, wysyłka partiami po 10, wznowienie.
+- **Kampania z samym kolażem albo samym tekstem** — produkty są opcjonalne (bez produktów mail idzie bez tabeli i PDF). To była naprawa z 2026-10-08.
+- **Obowiązkowa wysyłka testowa** na info@pluszek.pl przed wysyłką do wszystkich (`POST /api/campaigns/:id/send-test`).
+- Kolaż „Oferta tygodnia” z 3 zdjęć (krok 1), pomiar wyników (odpowiedzi, zamówienia, follow-upy, ranking), automat dzienny 6:45.
+
+### 🔧 W trakcie
+- Nic w kodzie. **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie został wysłany.
+
+### 🐛 Znane problemy / ograniczenia
+- Po odświeżeniu strony edytora test trzeba wysłać ponownie (blokada żyje w pamięci karty).
+- Adres testowy jest stałą w kodzie w dwóch miejscach: `backend/src/routes/campaigns.ts` (`CAMPAIGN_TEST_EMAIL`) i `frontend/src/services/api.ts` (napis na przycisku).
+- Outlook blokuje kolaż do kliknięcia „Pokaż obrazy” (inline CID — osobne zadanie). Pliki-sieroty kolażu nie są sprzątane.
+
+## Następne kroki (kolejność = priorytet)
+1. Testy ręczne wysyłki testowej na produkcji (sekcja „Kolaż w kroku 1…”, punkty 1–7) — najpierw punkt 1–2: sam kolaż → test → mail `[TEST]` w info@pluszek.pl.
+2. Testy ręczne kolażu z telefonu i w Gmailu/Outlooku (sekcja „Kolaż z 3 zdjęć”, punkty 1–8).
+3. Wypchnąć lokalne commity dokumentacji (same pliki `.md`; push = deploy, bez wpływu na działanie).
+4. Opcjonalnie: adres testowy jako ustawienie w Administracji; kolaż ze zdjęć produktów z katalogu (odłożone 2026-10-08).
+
+## Ważne do zapamiętania
+- **Push robi Krzysiek** (`! git push origin main`) — hook blokuje `git push` u Claude. Push na `main` = deploy przez GitHub Actions (ok. 2 min). Status bez logowania: `https://api.github.com/repos/biuro-ship-it/crm-antyramy/actions/runs?per_page=3`; potem `/health` i nowa nazwa `assets/index-*.js`.
+- Lokalna aplikacja wymaga logowania Google — Claude sprawdza ekrany na tymczasowej stronie testowej (komponent + podstawiony `fetch`), którą po sprawdzeniu usuwa.
+- Wysyłka testowa niczego nie zapisuje (ani w kampanii, ani w historii klienta) — tak ma zostać, inaczej zaburzy pomiar i ostrzeżenie „kampania w ostatnich 7 dniach”.
+- Kolaże i uploady testować tylko na produkcji (plik wgrany lokalnie nie wyświetli się w mailu).
+
+## Historia sesji
+- **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`).
+- **2026-10-07** — Kolaż z 3 zdjęć „Oferta tygodnia” (Canvas w przeglądarce, `heroImageUrl`, bezpieczne kasowanie plików). Wdrożone tego samego dnia (`2fbe062`).
+- **2026-09-29** — Etap 2: sprawdzanie odpowiedzi z Gmaila, przypisanie zamówień, follow-upy telefoniczne, raport, ranking, automat dzienny (cron 6:45).
+- **2026-09-28** — Etap 1: backend i ekran Kampanii, podpis w Administracji, migracja Promocji → Kampanie, usunięcie modułu Promocje.
+- **2026-09-27** — Założenia modułu Kampanie, pola klienta (zwrot, tagi, wypis), naprawa czyszczenia plików klienta przy „Edytuj dane”.
+
+---
+
+# Szczegóły
 
 ## Kolaż w kroku 1 + obowiązkowa wysyłka testowa — zrobione i wdrożone 2026-10-08 (commit `81b8677`; testy ręczne na produkcji jeszcze nie zrobione)
 
@@ -34,7 +76,7 @@ Edytor ma teraz kroki **1 Produkty i kolaż → 2 Treść → 3 Odbiorcy → 4 W
 - Po odświeżeniu strony test trzeba wysłać ponownie (blokada żyje w pamięci edytora — decyzja 2026-10-08).
 - Adres testowy jest stałą w kodzie (backend + napis we frontendzie), nie ustawieniem w Administracji.
 
-## Kolaż z 3 zdjęć — zrobione 2026-10-07, wdrożone 2026-10-08 razem z powyższym (testy ręczne na produkcji jeszcze nie zrobione)
+## Kolaż z 3 zdjęć — zrobione i wdrożone 2026-10-07 (commit `2fbe062`; testy ręczne na produkcji jeszcze nie zrobione)
 
 Przycisk „🖼 Utwórz kolaż” w kroku 1 edytora kampanii (do 2026-10-08: w kroku 3) → 3 zdjęcia → JPG 1200×800 (≤ ~250 KB) z plakietką „OFERTA TYGODNIA” → `<img>` 600 px w mailu między tytułem a treścią. Kolaż rysowany w przeglądarce (Canvas), bez nowych bibliotek; nie trafia do PDF.
 
