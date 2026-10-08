@@ -14,14 +14,18 @@ Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude:
 - Kolaż „Oferta tygodnia” z 3 zdjęć (krok 1), pomiar wyników (odpowiedzi, zamówienia, follow-upy, ranking), automat dzienny 6:45.
 
 ### 🔧 W trakcie
-- Nic w kodzie. **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie został wysłany.
+- **Poczta nie wychodzi — token Gmail wygasł** (stwierdzone 2026-10-08 wieczorem, patrz „Znane problemy”). Do czasu nowego tokenu nie działa ani test, ani wysyłka kampanii.
+- **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
+- Lokalny, niewdrożony commit: czytelny komunikat o wygasłym tokenie i błąd testu pokazywany przy przyciskach w kroku 4 (wcześniej tylko u góry strony, jako samo „invalid_grant”).
 
 ### 🐛 Znane problemy / ograniczenia
+- **Token Gmail (`GMAIL_REFRESH_TOKEN`) z 2026-09-29 jest nieważny** — Google: „Token has been expired or revoked”; w `logs/error.log` na serwerze `POST /:id/send-test błąd: GaxiosError: invalid_grant`. Ten sam token jest w `backend/.env` i na serwerze. Naprawa: sekcja „Uprawnienie Gmail” niżej (nowy token → linia `GMAIL_REFRESH_TOKEN` na serwer → restart). Prawdopodobna przyczyna (niepotwierdzona): aplikacja OAuth w Google Cloud ma status „Testing”, w którym tokeny wygasają po 7 dniach — do sprawdzenia w Google Cloud Console → „OAuth consent screen”; trwałe rozwiązanie to typ „Internal” (konto Workspace) albo „Publish app”.
 - Po odświeżeniu strony edytora test trzeba wysłać ponownie (blokada żyje w pamięci karty).
 - Adres testowy jest stałą w kodzie w dwóch miejscach: `backend/src/routes/campaigns.ts` (`CAMPAIGN_TEST_EMAIL`) i `frontend/src/services/api.ts` (napis na przycisku).
 - Outlook blokuje kolaż do kliknięcia „Pokaż obrazy” (inline CID — osobne zadanie). Pliki-sieroty kolażu nie są sprzątane.
 
 ## Następne kroki (kolejność = priorytet)
+0. **Nowy token Gmail:** `cd backend && node scripts/get-gmail-token.js` (logowanie na biuro@antyramy.eu) → przenieść linię `GMAIL_REFRESH_TOKEN` do `public_nodejs/.env` na serwerze → `devil www restart crm.antyramy.eu` → sprawdzić w Google Cloud, czy aplikacja OAuth nie jest w trybie „Testing”.
 1. Testy ręczne wysyłki testowej na produkcji (sekcja „Kolaż w kroku 1…”, punkty 1–7) — najpierw punkt 1–2: sam kolaż → test → mail `[TEST]` w info@pluszek.pl.
 2. Testy ręczne kolażu z telefonu i w Gmailu/Outlooku (sekcja „Kolaż z 3 zdjęć”, punkty 1–8).
 3. Wypchnąć lokalne commity dokumentacji (same pliki `.md`; push = deploy, bez wpływu na działanie).
