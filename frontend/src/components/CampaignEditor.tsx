@@ -679,7 +679,7 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
                   type="button"
                   onClick={handleTest}
                   disabled={saving || testing || !!contentError(currentDraft)}
-                  className="btn-secondary disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="btn-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {testing ? 'Wysyłam test…' : `✉ 1. Wyślij test na ${CAMPAIGN_TEST_EMAIL}`}
                 </button>
