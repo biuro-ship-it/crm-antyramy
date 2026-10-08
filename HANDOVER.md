@@ -2,7 +2,7 @@
 
 Stan na 2026-10-08. Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
-## Kolaż w kroku 1 + obowiązkowa wysyłka testowa — zrobione 2026-10-08 (commity lokalne, NIE wdrożone)
+## Kolaż w kroku 1 + obowiązkowa wysyłka testowa — zrobione i wdrożone 2026-10-08 (commit `81b8677`; testy ręczne na produkcji jeszcze nie zrobione)
 
 **Naprawiony błąd:** kampania z samym kolażem (bez produktu w kroku 1) nie dawała się wysłać.
 
@@ -34,7 +34,7 @@ Edytor ma teraz kroki **1 Produkty i kolaż → 2 Treść → 3 Odbiorcy → 4 W
 - Po odświeżeniu strony test trzeba wysłać ponownie (blokada żyje w pamięci edytora — decyzja 2026-10-08).
 - Adres testowy jest stałą w kodzie (backend + napis we frontendzie), nie ustawieniem w Administracji.
 
-## Kolaż z 3 zdjęć — zrobione 2026-10-07 (commity lokalne, NIE wdrożone)
+## Kolaż z 3 zdjęć — zrobione 2026-10-07, wdrożone 2026-10-08 razem z powyższym (testy ręczne na produkcji jeszcze nie zrobione)
 
 Przycisk „🖼 Utwórz kolaż” w kroku 1 edytora kampanii (do 2026-10-08: w kroku 3) → 3 zdjęcia → JPG 1200×800 (≤ ~250 KB) z plakietką „OFERTA TYGODNIA” → `<img>` 600 px w mailu między tytułem a treścią. Kolaż rysowany w przeglądarce (Canvas), bez nowych bibliotek; nie trafia do PDF.
 
