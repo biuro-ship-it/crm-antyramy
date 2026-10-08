@@ -1,6 +1,19 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getGmailClient, buildRawMessage } from './gmail';
+import { getGmailClient, buildRawMessage, isInvalidGrant } from './gmail';
+
+describe('isInvalidGrant — wygasły / cofnięty token', () => {
+  it('rozpoznaje odpowiedź Google i sam komunikat', () => {
+    assert.equal(isInvalidGrant({ message: 'x', response: { data: { error: 'invalid_grant' } } }), true);
+    assert.equal(isInvalidGrant(new Error('invalid_grant')), true);
+  });
+
+  it('inne błędy zostają bez zmian', () => {
+    assert.equal(isInvalidGrant(new Error('Recipient address rejected')), false);
+    assert.equal(isInvalidGrant({ response: { data: { error: 'rateLimitExceeded' } } }), false);
+    assert.equal(isInvalidGrant(null), false);
+  });
+});
 
 describe('getGmailClient — smoke test konfiguracji', () => {
   const saved: Partial<Record<string, string>> = {};

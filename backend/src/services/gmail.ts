@@ -99,8 +99,23 @@ export const sendEmail = async (options: SendEmailOptions): Promise<SentEmailIds
   const sender = process.env.GMAIL_SENDER || 'biuro@antyramy.eu';
 
   const raw = buildRawMessage(options, sender);
-  const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
-  return { id: res.data.id ?? null, threadId: res.data.threadId ?? null };
+  try {
+    const res = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
+    return { id: res.data.id ?? null, threadId: res.data.threadId ?? null };
+  } catch (err) {
+    if (isInvalidGrant(err)) throw new Error(GMAIL_TOKEN_ERROR);
+    throw err;
+  }
+};
+
+// Google odpowiada „invalid_grant”, gdy refresh token wygasł albo został cofnięty —
+// sam komunikat nic nie mówi użytkownikowi, więc zamieniamy go na instrukcję.
+export const GMAIL_TOKEN_ERROR =
+  'Gmail odrzucił wysyłkę: token poczty wygasł albo został cofnięty. Wygeneruj nowy (node scripts/get-gmail-token.js, patrz HANDOVER.md) i przenieś go na serwer';
+
+export const isInvalidGrant = (err: unknown): boolean => {
+  const e = err as { message?: string; response?: { data?: { error?: string } } } | null;
+  return e?.response?.data?.error === 'invalid_grant' || /invalid_grant/.test(e?.message ?? '');
 };
 
 export const GMAIL_READ_SCOPE_ERROR =

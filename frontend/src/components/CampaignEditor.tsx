@@ -82,6 +82,8 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
   const [testing, setTesting] = useState(false);
   const [testedFingerprint, setTestedFingerprint] = useState<string | null>(null);
   const [testNote, setTestNote] = useState('');
+  // Błąd testu / wysyłki — pokazywany przy przyciskach (góra strony bywa poza ekranem)
+  const [sendError, setSendError] = useState('');
 
   // Podgląd
   const [previewClientId, setPreviewClientId] = useState<string>('');
@@ -255,34 +257,36 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
 
   const handleTest = async () => {
     const v = contentError(currentDraft);
-    if (v) { setError(v); return; }
+    if (v) { setSendError(v); return; }
     setTesting(true);
+    setSendError('');
     try {
       const id = await save();
-      if (!id) return;
+      if (!id) { setSendError('Nie udało się zapisać szkicu — test nie został wysłany.'); return; }
       const res = await sendCampaignTest(id, previewClient || null);
       setTestedFingerprint(contentFingerprint(currentDraft));
       const time = new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
       setTestNote(`${res.to}, ${time}${res.sent > 1 ? ` — ${res.sent} maile (A i B)` : ''}`);
     } catch (e) {
-      setError((e as Error).message);
+      setSendError(`Test NIE został wysłany. ${(e as Error).message}`);
     } finally {
       setTesting(false);
     }
   };
 
   const handleSend = async () => {
-    if (validation) { setError(validation); return; }
-    if (!tested) { setError(`Najpierw wyślij test na ${CAMPAIGN_TEST_EMAIL} i sprawdź go w skrzynce.`); return; }
+    if (validation) { setSendError(validation); return; }
+    if (!tested) { setSendError(`Najpierw wyślij test na ${CAMPAIGN_TEST_EMAIL} i sprawdź go w skrzynce.`); return; }
+    setSendError('');
     const abInfo = abTest ? ` (A: ${sendable.length - countB}, B: ${countB})` : '';
     if (!window.confirm(`Wysłać kampanię „${name.trim() || 'bez nazwy'}” do ${sendable.length} odbiorców${abInfo}?`)) return;
     const id = await save();
-    if (!id) return;
+    if (!id) { setSendError('Nie udało się zapisać szkicu — wysyłka nie ruszyła.'); return; }
     try {
       const res = await startCampaign(id);
       setSending({ total: res.pending });
     } catch (e) {
-      setError((e as Error).message);
+      setSendError((e as Error).message);
     }
   };
 
@@ -692,6 +696,7 @@ const CampaignEditor: React.FC<CampaignEditorProps> = ({ campaign, clients, prod
                   2. Wyślij do {sendable.length} odbiorców
                 </button>
               </div>
+              {sendError && <Alert tone="error">{sendError}</Alert>}
               {tested ? (
                 <Alert tone="info">✓ Test tej wersji wysłany ({testNote}). Sprawdź go w skrzynce, potem wyślij do wszystkich.</Alert>
               ) : testedFingerprint !== null ? (
