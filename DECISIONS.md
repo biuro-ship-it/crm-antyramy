@@ -175,3 +175,28 @@ Rejestr decyzji projektowych. Najnowsze na dole sekcji.
 - **Mail:** blok `<img width="600">` w komórce **bez bocznego paddingu** (kolaż na całą szerokość karty 600 px) — Outlook bierze szerokość z atrybutu `width`, w komórce z paddingiem 36 px obrazek wystawałby poza kartę. Alt: „Oferta tygodnia - {tytuł oferty}”, a gdy tytuł pusty — temat po placeholderach. Bez kolażu HTML **identyczny** jak przed zmianą — test porównuje z wzorcem zapisanym z kodu sprzed zmiany (`services/__fixtures__/`).
 - Podgląd maila w edytorze (`POST /preview`) dostaje `heroImageUrl` — ta sama walidacja co zapis.
 - **Ograniczenie:** plik wgrany, a potem nieprzypisany (np. nieudany zapis szkicu po uploadzie, zamknięta karta w trakcie) zostaje w `public/uploads` jako sierota — bez automatycznego sprzątania.
+
+---
+
+# Edytor: kolaż w kroku 1 i wysyłka testowa
+
+## 2026-10-08 — założenia (zaakceptowane przez Krzyśka)
+
+- **Błąd wyjściowy:** kampania z samym kolażem nie dawała się wysłać — edytor i `POST /:id/start` wymagały produktu albo haczyka „Bez tabeli i PDF” w kroku 1, a kolaż robiło się dopiero w kroku 3.
+- **Produkty i kolaż niezależne** (jedno, drugie, oba albo nic). Haczyk „Bez tabeli i PDF” usunięty: **brak zaznaczonych produktów = mail bez tabeli i PDF**. Pole `noProducts` zostaje w bazie (stare kampanie, raporty) — edytor wylicza je z liczby produktów. Mail bez produktów i bez kolażu jest dozwolony, krok 4 pokazuje ostrzeżenie „pójdzie sam tekst”.
+- **Zdjęcia do kolażu jak dotąd** — z dysku / telefonu; okno kolażu bez zmian (kolaż ze zdjęć z katalogu — nie teraz).
+- **Kolejność kroków: Produkty i kolaż → Treść → Odbiorcy → Wysyłka.** Podgląd na żywo zostaje obok treści i pojawia się drugi raz w kroku 4 — tam, gdzie klika się wysyłkę (niezmiennik „wysyłka po podglądzie”).
+- **Wysyłka testowa na info@pluszek.pl jest obowiązkowa** przed wysyłką do wszystkich.
+
+## 2026-10-08 — commit 1: `POST /api/campaigns/:id/send-test`
+
+- **Adres testowy na sztywno w backendzie** (`CAMPAIGN_TEST_EMAIL`), nigdy z żądania — trasa nie może posłużyć do wysłania maila na dowolny adres. Zmiana adresu = zmiana stałej (i napisu w `frontend/src/services/api.ts`).
+- Test idzie **tylko ze szkicu** i używa tego samego renderu co wysyłka (`renderForClient`, PDF, kolaż); temat `[TEST] …`, przy A/B dwa maile `[TEST A]` / `[TEST B]`. Placeholdery dla odbiorcy wybranego w podglądzie (bez odbiorcy — teksty zastępcze).
+- **Niczego nie zapisuje:** status, odbiorcy, liczniki, historia kontaktów klienta i `lastCampaignAt` bez zmian — test nie zaburza pomiaru ani ostrzeżenia „kampania w ostatnich 7 dniach”.
+- Walidacja tematu i treści wspólna dla `start` i `send-test` (`campaignContentError` w `services/campaignRender.ts`). W `start` zostaje zabezpieczenie na produkty usunięte z katalogu po zapisie szkicu (nowy komunikat).
+
+## 2026-10-08 — commit 2: edytor
+
+- **„Test aktualnej wersji” = odcisk treści** (`contentFingerprint` w `frontend/src/utils/campaignSend.ts`): tytuł, produkty, temat i treść A/B, kolaż. Nazwa kampanii i lista odbiorców nie wchodzą do odcisku — ich zmiana nie wymaga nowego testu.
+- **Blokada tylko w edytorze, w pamięci karty** — po odświeżeniu strony albo ponownym otwarciu szkicu test trzeba wysłać jeszcze raz. Świadome uproszczenie: backend nie pamięta testu i `start` go nie wymaga (jedyna droga do `start` to przycisk w edytorze).
+- Reguły „co musi być uzupełnione” wydzielone do czystych funkcji (`contentError`, `recipientsError`) z testami.

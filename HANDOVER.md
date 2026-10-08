@@ -1,16 +1,48 @@
 # HANDOVER — moduł Kampanie (CRM_ANTYRAMY)
 
-Stan na 2026-10-07. Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
+Stan na 2026-10-08. Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
+
+## Kolaż w kroku 1 + obowiązkowa wysyłka testowa — zrobione 2026-10-08 (commity lokalne, NIE wdrożone)
+
+**Naprawiony błąd:** kampania z samym kolażem (bez produktu w kroku 1) nie dawała się wysłać.
+
+Edytor ma teraz kroki **1 Produkty i kolaż → 2 Treść → 3 Odbiorcy → 4 Wysyłka**. Produkty i kolaż są niezależne i opcjonalne (bez produktów = mail bez tabeli i PDF; haczyk „Bez tabeli i PDF” zniknął). W kroku 4: podgląd końcowy, „✉ 1. Wyślij test na info@pluszek.pl”, a dopiero po teście aktualnej wersji — „2. Wyślij do N odbiorców”.
+
+| Co | Gdzie |
+|---|---|
+| Kroki, kolaż w kroku 1, podgląd w krokach 2 i 4, przyciski testu i wysyłki | `frontend/src/components/CampaignEditor.tsx` |
+| Reguły: co musi być uzupełnione, „odcisk treści” (czy test dotyczył aktualnej wersji) | `frontend/src/utils/campaignSend.ts` (+ `campaignSend.test.ts`) |
+| `sendCampaignTest`, napis z adresem testowym | `frontend/src/services/api.ts` |
+| `POST /api/campaigns/:id/send-test` (adres na sztywno: `CAMPAIGN_TEST_EMAIL`), nowy komunikat w `start` | `backend/src/routes/campaigns.ts` |
+| `campaignContentError`, `testSubject` | `backend/src/services/campaignRender.ts` (+ testy) |
+
+### Sprawdzone
+- Testy: backend 60, frontend 66; `npm run build` frontendu bez błędów.
+- W Chrome na tymczasowej stronie testowej z prawdziwym `CampaignEditor` i podstawionym backendem (bez logowania, żaden mail nie wyszedł): kolejność kroków, kolaż w kroku 1 (okno się otwiera), kampania bez produktów bez błędu (zapis `noProducts: true`), przycisk wysyłki nieaktywny przed testem, aktywny po teście, znów nieaktywny po zmianie treści lub produktów, aktywny po zmianie samych odbiorców.
+- **Niesprawdzone:** prawdziwa wysyłka testowa (Gmail), wygląd maila `[TEST]` w skrzynce, zalogowana aplikacja, telefon.
+
+### Testy ręczne na produkcji (po deployu)
+1. **Sam kolaż (scenariusz błędu):** Kampanie → Nowa kampania → krok 1: tytuł + „Utwórz kolaż”, **bez produktów** → krok 2: temat i treść → krok 3: klient testowy z własnym adresem → krok 4: brak błędu o produktach, w podglądzie kolaż nad treścią, bez tabeli.
+2. **Test:** „2. Wyślij do…” jest szary → „✉ 1. Wyślij test na info@pluszek.pl” → informacja „Test tej wersji wysłany” → w skrzynce info@pluszek.pl mail `[TEST] {temat}` z kolażem, bez tabeli i bez PDF, ze zwrotem klienta wybranego w podglądzie. W historii kontaktów tego klienta **nie ma** nowego wpisu.
+3. **Zmiana po teście:** wróć do kroku 2, dopisz słowo → krok 4: żółte „Mail zmieniony po teście”, wysyłka znów szara → wyślij test ponownie → aktywna. Zmiana samych odbiorców (krok 3) nie wymaga nowego testu.
+4. **Wysyłka:** „2. Wyślij do 1 odbiorców” → potwierdzenie → pasek postępu → mail u klienta testowego bez dopisku `[TEST]`.
+5. **Produkty + kolaż:** drugi szkic z 1–2 produktami i kolażem → test ma kolaż, tabelę i PDF w załączniku.
+6. **A/B:** szkic z tematem B → test = dwa maile: `[TEST A] …` i `[TEST B] …`.
+7. **Stary szkic** (zapisany przed zmianą, z produktami albo z „bez tabeli i PDF”) otwiera się z tymi samymi produktami / bez produktów.
+
+### Otwarte
+- Po odświeżeniu strony test trzeba wysłać ponownie (blokada żyje w pamięci edytora — decyzja 2026-10-08).
+- Adres testowy jest stałą w kodzie (backend + napis we frontendzie), nie ustawieniem w Administracji.
 
 ## Kolaż z 3 zdjęć — zrobione 2026-10-07 (commity lokalne, NIE wdrożone)
 
-Przycisk „🖼 Utwórz kolaż” w kroku 3 edytora kampanii → 3 zdjęcia → JPG 1200×800 (≤ ~250 KB) z plakietką „OFERTA TYGODNIA” → `<img>` 600 px w mailu między tytułem a treścią. Kolaż rysowany w przeglądarce (Canvas), bez nowych bibliotek; nie trafia do PDF.
+Przycisk „🖼 Utwórz kolaż” w kroku 1 edytora kampanii (do 2026-10-08: w kroku 3) → 3 zdjęcia → JPG 1200×800 (≤ ~250 KB) z plakietką „OFERTA TYGODNIA” → `<img>` 600 px w mailu między tytułem a treścią. Kolaż rysowany w przeglądarce (Canvas), bez nowych bibliotek; nie trafia do PDF.
 
 | Co | Gdzie |
 |---|---|
 | Układ, przycięcie, plakietka, dobór jakości JPG, przerywanie generowania | `frontend/src/utils/collage.ts` (+ `collage.test.ts`) |
 | Okno „Utwórz kolaż” (3 pola, „Ustaw jako duże”, podgląd = zapisywany plik, KB i jakość, ostrzeżenia) | `frontend/src/components/CollageDialog.tsx` |
-| Sekcja „Kolaż nad treścią” (Utwórz / Zmień / Usuń, ostrzeżenie o localhost), kolaż w podglądzie maila | `frontend/src/components/CampaignEditor.tsx`, `services/api.ts` |
+| Sekcja „Kolaż nad treścią” w kroku 1 (Utwórz / Zmień / Usuń, ostrzeżenie o localhost), kolaż w podglądzie maila | `frontend/src/components/CampaignEditor.tsx`, `services/api.ts` |
 | Upload `POST /api/upload?kind=kolaz` → `kolaz-<czas>-<los>.jpg` | `backend/src/routes/upload.ts` |
 | Walidacja `heroImageUrl`, zapis częściowy, bezpieczne kasowanie pliku (współdzielenie) | `backend/src/services/collageFiles.ts` (+ `collageFiles.test.ts`) |
 | Pole `heroImageUrl` w szkicu, duplikacie, usuwaniu, podglądach i wysyłce | `backend/src/routes/campaigns.ts` |
@@ -24,13 +56,13 @@ Przycisk „🖼 Utwórz kolaż” w kroku 3 edytora kampanii → 3 zdjęcia →
 - **Niesprawdzone:** prawdziwy upload i zapis w zalogowanej aplikacji, prawdziwy iPhone/Safari i zdjęcia z aparatu, wygląd w Gmailu/Outlooku.
 
 ### Testy ręczne na produkcji (po deployu)
-1. **Kolaż z telefonu:** Kampanie → szkic → krok 3 → „Utwórz kolaż” → „Wybierz zdjęcia” z galerii: 1 poziome + 2 pionowe zdjęcia **z aparatu** (nie zrzuty). Wszystkie stoją prosto (nie obrócone o 90°), przycięcie bez czarnych pasów; „Ustaw jako duże” zmienia podgląd. To samo z komputera (przeciągnięcie pliku na pole).
+1. **Kolaż z telefonu:** Kampanie → szkic → krok 1 → „Utwórz kolaż” → „Wybierz zdjęcia” z galerii: 1 poziome + 2 pionowe zdjęcia **z aparatu** (nie zrzuty). Wszystkie stoją prosto (nie obrócone o 90°), przycięcie bez czarnych pasów; „Ustaw jako duże” zmienia podgląd. To samo z komputera (przeciągnięcie pliku na pole).
 2. **Plakietka na iPhonie/Safari:** czytelna, proporcjonalna do zdjęcia, litery „OFERTA TYGODNIA” kompletne i równo rozstawione (odstępy między literami), tekst na środku niebieskiego prostokąta, prostokąt w samym rogu. Polskich znaków w plakietce nie ma — tylko litery i odstępy.
-3. **Rozmiar:** pod podglądem rozmiar w KB i jakość JPG — zwykle ≤ 250 KB; przy > 250 KB żółte ostrzeżenie, a „Zapisz kolaż” nadal działa. Po zapisie: miniatura w kroku 3, w podglądzie maila obrazek pod tytułem; adres obrazka (prawy klik → kopiuj adres) zaczyna się od `https://crm.antyramy.eu/uploads/kolaz-`. Brak żółtego ostrzeżenia o localhost.
-4. **Wysyłka testowa** tylko do klienta testowego z własnym adresem: w **Gmailu** kolaż od razu, na pełną szerokość karty, nad treścią; w **Outlooku** (desktop i/lub web) — po „Pokaż obrazy” kolaż nie wystaje poza kartę 600 px; tekst alternatywny przed pokazaniem obrazów: „Oferta tygodnia - {tytuł}”. PDF w załączniku bez kolażu.
+3. **Rozmiar:** pod podglądem rozmiar w KB i jakość JPG — zwykle ≤ 250 KB; przy > 250 KB żółte ostrzeżenie, a „Zapisz kolaż” nadal działa. Po zapisie: miniatura w kroku 1, w podglądzie maila (krok 2 lub 4) obrazek pod tytułem; adres obrazka (prawy klik → kopiuj adres) zaczyna się od `https://crm.antyramy.eu/uploads/kolaz-`. Brak żółtego ostrzeżenia o localhost.
+4. **Wysyłka** (najpierw test na info@pluszek.pl, potem tylko klient testowy z własnym adresem): w **Gmailu** kolaż od razu, na pełną szerokość karty, nad treścią; w **Outlooku** (desktop i/lub web) — po „Pokaż obrazy” kolaż nie wystaje poza kartę 600 px; tekst alternatywny przed pokazaniem obrazów: „Oferta tygodnia - {tytuł}”. PDF w załączniku bez kolażu.
 5. **Duplikat:** wysłana (albo dowolna) kampania z kolażem → „Duplikuj kampanię” → w kopii kolaż jest → w kopii „Usuń” → zapis → oryginał nadal pokazuje kolaż (szczegóły → podgląd), a plik otwiera się pod swoim adresem. Potem w kopii nowy kolaż i „Zmień” — oryginał bez zmian.
 6. **Kampania bez kolażu** (nowa i stara wysłana): podgląd i mail wyglądają jak dotąd.
-7. **Zapis z innego kroku:** szkic z kolażem → zmień coś w kroku 1 → „Zapisz szkic” → odśwież stronę → kolaż nadal jest.
+7. **Zapis z innego kroku:** szkic z kolażem → zmień coś w kroku 2 → „Zapisz szkic” → odśwież stronę → kolaż nadal jest.
 8. (opcjonalnie) Usunięcie szkicu z kolażem → plik `kolaz-…` znika z `public_nodejs/public/uploads/` (log: `[campaigns] kolaż … deleted`).
 
 ### Otwarte
@@ -76,7 +108,7 @@ Idempotentna (`migratedFrom`). Przeniesione kampanie mają znaczek „z Promocji
 1. **Karta klienta:** zwrot, 2 tagi, wypis → odśwież stronę, wszystko zostaje; znaczek „wypisany” na liście.
 2. **„Edytuj dane” klienta** z plikami i fakturami → zapis nie usuwa plików ani faktur.
 3. **Administracja → Podpis:** zmień, zapisz, odśwież; mail z szablonu ma nową stopkę; przywróć.
-4. **Kampanie → Nowa kampania:** 4 kroki, filtry (w tym „od X dni”), kolumna „Zwrot w mailu” (⚠ przy braku).
+4. **Kampanie → Nowa kampania:** 4 kroki (od 2026-10-08: produkty i kolaż → treść → odbiorcy → wysyłka), filtry (w tym „od X dni”), kolumna „Zwrot w mailu” (⚠ przy braku).
 5. **Treść:** placeholdery kliknięciem, podgląd dla różnych odbiorców, A/B z osobną treścią, ostrzeżenie po wpisaniu podpisu z telefonem na końcu.
 6. **Szkic:** zapisz, wyjdź, wejdź — dane zostają; usuń szkic z listy.
 7. **Wklej z JSON:** poprawny (z nieznanym kodem produktu → ostrzeżenie), niepoprawny (→ komunikat), z filtrem (→ zaznaczeni odbiorcy, wypisani pominięci).

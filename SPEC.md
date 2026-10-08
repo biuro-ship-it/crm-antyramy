@@ -14,15 +14,17 @@ do klientów z mierzeniem, co przyniosły.
 Tygodniowa oferta mailowa do wybranych klientów, wysyłana z Gmaila biuro@antyramy.eu.
 
 ### Edytor (4 kroki)
-1. **Produkty** — wybór z katalogu (tabela w mailu + PDF w załączniku) albo „bez tabeli i PDF”; tytuł oferty.
-2. **Odbiorcy** — filtry (typ, kolor, trasa, województwo, tagi, „od X dni” bez zamówienia / kontaktu / kampanii); wypisani i bez e-maila nie do zaznaczenia; ostrzeżenie o kampanii w ostatnich 7 dniach.
-3. **Treść** — temat, treść z placeholderami `{zwrot|Dzień dobry}`, `{firma}`, `{miasto}`; test A/B; **kolaż**; podgląd maila dla wybranego odbiorcy.
-4. **Wysyłka** — podsumowanie, potwierdzenie, wysyłka partiami po 10 z paskiem postępu; przerwaną można wznowić.
+1. **Produkty i kolaż** — tytuł oferty; **kolaż** (opcjonalnie); produkty z katalogu (opcjonalnie — tabela w mailu + PDF w załączniku). Można wybrać jedno, drugie, oba albo nic: bez produktów mail idzie bez tabeli i PDF, bez obu — sam tekst.
+2. **Treść** — temat, treść z placeholderami `{zwrot|Dzień dobry}`, `{firma}`, `{miasto}`; test A/B; podgląd maila na żywo obok.
+3. **Odbiorcy** — filtry (typ, kolor, trasa, województwo, tagi, „od X dni” bez zamówienia / kontaktu / kampanii); wypisani i bez e-maila nie do zaznaczenia; ostrzeżenie o kampanii w ostatnich 7 dniach.
+4. **Wysyłka** — podsumowanie i podgląd końcowy dla wybranego odbiorcy; **najpierw „Wyślij test”** (na info@pluszek.pl), potem „Wyślij do N odbiorców”: potwierdzenie, wysyłka partiami po 10 z paskiem postępu; przerwaną można wznowić.
+
+**Wysyłka testowa (obowiązkowa):** mail wygląda dokładnie jak u odbiorcy wybranego w podglądzie (kolaż, tabela, PDF), temat z dopiskiem `[TEST]`; przy teście A/B przychodzą dwa maile (`[TEST A]`, `[TEST B]`). Niczego nie zapisuje w kampanii ani w historii klienta. Przycisk wysyłki do wszystkich jest aktywny dopiero po teście aktualnej wersji — zmiana tytułu, produktów, tematu, treści lub kolażu wymaga nowego testu (zmiana odbiorców nie).
 
 Dodatkowo: szkice, „Duplikuj kampanię”, „Wklej z JSON” (wypełnia formularz, nic nie wysyła), podpis z Administracji, stopka wypisu („odpisz NIE”).
 
 ### Kolaż „Oferta tygodnia”
-- Przycisk **„Utwórz kolaż”** w kroku 3 → okno z 3 zdjęciami (JPG/PNG, z telefonu lub komputera).
+- Przycisk **„Utwórz kolaż”** w kroku 1 → okno z 3 zdjęciami (JPG/PNG, z telefonu lub komputera).
 - Układ 1200×800 px: duże zdjęcie po lewej (~60%), dwa mniejsze po prawej, białe odstępy 6 px, zdjęcia przycięte do pól; plakietka **„OFERTA TYGODNIA”** (`#1a56db`, biały Inter Bold) w lewym górnym rogu.
 - „Ustaw jako duże” zmienia kolejność; podgląd na żywo pokazuje dokładnie plik, który zostanie zapisany, z rozmiarem w KB i jakością JPG. Cel: ≤ 250 KB; większy plik — żółte ostrzeżenie, zapis nadal możliwy.
 - Działa, gdy: kolaż jest w mailu nad treścią (600 px szerokości), a kampania bez kolażu wygląda jak wcześniej. Kolaż nie trafia do PDF.
