@@ -1,6 +1,75 @@
-# Decyzje — moduł Kampanie (CRM_ANTYRAMY)
+# CRM Antyramy – decyzje
 
-Rejestr decyzji projektowych. Najnowsze na dole sekcji.
+Dziennik decyzji: co postanowiliśmy i dlaczego. Nowe wpisy dopisujemy **na górze**.
+Zmiana zdania = nowy wpis, a stary dostaje status „zastąpiona przez #N”.
+Wpisy #001–#008 spisane wstecz 2026-10-14 z kodu, `CLAUDE.md`, audytu z 2026-09-12 i poniższego archiwum;
+gdzie daty albo powodu nie było w notatkach, jest to zaznaczone („nie zapisano”).
+Szczegółowy dziennik prac nad modułem Kampanie (wrzesień–październik 2026, układ „commit po commicie”)
+zostaje bez zmian w sekcji **Archiwum** na dole pliku.
+
+<!-- Nowe wpisy dodawaj NA GÓRZE -->
+
+## #008 – 2026-10-14 – Dokumentacja całej aplikacji według szablonu
+- **Status:** obowiązuje
+- **Decyzja:** Wiedza o aplikacji mieszka w repo: `CLAUDE.md` (instrukcja), `SPEC.md` (co robi aplikacja – cały CRM, nie tylko Kampanie), `DECISIONS.md` (ten plik), `HANDOVER.md` (stan). Deploy opisuje `secret/DEPLOY.md` (lokalnie, poza repo) i `deploy.bat`.
+- **Dlaczego:** Dokumenty opisywały wyłącznie moduł Kampanie, a reszta aplikacji (klienci, kalendarz, Kanban, dostawcy…) nie miała opisu. Schemat z `C:\Claude\szablony` jest wspólny dla wszystkich aplikacji.
+- **Odrzucone opcje:** Pełny `SPEC.md` z kryteriami „działa, gdy…” dla każdego modułu naraz (za dużo pracy przy działającej aplikacji – dopisujemy je przy najbliższej zmianie danego modułu); przepisanie archiwalnego dziennika Kampanii do nowego układu (ryzyko zgubienia szczegółów).
+- **Konsekwencje:** Po każdej sesji aktualizujemy `HANDOVER.md`, decyzje trafiają tutaj, zmiany funkcji – najpierw do `SPEC.md`. Archiwum Kampanii poniżej zostaje tylko do odczytu.
+
+## #007 – 2026-10-08 – Obowiązkowa wysyłka testowa przed wysyłką do wszystkich
+- **Status:** obowiązuje
+- **Decyzja:** Przycisk „Wyślij do N odbiorców” jest aktywny dopiero po teście aktualnej wersji (`POST /api/campaigns/:id/send-test`, adres info@pluszek.pl, temat z `[TEST]`). Zmiana tytułu, produktów, tematu, treści lub kolażu wymaga nowego testu; zmiana odbiorców – nie. Test niczego nie zapisuje w kampanii ani w historii klienta.
+- **Dlaczego:** Wysyłka do kilkudziesięciu klientów jest nieodwracalna; test pokazuje mail dokładnie tak, jak zobaczy go odbiorca (kolaż, tabela, PDF).
+- **Odrzucone opcje:** Test opcjonalny (łatwo go pominąć); test zapisujący się w historii (zaburzałby pomiar wyników i ostrzeżenie „kampania w ostatnich 7 dniach”).
+- **Konsekwencje:** Adres testowy jest stałą w dwóch miejscach kodu (`backend/src/routes/campaigns.ts`, `frontend/src/services/api.ts`). Szczegóły: archiwum niżej, wpisy z 2026-10-08.
+
+## #006 – 2026-09-27 – Kampanie zastępują Promocje; żaden mail nie wychodzi bez „Wyślij”
+- **Status:** obowiązuje
+- **Decyzja:** Zakładka „Promocje” zamieniona na „Kampanie” (id zakładki zostaje `promotions`); rekordy przeniesione skryptem `migrate-promotions-to-campaigns`, kolekcja `promotions` zostaje jako kopia. **Niezmiennik:** żaden mail nie wychodzi bez kliknięcia „Wyślij” po podglądzie; automaty (cron 6:45, „Sprawdź odpowiedzi”) tylko czytają i liczą; wysłana kampania jest niezmienna razem ze swoim kolażem. Wysyłka partiami po 10 sterowana z przeglądarki (Passenger może ubić proces w tle).
+- **Dlaczego:** Kampanie mierzą wyniki (odpowiedzi, zamówienia, telefony), czego Promocje nie robiły; niezmiennik chroni klientów przed przypadkową wysyłką.
+- **Odrzucone opcje:** Kolejka wysyłki na serwerze (Passenger); automatyczna wysyłka z crona.
+- **Konsekwencje:** Pełne uzasadnienia, mapowanie pól i kolejne etapy – w archiwum niżej (wpisy z 2026-09-27 … 2026-10-08).
+
+## #005 – 2026-09-12 – Testy przed deployem i obsługa błędów po audycie
+- **Status:** obowiązuje
+- **Decyzja:** `npm test` backendu i frontendu jest w `.github/workflows/deploy.yml` **przed** buildem – nieudany test wstrzymuje deploy. Czyste funkcje wydzielamy do `services/` / `utils/` i testujemy (trasy importują Firestore, więc testy bez bazy ich nie załadują). Daty „dzisiaj” liczy `todayISO()` (Europe/Warsaw), a `PUT` na usunięty rekord zwraca 404 (`isNotFound()`).
+- **Dlaczego:** Audyt 2026-09-12 znalazł 43 błędy TypeScript na froncie, 4 testy w całym projekcie i 22 `catch` bez logu; lepiej zatrzymać deploy niż wysłać zepsutą wersję.
+- **Odrzucone opcje:** `multer` 2.x (zmienia API uploadu – osobne zadanie), `exceljs` zamiast `xlsx` i `firebase` 11+ (zmiany łamiące – zostawione świadomie, opis w `secret/audyt-2026-09-12.md`).
+- **Konsekwencje:** Nowy plik testów backendu trzeba dopisać do skryptu `test` w `backend/package.json`.
+
+## #004 – data nie zapisana – Jedno konto OAuth Google dla Gmaila i Kalendarza
+- **Status:** obowiązuje
+- **Decyzja:** Wysyłka maili, czytanie odpowiedzi i Kalendarz Google używają tej samej konfiguracji OAuth2 (`GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` w `.env` na serwerze); token generuje `backend/scripts/get-gmail-token.js` ze scope’ami Gmail i `calendar.events`.
+- **Dlaczego:** Jedna autoryzacja zamiast kilku; poczta idzie z biuro@antyramy.eu. Powodu wyboru nie zapisano.
+- **Odrzucone opcje:** nie zapisano
+- **Konsekwencje:** Wygaśnięcie tokenu (`invalid_grant`) wyłącza naraz pocztę, kampanie i Kalendarz. 2026-10-08 token wygasł po 9 dniach – prawdopodobna przyczyna to status aplikacji OAuth „Testing” (tokeny na 7 dni); trwałe rozwiązanie czeka w `HANDOVER.md`.
+
+## #003 – data nie zapisana – Pliki na dysku serwera, sprzątane razem z rekordem
+- **Status:** obowiązuje
+- **Decyzja:** Uploady (zdjęcia produktów, dokumenty klientów i dostawców, kolaże) leżą w `public_nodejs/public/uploads/` i są serwowane jako `/uploads`. Usunięcie rekordu z plikiem sprzątamy plik (`deleteUpload`; kolaże: `releaseCollageFile` sprawdza współdzielenie). Pola, których formularz nie wysyła, mają w schematach zod samo `.optional()` – nie `.default()`, który nadpisywałby dane przy `PUT`.
+- **Dlaczego:** Najprostsze na hostingu mydevil bez osobnego magazynu plików. Powodu wyboru nie zapisano; zasada `.optional()` wynika z błędu naprawionego 2026-09-27 (zapis formularza „Edytuj dane” czyścił pliki i faktury klienta).
+- **Odrzucone opcje:** nie zapisano
+- **Konsekwencje:** Pliki wgrane lokalnie nie istnieją na produkcji – kolaże i uploady testujemy na crm.antyramy.eu. Pliki nie są w repo; kopię zapewnia Archiwum (ZIP) i `backup.js --include-uploads`.
+
+## #002 – data nie zapisana – Dostęp tylko dla kont z listy, sprawdzany w backendzie
+- **Status:** obowiązuje
+- **Decyzja:** Logowanie kontem Google (Firebase Auth); każde żądanie `/api/*` przechodzi `authenticate`, który weryfikuje token i sprawdza e-mail na liście `ALLOWED_EMAILS` (`.env`, domyślnie biuro@antyramy.eu i jedno konto prywatne). Kopia listy we froncie (`useAuth.ts`) tylko blokuje logowanie od razu.
+- **Dlaczego:** CRM zawiera dane osobowe klientów – dostęp ma być zamknięty, a dodanie użytkownika nie powinno wymagać zmiany kodu.
+- **Odrzucone opcje:** nie zapisano
+- **Konsekwencje:** Źródłem prawdy jest backend; brak ról – każde dopuszczone konto widzi wszystko. Nowe konto = zmiana `ALLOWED_EMAILS` na serwerze i restart.
+
+## #001 – data nie zapisana – Wybór stacku
+- **Status:** obowiązuje
+- **Decyzja:** Frontend: React 18 + TypeScript + Vite + Tailwind, PWA. Backend: Node.js + Express (TypeScript). Baza i logowanie: Firebase (Firestore + Auth Google). Hosting: s61.mydevil.net (FreeBSD, Passenger), deploy przez GitHub Actions lub lokalny `deploy.bat`.
+- **Dlaczego:** Spójne z pozostałymi aplikacjami Antyramy / EBRA na mydevil; PWA zastępuje aplikację mobilną. Szczegółowego uzasadnienia nie zapisano.
+- **Odrzucone opcje:** nie zapisano
+- **Konsekwencje:** Passenger może ubić proces w tle, więc zadania długie dzielimy na krótkie żądania (wysyłka partiami); biblioteki z natywnymi binarkami odpadają na FreeBSD (kolaż rysowany w przeglądarce).
+
+---
+
+# Archiwum – dziennik prac nad modułem Kampanie (przed numeracją, bez zmian)
+
+Rejestr decyzji projektowych modułu Kampanie. Najnowsze na dole sekcji.
 
 ## 2026-09-27 — założenia (zaakceptowane przez Krzyśka)
 

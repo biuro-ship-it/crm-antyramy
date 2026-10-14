@@ -1,25 +1,28 @@
-# HANDOVER — moduł Kampanie (CRM_ANTYRAMY)
+# CRM Antyramy – handover
 
-**Ostatnia aktualizacja:** 2026-10-08
+**Ostatnia aktualizacja:** 2026-10-14
 **Wersja produkcyjna:** commit `81b8677` — https://crm.antyramy.eu (deploy 2026-10-08, `/health` = 200). Lokalnie czekają niewypchnięte commity: poprawka komunikatu błędu (`b0d5dc9`) + dokumentacja.
 
-Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
+Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
 ## Stan obecny
 
 ### ✅ Działa (wdrożone)
+- Pozostałe moduły (Klienci, Kalendarz, Kanban, Produkty, Szablony maili, Notatki, Dostawcy z kalkulatorem HDF, Archiwum, Administracja) działają w produkcji; opis w [SPEC.md](SPEC.md). Audyt z 2026-09-12 domknięty (`secret/audyt-2026-09-12.md`).
 - Kampanie: edytor w 4 krokach (**Produkty i kolaż → Treść → Odbiorcy → Wysyłka**), szkice, duplikat, import JSON, test A/B, wysyłka partiami po 10, wznowienie.
 - **Kampania z samym kolażem albo samym tekstem** — produkty są opcjonalne (bez produktów mail idzie bez tabeli i PDF). To była naprawa z 2026-10-08.
 - **Obowiązkowa wysyłka testowa** na info@pluszek.pl przed wysyłką do wszystkich (`POST /api/campaigns/:id/send-test`).
 - Kolaż „Oferta tygodnia” z 3 zdjęć (krok 1), pomiar wyników (odpowiedzi, zamówienia, follow-upy, ranking), automat dzienny 6:45.
 
 ### 🔧 W trakcie
-- **Token Gmail odnowiony 2026-10-08 ok. 21:20** (wygenerowany przez Krzyśka, przeniesiony na serwer, restart, Google przyjmuje go lokalnie i na serwerze). Prawdziwej wysyłki po odnowieniu jeszcze nie było — pierwszy test z CRM to potwierdzi.
+- **Dokumentacja według szablonu** (2026-10-14): `SPEC.md` obejmuje już cały CRM, `DECISIONS.md` ma numerowane wpisy #001–#008. Do zrobienia przy okazji: kryteria „działa, gdy…” w `SPEC.md` dla modułów innych niż Kampanie; region bazy Firestore do potwierdzenia w konsoli Firebase.
+- **Token Gmail odnowiony 2026-10-14 ok. 19:10** (powód: w CRM błąd „Brak uprawnienia do czytania poczty”). Weryfikacja: tokeninfo pokazuje `gmail.readonly`, `gmail.send`, `calendar.events`; `getThreadMessages` lokalnie czyta wątek bez 403; na serwerze podmieniona tylko linia `GMAIL_REFRESH_TOKEN` w `public_nodejs/.env` (kopia `.env.bak-2026-10-14`, md5 linii zgodne z lokalnym), `devil www restart` OK, `/health` = 200, w `logs/error.log` brak błędów Gmail. „📬 Sprawdź odpowiedzi” na produkcji po odnowieniu jeszcze nie klikane — to potwierdzi odczyt na serwerze.
+- W `logs/error.log` po każdym starcie: `[followups] GET /summary` → Firestore „The query requires an index” (kolekcja `followups`, pola `status` + `dueDate`). Niezwiązane z tokenem, nie naprawiane — do zrobienia: utworzyć indeks z linku w logu.
 - **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
 - Lokalny, niewdrożony commit `b0d5dc9`: czytelny komunikat o wygasłym tokenie Gmail i błąd testu / wysyłki pokazywany przy przyciskach w kroku 4 (na produkcji nadal tylko u góry strony, jako samo „invalid_grant”). Testy i build przechodzą (backend 62, frontend 66).
 
 ### 🐛 Znane problemy / ograniczenia
-- **Token Gmail może znów wygasnąć.** Token z 2026-09-29 przestał działać po 9 dniach (Google: „Token has been expired or revoked”; w `logs/error.log` na serwerze `GaxiosError: invalid_grant`) — nie działał wtedy ani test, ani wysyłka kampanii, ani Kalendarz Google (ten sam token). Prawdopodobna przyczyna (niepotwierdzona): aplikacja OAuth w Google Cloud ma status „Testing”, w którym tokeny wygasają po 7 dniach — do sprawdzenia w Google Cloud Console → „OAuth consent screen”; trwałe rozwiązanie to typ „Internal” (konto Workspace) albo „Publish app”. Jeśli nic się nie zmieni, kolejne wygaśnięcie ok. 2026-10-15. Naprawa: sekcja „Uprawnienie Gmail” niżej.
+- **Token Gmail może znów wygasnąć.** Token z 2026-09-29 przestał działać po 9 dniach (Google: „Token has been expired or revoked”; w `logs/error.log` na serwerze `GaxiosError: invalid_grant`) — nie działał wtedy ani test, ani wysyłka kampanii, ani Kalendarz Google (ten sam token). Prawdopodobna przyczyna (niepotwierdzona): aplikacja OAuth w Google Cloud ma status „Testing”, w którym tokeny wygasają po 7 dniach — do sprawdzenia w Google Cloud Console → „OAuth consent screen”; trwałe rozwiązanie to typ „Internal” (konto Workspace) albo „Publish app”. Jeśli nic się nie zmieni, kolejne wygaśnięcie ok. 2026-10-21 (7 dni od odnowienia 2026-10-14). Naprawa: sekcja „Uprawnienie Gmail” niżej.
 - Po odświeżeniu strony edytora test trzeba wysłać ponownie (blokada żyje w pamięci karty).
 - Adres testowy jest stałą w kodzie w dwóch miejscach: `backend/src/routes/campaigns.ts` (`CAMPAIGN_TEST_EMAIL`) i `frontend/src/services/api.ts` (napis na przycisku).
 - Outlook blokuje kolaż do kliknięcia „Pokaż obrazy” (inline CID — osobne zadanie). Pliki-sieroty kolażu nie są sprzątane.
@@ -38,11 +41,11 @@ Decyzje i ich uzasadnienia: [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude:
 - Kolaże i uploady testować tylko na produkcji (plik wgrany lokalnie nie wyświetli się w mailu).
 
 ## Historia sesji
+- **2026-10-14** — Dokumentacja całej aplikacji według szablonu: `SPEC.md` rozszerzony z modułu Kampanie na cały CRM, `DECISIONS.md` z numerowanymi wpisami #001–#008 (stary dziennik Kampanii zachowany jako archiwum), `HANDOVER.md` i `CLAUDE.md` uzupełnione. Bez zmian w kodzie.
 - **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`). Wieczorem: test nie doszedł, bo wygasł token Gmail (`invalid_grant`) — token odnowiony i przeniesiony na serwer; lokalnie czytelniejszy komunikat błędu (`b0d5dc9`, niewdrożone).
 - **2026-10-07** — Kolaż z 3 zdjęć „Oferta tygodnia” (Canvas w przeglądarce, `heroImageUrl`, bezpieczne kasowanie plików). Wdrożone tego samego dnia (`2fbe062`).
 - **2026-09-29** — Etap 2: sprawdzanie odpowiedzi z Gmaila, przypisanie zamówień, follow-upy telefoniczne, raport, ranking, automat dzienny (cron 6:45).
 - **2026-09-28** — Etap 1: backend i ekran Kampanii, podpis w Administracji, migracja Promocji → Kampanie, usunięcie modułu Promocje.
-- **2026-09-27** — Założenia modułu Kampanie, pola klienta (zwrot, tagi, wypis), naprawa czyszczenia plików klienta przy „Edytuj dane”.
 
 ---
 
@@ -176,6 +179,7 @@ Idempotentna (`migratedFrom`). Przeniesione kampanie mają znaczek „z Promocji
 
 ### Uprawnienie Gmail (zrobione 2026-09-29)
 Token z `gmail.readonly` wygenerowany (`node backend/scripts/get-gmail-token.js` — zapisuje token w `backend/.env`, nie na ekran) i przeniesiony na serwer (`public_nodejs/.env`, kopia `.env.bak`). Po ponownym generowaniu tokenu: przenieść linię `GMAIL_REFRESH_TOKEN` na serwer i zrestartować aplikację (`devil www restart crm.antyramy.eu`).
+Ostatnie odnowienie: **2026-10-14** (Claude przez SSH: linia tokenu przekazana przez stdin ssh i podmieniona `awk`, bez wypisywania; kopia `public_nodejs/.env.bak-2026-10-14`).
 
 ### Automat dzienny
 - Skrypt: `backend/src/scripts/campaign-daily.ts` → `dist/scripts/campaign-daily.js`. Kampanie wysłane w ostatnich 30 dniach: sprawdza odpowiedzi, potem przelicza zamówienia we wszystkich. **Nic nie wysyła, nie pobiera faktur z Fakturowni.**

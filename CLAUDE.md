@@ -9,7 +9,7 @@ Wewnętrzny CRM firmy Antyramy (crm.antyramy.eu): klienci, produkty, kampanie ma
 ## Przed rozpoczęciem pracy
 1. Przeczytaj `HANDOVER.md` – aktualny stan, testy ręczne do zrobienia.
 2. Przy większych zmianach sprawdź `DECISIONS.md` (najnowsze wpisy na dole sekcji).
-3. Po sesji zaktualizuj `HANDOVER.md`; nową decyzję dopisz do `DECISIONS.md`.
+3. Po sesji zaktualizuj `HANDOVER.md`; nową decyzję dopisz do `DECISIONS.md` (wpisy numerowane, **na górze**). Nową funkcję opisz najpierw w `SPEC.md`.
 
 ## Stack
 - Frontend: React 18 + TypeScript + Vite + Tailwind, PWA (`vite-plugin-pwa`)
@@ -46,7 +46,9 @@ cd frontend && npm run build   # tsc --noEmit + vite build
 - Nowy plik testów backendu dopisz do skryptu `test` w `backend/package.json`.
 - Czyste funkcje wydzielaj do `services/` / `utils/` i testuj; trasy importują Firestore (testy bez bazy ich nie załadują).
 - Usunięcie rekordu z plikiem → sprzątanie pliku (`deleteUpload`; kolaże: `releaseCollageFile` sprawdza współdzielenie).
+- Nie usuwaj działających funkcji bez pytania. Gdy polecenie jest niejasne – zapytaj, zanim zaczniesz.
 - Sekrety tylko w `.env` / `secret/`. Kolory interfejsu: czerń + akcent magenta (`accent-magenta`); maile/PDF: niebieski `#1a56db`.
 
 ## Deploy
 Push na `main` → GitHub Actions (testy, build, rsync na s61, restart). Alternatywa: lokalny `deploy.bat`. Weryfikacja: `https://crm.antyramy.eu/health`.
+Szczegóły kroków i serwera: `secret/DEPLOY.md` (lokalnie, poza repo) oraz `deploy.bat`. Token Gmail wygasł już raz (`invalid_grant`) – naprawa w `HANDOVER.md`.

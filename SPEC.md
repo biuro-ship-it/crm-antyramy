@@ -1,14 +1,65 @@
 # CRM Antyramy – specyfikacja
 
-> Na razie opisany tylko moduł **Kampanie** (z kolażem). Pozostałe moduły (klienci, produkty, kalendarz,
-> notatki, dostawcy, Kanban, archiwum) — do uzupełnienia; szczegóły kampanii: `HANDOVER.md`, `DECISIONS.md`.
+Wersja lekka, spisana 2026-10-14 z działającej aplikacji (kod, `CLAUDE.md`, `HANDOVER.md`, `DECISIONS.md`).
+Opisuje stan faktyczny; rozbudowujemy ją przy każdej nowej funkcji – **najpierw tu, potem kod**.
+Moduł **Kampanie** ma pełny opis (sekcja niżej). Pozostałe moduły mają opis podstawowy – kryteria
+„działa, gdy…” dopisujemy przy ich najbliższej zmianie.
 
 ## Cel
-Wewnętrzny CRM firmy Antyramy: baza klientów (zakłady, sklepy, agencje), katalog produktów i oferty mailowe
-do klientów z mierzeniem, co przyniosły.
+Wewnętrzny CRM firmy Antyramy (producent ram z Tarnowa): jedno miejsce na klientów (zakłady ramiarskie,
+sklepy, agencje), katalog produktów, kontakty z dostawcami, telefony kontrolne i zadania — oraz oferty mailowe
+do klientów z mierzeniem, co przyniosły. Zamiast notatek w arkuszach i skrzynce pocztowej.
 
 ## Użytkownicy
-- **Krzysiek i biuro** — konta Google z listy `ALLOWED_EMAILS`; pracują na komputerze i telefonie (PWA).
+- **Krzysiek i biuro** — konta Google z listy `ALLOWED_EMAILS` (backend jest źródłem prawdy, front blokuje logowanie
+  od razu); pracują na komputerze i telefonie (PWA). Brak ról — wszyscy dopuszczeni widzą wszystko.
+
+## Funkcje
+### Działa (wdrożone na crm.antyramy.eu)
+- ☑ **Klienci** — lista z wyszukiwarką i filtrami; typ klienta: zakład / sklep / agencja / inne, kolor relacji, trasa, tagi;
+  karta klienta z historią kontaktów (telefon / mail / spotkanie / inne), zamówieniami (sprzedaż rok / miesiąc / razem),
+  plikami, danymi z Białej listy VAT po NIP, fakturami z Fakturowni (tylko odczyt), polami marketingowymi
+  (zwrot w wołaczu, tagi, „nie wysyłać ofert”).
+- ☑ **Kalendarz i follow-upy** — zadania „zadzwoń / przypomnij” z terminem, podsumowanie na dziś i zaległych na ekranie klientów,
+  wynik rozmowy; korzysta z Kalendarza Google (to samo konto OAuth co Gmail).
+- ☑ **Kanban** — karty w kolumnach „do zrobienia / w toku / zrobione”, kolory, termin, powiązanie z klientem, przeciąganie.
+- ☑ **Produkty** — katalog (nazwa, kod, cena netto, zdjęcie); źródło tabeli i PDF w ofertach.
+- ☑ **Kampanie** — tygodniowe oferty mailowe z kolażem, testem A/B, obowiązkową wysyłką testową i pomiarem wyników (opis niżej).
+- ☑ **Szablony maili** — edytor z wersjonowaniem treści, kategorie, wysyłka z szablonu do klienta.
+- ☑ **Notatki** — notatki z kolorami (etykiety kolorów ustawiane w Administracji).
+- ☑ **Dostawcy** — karta dostawcy (kontakty, ustalenia: rabat / termin płatności / dostawy, materiały z cenami, pliki, historia kontaktów)
+  oraz kalkulator HDF (cena z m² i cięcia, zapis ceny do materiałów dostawcy).
+- ☑ **Archiwum** — pełna kopia danych (JSON odtwarzalny skryptem `backup restore`), paczka ZIP z plikami, eksport do Excela.
+- ☑ **Administracja** — etykiety kolorów (klienci, notatki), analityka (rozkład Kanban, klienci, sprzedaż wg klientów),
+  podpis w mailach, ustawienia kampanii.
+
+### Później
+- ☐ Opisy „działa, gdy…” dla modułów innych niż Kampanie (patrz uwaga na górze).
+- ☐ Obrazek kolażu osadzony w mailu (inline CID) — Outlook blokuje obrazy do kliknięcia „Pokaż obrazy”.
+- ☐ Adres wysyłki testowej jako ustawienie w Administracji (dziś stała w kodzie).
+- ☐ Kolaż ze zdjęć produktów z katalogu.
+
+### Poza zakresem (świadomie NIE robimy)
+- Automatyczna wysyłka maili bez kliknięcia „Wyślij” po podglądzie (niezmiennik — patrz `CLAUDE.md`).
+- Moduł „Promocje” — usunięty 2026-09-28, zastąpiony przez Kampanie.
+- Role i uprawnienia per użytkownik (na razie dwa konta, pełny dostęp).
+
+## Ekrany
+Zakładki w górnym pasku (na telefonie — menu dolne):
+
+| Ekran (zakładka) | Co zawiera | Akcje użytkownika |
+|---|---|---|
+| Logowanie | przycisk „Zaloguj przez Google” | logowanie kontem z listy dozwolonych |
+| Klienci (start) | zadania na dziś i zaległe, lista klientów, wyszukiwarka, filtry | dodaj / edytuj klienta, otwórz kartę, dodaj kontakt, zamówienie, plik, wyślij mail |
+| Kalendarz | follow-upy i zdarzenia w układzie kalendarza | dodaj / zakończ zadanie, zapisz wynik rozmowy |
+| Kanban | trzy kolumny z kartami | dodaj kartę, przeciągnij, zmień kolor / termin |
+| Produkty | katalog produktów ze zdjęciami | dodaj / edytuj / usuń produkt |
+| Kampanie (id `promotions`) | lista kampanii, ranking, ustawienia | edytor w 4 krokach, wysyłka, raport, duplikat |
+| Szablony maili | lista szablonów, edytor, historia wersji | utwórz, edytuj, wyślij |
+| Notatki | lista notatek | dodaj / edytuj / usuń |
+| Dostawcy | lista i karta dostawcy, kalkulator HDF | dodaj dostawcę, kontakt, materiał, plik |
+| Archiwum | eksporty danych | pobierz JSON / ZIP / Excel |
+| Administracja | etykiety kolorów, analityka, podpis, ustawienia kampanii | edytuj ustawienia |
 
 ## Kampanie
 Tygodniowa oferta mailowa do wybranych klientów, wysyłana z Gmaila biuro@antyramy.eu.
@@ -39,10 +90,20 @@ Dodatkowo: szkice, „Duplikuj kampanię”, „Wklej z JSON” (wypełnia formu
 - Obrazek osadzony w mailu (inline CID) — kolaż idzie jako link do pliku na crm.antyramy.eu; możliwe później.
 - Automatyczna wysyłka bez kliknięcia „Wyślij”.
 
+## Dane
+Firestore (Firebase): `clients` (+ podkolekcja `interactions`), `products`, `followups`, `notes`, `suppliers` (+ `interactions`),
+`emailTemplates`, `kanbanTasks`, `campaigns`, `settings`; `promotions` zostaje jako kopia sprzed migracji.
+Pliki (zdjęcia produktów, dokumenty klientów i dostawców, kolaże) leżą na serwerze w `public_nodejs/public/uploads/`.
+**Dane osobowe:** osoby kontaktowe, e-maile i telefony klientów oraz treść korespondencji — dostęp tylko dla kont z listy
+`ALLOWED_EMAILS`. Klucze (`serviceAccountKey.json`, `.env`, token Gmail) tylko na serwerze i lokalnie, nigdy w repo.
+Region bazy Firestore: nie zapisano — do potwierdzenia w konsoli Firebase.
+
 ## Wygląd
 - Interfejs: czerń/biel, akcent magenta `#FF3D8B`, zaokrąglone karty i przyciski, font Inter; tryb ciemny.
 - Maile i PDF: nagłówek niebieski `#1a56db`, Arial; PDF — LiberationSans.
 
 ## Wymagania niefunkcjonalne
+- Dostęp tylko dla kont z `ALLOWED_EMAILS`; dane osobowe klientów — nie wychodzą poza Firebase, serwer mydevil i Gmail.
+- Offline: niewymagany (PWA instaluje się na telefonie, ale dane pobiera z serwera).
 - Telefon i komputer (PWA); okno kolażu w jednej kolumnie na wąskim ekranie.
 - Hosting mydevil (FreeBSD) — bez bibliotek z natywnymi binarkami (kolaż rysowany w przeglądarce).
