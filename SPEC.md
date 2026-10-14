@@ -82,7 +82,7 @@ Dodatkowo: szkice, „Duplikuj kampanię”, „Wklej z JSON” (wypełnia formu
 - „Zmień” / „Usuń” w szkicu; wysłana kampania zachowuje swój kolaż; duplikat dostaje ten sam kolaż.
 
 ### Wyniki
-- „Sprawdź odpowiedzi” (+ automat codziennie 6:45): odpowiedzi w wątku Gmail, „NIE” = prośba o wypis (oznaczana ręcznie).
+- „Sprawdź odpowiedzi” (+ automat codziennie 6:45): odpowiedzi w wątku Gmail oraz odpowiedzi ze zmienionym tematem (nowy wątek, ale `In-Reply-To`/`References` wskazują na nasz mail kampanii), „NIE” = prośba o wypis (oznaczana ręcznie).
 - Zamówienia przypisywane do ostatniej kampanii w oknie N dni (domyślnie 14), do potwierdzenia ✓/✕.
 - Telefony kontrolne („Utwórz follow-upy”, wynik rozmowy), raport kampanii, ranking z wykresem i wynikiem A/B.
 

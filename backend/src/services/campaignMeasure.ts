@@ -2,9 +2,12 @@
 // zamówień. Reguły (czyste funkcje) w campaignResults.ts; tu tylko odczyt/zapis.
 // Nic tu nie wysyła maili — używa tego przycisk w raporcie i skrypt dzienny.
 import { db } from './firebase';
-import { getThreadMessages, listThreadIdsWithIncomingMail, GMAIL_READ_SCOPE_ERROR, GMAIL_RATE_LIMIT_ERROR } from './gmail';
 import {
-  findReply, extractReplyText, incomingMailQuery, isUnsubscribeReply, attributeOrders, computeResults,
+  getThreadMessages, listThreadIdsWithIncomingMail, listMessageRefs, getMessage, getThreadMessageIds,
+  GMAIL_READ_SCOPE_ERROR, GMAIL_RATE_LIMIT_ERROR,
+} from './gmail';
+import {
+  findReply, extractReplyText, incomingMailQuery, recipientMailQueries, repliesToAny, ThreadMessage, isUnsubscribeReply, attributeOrders, computeResults,
   AttributedOrder, AttributionCampaign, ClientOrder, CallOutcome,
 } from './campaignResults';
 import { recomputeLastContact } from '../utils/date';
@@ -90,52 +93,101 @@ export const checkReplies = async (campaignId: string): Promise<ReplyCheckSummar
     }
   }
 
+  const recordReply = async (r: MeasuredRecipient, reply: ThreadMessage) => {
+    const text = extractReplyText(reply.text);
+    const unsubscribe = isUnsubscribeReply(text);
+    const snippet = text.replace(/\s+/g, ' ').slice(0, 200);
+    updates.set(r.clientId, {
+      replied: !unsubscribe,
+      unsubscribeRequest: unsubscribe,
+      repliedAt: reply.date,
+      replySnippet: snippet,
+    });
+    if (unsubscribe) summary.newUnsubscribeRequests++; else summary.newReplies++;
+
+    // Historia kontaktów przy pierwszym wykryciu. Błąd historii nie blokuje wyniku.
+    try {
+      const clientRef = db.collection('clients').doc(r.clientId);
+      await clientRef.collection('interactions').add({
+        contactDate: reply.date.slice(0, 10),
+        channel: 'mail',
+        notes: unsubscribe
+          ? `Prośba o wypis (odpowiedź NIE) — kampania: ${c.name}`
+          : `Odpowiedź na kampanię: ${c.name}`,
+        tradeNotes: snippet,
+        campaignId,
+        createdBy: 'kampanie (automatycznie)',
+        createdAt: new Date().toISOString(),
+      });
+      await recomputeLastContact(clientRef);
+    } catch (histErr) {
+      console.error(`[campaignMeasure] historia klienta ${r.clientId} nie zapisana:`, histErr);
+    }
+  };
+
+  // Przerwa między pobraniami — kampania na kilkadziesiąt adresów nie wyczerpie limitu na minutę
   let fetched = 0;
+  const pause = async () => { if (fetched++ > 0) await new Promise(res => setTimeout(res, THREAD_PAUSE_MS)); };
+  const isFatal = (err: unknown) => {
+    const msg = (err as Error).message;
+    return msg === GMAIL_READ_SCOPE_ERROR || msg === GMAIL_RATE_LIMIT_ERROR;
+  };
+
   for (const r of todo) {
     if (!r.gmailThreadId) { summary.noThread++; continue; }
     summary.checked++;
     if (withIncoming && !withIncoming.has(r.gmailThreadId)) continue; // nic nie przyszło — brak odpowiedzi
-    // Przerwa między pobraniami — kampania na kilkadziesiąt adresów nie wyczerpie limitu na minutę
-    if (fetched++ > 0) await new Promise(res => setTimeout(res, THREAD_PAUSE_MS));
+    await pause();
     try {
       const messages = await getThreadMessages(r.gmailThreadId);
       const reply = findReply(messages, r.email, r.sentAt || c.sentAt || '');
-      if (!reply) continue;
-      const text = extractReplyText(reply.text);
-      const unsubscribe = isUnsubscribeReply(text);
-      const snippet = text.replace(/\s+/g, ' ').slice(0, 200);
-      updates.set(r.clientId, {
-        replied: !unsubscribe,
-        unsubscribeRequest: unsubscribe,
-        repliedAt: reply.date,
-        replySnippet: snippet,
-      });
-      if (unsubscribe) summary.newUnsubscribeRequests++; else summary.newReplies++;
-
-      // Historia kontaktów przy pierwszym wykryciu. Błąd historii nie blokuje wyniku.
-      try {
-        const clientRef = db.collection('clients').doc(r.clientId);
-        await clientRef.collection('interactions').add({
-          contactDate: reply.date.slice(0, 10),
-          channel: 'mail',
-          notes: unsubscribe
-            ? `Prośba o wypis (odpowiedź NIE) — kampania: ${c.name}`
-            : `Odpowiedź na kampanię: ${c.name}`,
-          tradeNotes: snippet,
-          campaignId,
-          createdBy: 'kampanie (automatycznie)',
-          createdAt: new Date().toISOString(),
-        });
-        await recomputeLastContact(clientRef);
-      } catch (histErr) {
-        console.error(`[campaignMeasure] historia klienta ${r.clientId} nie zapisana:`, histErr);
-      }
+      if (reply) await recordReply(r, reply);
     } catch (err) {
-      const msg = (err as Error).message;
-      if (msg === GMAIL_READ_SCOPE_ERROR || msg === GMAIL_RATE_LIMIT_ERROR) throw err;
+      if (isFatal(err)) throw err;
       console.error(`[campaignMeasure] wątek ${r.gmailThreadId} (${r.email}):`, (err as Error).message);
       summary.errors++;
     }
+  }
+
+  // Odpowiedź ze zmienionym tematem Gmail umieszcza w nowym wątku. Szukamy maili od odbiorców
+  // bez odpowiedzi poza wątkami kampanii i liczymy te, których In-Reply-To / References
+  // wskazują na nasz mail kampanii do tego odbiorcy (mail na inny temat się nie liczy).
+  const pending = todo.filter(r => r.gmailThreadId && !updates.has(r.clientId));
+  const byEmail = new Map(pending.map(r => [r.email.trim().toLowerCase(), r]));
+  const campaignThreads = new Set(todo.map(r => r.gmailThreadId).filter(Boolean));
+  const found = new Map<string, ThreadMessage>(); // clientId → najwcześniejsza odpowiedź
+  const ourIds = new Map<string, string[]>();      // wątek kampanii → Message-ID naszych maili
+  for (const q of recipientMailQueries([...byEmail.keys()], pending.map(r => r.sentAt || c.sentAt))) {
+    let refs: Array<{ id: string; threadId: string }>;
+    try {
+      refs = await listMessageRefs(q);
+    } catch (err) {
+      if (isFatal(err)) throw err;
+      console.error('[campaignMeasure] szukanie odpowiedzi w innych wątkach:', (err as Error).message);
+      summary.errors++;
+      continue;
+    }
+    for (const ref of refs) {
+      if (campaignThreads.has(ref.threadId)) continue; // wątek kampanii — sprawdzony wyżej
+      try {
+        await pause();
+        const msg = await getMessage(ref.id);
+        const r = byEmail.get(msg.from);
+        if (!r || !(msg.date > (r.sentAt || c.sentAt || ''))) continue;
+        const prev = found.get(r.clientId);
+        if (prev && prev.date <= msg.date) continue;
+        if (!ourIds.has(r.gmailThreadId!)) { await pause(); ourIds.set(r.gmailThreadId!, await getThreadMessageIds(r.gmailThreadId!)); }
+        if (repliesToAny(msg, ourIds.get(r.gmailThreadId!)!)) found.set(r.clientId, msg);
+      } catch (err) {
+        if (isFatal(err)) throw err;
+        console.error(`[campaignMeasure] wiadomość ${ref.id}:`, (err as Error).message);
+        summary.errors++;
+      }
+    }
+  }
+  for (const r of pending) {
+    const reply = found.get(r.clientId);
+    if (reply) await recordReply(r, reply);
   }
 
   await db.runTransaction(async tx => {

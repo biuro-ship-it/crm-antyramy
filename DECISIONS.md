@@ -9,6 +9,13 @@ zostaje bez zmian w sekcji **Archiwum** na dole pliku.
 
 <!-- Nowe wpisy dodawaj NA GÓRZE -->
 
+## #011 – 2026-10-14 – Odpowiedź ze zmienionym tematem też jest odpowiedzią na kampanię
+- **Status:** obowiązuje
+- **Decyzja:** Po sprawdzeniu wątków kampanii `checkReplies` szuka maili od odbiorców bez odpowiedzi (`from:(…) after:<wysyłka − 1 h>`, po 25 adresów na zapytanie, ze spamem) poza wątkami kampanii. Mail liczy się jako odpowiedź tylko wtedy, gdy jego `In-Reply-To` / `References` wskazują na `Message-ID` naszego maila kampanii do tego odbiorcy; mail na inny temat — nie. Filtr cytatu rozpoznaje też nagłówek „W liście datowanym … napisano:” (Onet / Interia / WP).
+- **Dlaczego:** biuro@fotogasek.pl odpowiedział 12.10 na kampanię z 8.10 tematem „Zamówienie FotoGAsek” — Gmail założył nowy wątek i CRM tego nie widział, choć nagłówki wskazywały na nasz mail. Sprawdzone na sucho: kampania z 8.10 → 1 nowa odpowiedź (fotogasek.pl, fragment „Witam!”), 0 błędów, ok. 7 s.
+- **Odrzucone opcje:** Liczenie każdego maila od odbiorcy po wysyłce (łapałoby korespondencję na inne tematy); dopasowanie po temacie „Re: …” (klient zmienił temat).
+- **Konsekwencje:** Funkcje `listMessageRefs`, `getMessage`, `getThreadMessageIds` (gmail.ts), `recipientMailQueries`, `repliesToAny`, `messageIdsIn` (campaignResults.ts, testy). Kilka dodatkowych zapytań do Gmaila na kampanię — tylko dla maili od odbiorców spoza wątków kampanii.
+
 ## #010 – 2026-10-14 – Sprawdzanie odpowiedzi: najpierw lista poczty przychodzącej, potem tylko te wątki
 - **Status:** obowiązuje (uzupełnia #009)
 - **Decyzja:** `checkReplies` jednym zapytaniem `messages.list` (`after:<najwcześniejsza wysyłka − 1 h> -from:me`, ze spamem i koszem) ustala wątki, do których coś przyszło, i pobiera (`threads.get`) tylko te. Gdy zawężenie się nie uda (brak daty wysyłki, ponad 10 000 wiadomości, inny błąd listy) — sprawdza wszystkie wątki jak dawniej.

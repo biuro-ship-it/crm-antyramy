@@ -1,7 +1,7 @@
 # CRM Antyramy – handover
 
 **Ostatnia aktualizacja:** 2026-10-14
-**Wersja produkcyjna:** commit `67c557e` — https://crm.antyramy.eu (deploy 2026-10-14, `/health` = 200). Brak niewypchniętych zmian w kodzie.
+**Wersja produkcyjna:** commit `67c557e` — https://crm.antyramy.eu (deploy 2026-10-14, `/health` = 200). Lokalnie czeka poprawka odpowiedzi ze zmienionym tematem (DECISIONS #011).
 
 Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
@@ -16,7 +16,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 
 ### 🔧 W trakcie
 - **Dokumentacja według szablonu** (2026-10-14): `SPEC.md` obejmuje już cały CRM, `DECISIONS.md` ma numerowane wpisy #001–#008. Do zrobienia przy okazji: kryteria „działa, gdy…” w `SPEC.md` dla modułów innych niż Kampanie; region bazy Firestore do potwierdzenia w konsoli Firebase.
-- **Token Gmail odnowiony 2026-10-14 ok. 19:10** (powód: w CRM błąd „Brak uprawnienia do czytania poczty”). Weryfikacja: tokeninfo pokazuje `gmail.readonly`, `gmail.send`, `calendar.events`; `getThreadMessages` lokalnie czyta wątek bez 403; na serwerze podmieniona tylko linia `GMAIL_REFRESH_TOKEN` w `public_nodejs/.env` (kopia `.env.bak-2026-10-14`, md5 linii zgodne z lokalnym), `devil www restart` OK, `/health` = 200, w `logs/error.log` brak błędów Gmail. **Po odnowieniu błąd wrócił — prawdziwa przyczyna to limit zapytań Gmaila** (403 „Quota exceeded … per minute per user” dla 10 z 62 wątków kampanii z 2026-10-08), który kod brał za brak uprawnienia. Poprawka #009 (ponawianie, przerwa, osobny komunikat) wdrożona `fb0a428`, ale nie wystarczyła — zmierzony limit to ok. 70 pobrań wątku/min. Poprawka #010: najpierw lista poczty przychodzącej, pobierane tylko wątki z nową pocztą (kampania z 8.10: 5 zamiast 62; porównanie z pełnym sprawdzeniem zgodne, odpowiedzi w niej na razie 0). Testy 68/68, build OK; wdrożone `67c557e`, **na produkcji potwierdzone 2026-10-14**: „Sprawdzono 62 wątków — nowe odpowiedzi: 0, prośby o wypis: 0. Zamówienia przeliczone.”
+- **Token Gmail odnowiony 2026-10-14 ok. 19:10** (powód: w CRM błąd „Brak uprawnienia do czytania poczty”). Weryfikacja: tokeninfo pokazuje `gmail.readonly`, `gmail.send`, `calendar.events`; `getThreadMessages` lokalnie czyta wątek bez 403; na serwerze podmieniona tylko linia `GMAIL_REFRESH_TOKEN` w `public_nodejs/.env` (kopia `.env.bak-2026-10-14`, md5 linii zgodne z lokalnym), `devil www restart` OK, `/health` = 200, w `logs/error.log` brak błędów Gmail. **Po odnowieniu błąd wrócił — prawdziwa przyczyna to limit zapytań Gmaila** (403 „Quota exceeded … per minute per user” dla 10 z 62 wątków kampanii z 2026-10-08), który kod brał za brak uprawnienia. Poprawka #009 (ponawianie, przerwa, osobny komunikat) wdrożona `fb0a428`, ale nie wystarczyła — zmierzony limit to ok. 70 pobrań wątku/min. Poprawka #010: najpierw lista poczty przychodzącej, pobierane tylko wątki z nową pocztą (kampania z 8.10: 5 zamiast 62; porównanie z pełnym sprawdzeniem zgodne, odpowiedzi w niej na razie 0). Testy 68/68, build OK; wdrożone `67c557e`, **na produkcji potwierdzone 2026-10-14**: „Sprawdzono 62 wątków — nowe odpowiedzi: 0, prośby o wypis: 0. Zamówienia przeliczone.” Potem wyszło, że odpowiedź fotogasek.pl ze zmienionym tematem (nowy wątek) nie była liczona — poprawka #011, testy 72/72, na sucho 1 nowa odpowiedź; commit lokalny, **niewdrożony** — po pushu kliknąć „📬 Sprawdź odpowiedzi” (powinna dojść 1 odpowiedź od biuro@fotogasek.pl).
 - W `logs/error.log` po każdym starcie: `[followups] GET /summary` → Firestore „The query requires an index” (kolekcja `followups`, pola `status` + `dueDate`). Niezwiązane z tokenem, nie naprawiane — do zrobienia: utworzyć indeks z linku w logu.
 - **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
 - Commit `b0d5dc9` (czytelny komunikat o wygasłym tokenie Gmail, błąd testu / wysyłki przy przyciskach w kroku 4) wdrożony 2026-10-14 razem z `bdffc4c`.
@@ -189,7 +189,7 @@ Ostatnie odnowienie: **2026-10-14** (Claude przez SSH: linia tokenu przekazana p
 
 ### Ograniczenia
 - Kampanie przeniesione z Promocji nie mają wątków Gmail — odpowiedzi dla nich nie są mierzone (w rankingu „—”); zamówienia tak.
-- Odpowiedź z innego adresu niż ten, na który poszedł mail, nie zostanie wykryta.
+- Odpowiedź z innego adresu niż ten, na który poszedł mail, nie zostanie wykryta. Odpowiedź ze zmienionym tematem (nowy wątek) — wykrywana od 2026-10-14 (DECISIONS #011). Odpowiedzi, które Gmail wrzucił do spamu, są liczone (wyszukiwanie obejmuje spam), ale kampanie sprzed pomiaru (bez wątków, np. „Klasyczna ramka A4” z 27.09) nie są mierzone.
 - Dni robocze bez świąt. Zamówienia z faktur liczą się dopiero po „hurtowej aktualizacji z Fakturowni”.
 
 ## Do przetestowania ręcznie (Etap 2)

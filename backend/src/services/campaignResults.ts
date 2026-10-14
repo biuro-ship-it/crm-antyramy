@@ -9,7 +9,12 @@ export interface ThreadMessage {
   from: string;      // sam adres, małymi literami
   date: string;      // ISO
   text: string;      // treść (text/plain albo HTML bez tagów)
+  messageId?: string;   // nagłówek Message-ID, np. „<abc@mail.gmail.com>”
+  refersTo?: string[];  // Message-ID z In-Reply-To i References — na co ta wiadomość odpowiada
 }
+
+/** Wszystkie identyfikatory „<…>” z nagłówka In-Reply-To / References. */
+export const messageIdsIn = (value: string): string[] => value.match(/<[^<>\s]+>/g) ?? [];
 
 interface GmailPart {
   mimeType?: string | null;
@@ -62,14 +67,21 @@ export const parseGmailMessage = (msg: GmailMessageLike): ThreadMessage => {
     from: emailFromHeader(header('from')),
     date: Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : '',
     text: plain ?? (html !== null ? htmlToText(html) : ''),
+    messageId: header('message-id').trim(),
+    refersTo: [...new Set([...messageIdsIn(header('in-reply-to')), ...messageIdsIn(header('references'))])],
   };
 };
+
+/** Czy wiadomość odpowiada na któryś z naszych maili (po In-Reply-To / References). */
+export const repliesToAny = (msg: ThreadMessage, ourMessageIds: string[]): boolean =>
+  ourMessageIds.length > 0 && (msg.refersTo ?? []).some(id => ourMessageIds.includes(id));
 
 // ─── Odpowiedzi ─────────────────────────────────────────────────────────────
 
 // Początek cytowanej wiadomości w odpowiedzi (Gmail PL/EN, Outlook, Apple Mail)
 const QUOTE_HEADERS = [
   /^W dniu .+ napisał(\(a\)|a)?:?\s*$/i,          // Gmail PL: „napisał(a):”
+  /^W liście datowanym .+ napisa(no|ł|ła|ł\(a\)):?\s*$/i, // Onet / Interia / WP
   /^On .+ wrote:\s*$/i,
   /^-{2,}\s*(Original Message|Wiadomość oryginalna|Oryginalna wiadomość)\s*-{2,}/i,
   /^(Od|From):\s.+/i,
@@ -128,6 +140,23 @@ export const incomingMailQuery = (sentAts: Array<string | null | undefined>): st
     earliest = Math.min(earliest, t);
   }
   return `after:${Math.floor(earliest / 1000) - 3600} -from:me`;
+};
+
+const RECIPIENTS_PER_QUERY = 25;
+
+/**
+ * Zapytania Gmaila o maile od odbiorców od wysyłki (po 25 adresów na zapytanie) — do szukania
+ * odpowiedzi ze zmienionym tematem, które Gmail umieszcza w nowym wątku. [] = nie da się zawęzić.
+ */
+export const recipientMailQueries = (emails: string[], sentAts: Array<string | null | undefined>): string[] => {
+  const base = incomingMailQuery(sentAts);
+  const addrs = [...new Set(emails.map(e => e.trim().toLowerCase()).filter(e => /^[^\s()"]+@[^\s()"]+$/.test(e)))];
+  if (!base || addrs.length === 0) return [];
+  const queries: string[] = [];
+  for (let i = 0; i < addrs.length; i += RECIPIENTS_PER_QUERY) {
+    queries.push(`${base} from:(${addrs.slice(i, i + RECIPIENTS_PER_QUERY).join(' OR ')})`);
+  }
+  return queries;
 };
 
 // ─── Zamówienia ─────────────────────────────────────────────────────────────

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseGmailMessage, emailFromHeader, extractReplyText, isUnsubscribeReply, findReply,
-  attributeOrders, computeResults, addWorkingDays, incomingMailQuery, ThreadMessage, AttributionCampaign, ClientOrder,
+  attributeOrders, computeResults, addWorkingDays, incomingMailQuery, recipientMailQueries, repliesToAny, messageIdsIn, ThreadMessage, AttributionCampaign, ClientOrder,
 } from './campaignResults';
 
 const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
@@ -18,6 +18,46 @@ test('incomingMailQuery: brak albo zła data → null (sprawdzamy wszystkie wąt
   assert.equal(incomingMailQuery([]), null);
   assert.equal(incomingMailQuery(['2026-10-08T18:00:00.000Z', null]), null);
   assert.equal(incomingMailQuery(['2026-10-08T18:00:00.000Z', 'xx']), null);
+});
+
+// 2026-10-14: klient odpowiedział na kampanię ze zmienionym tematem („Zamówienie FotoGAsek”),
+// Gmail założył nowy wątek i odpowiedź nie była liczona.
+test('parseGmailMessage: Message-ID oraz In-Reply-To + References bez duplikatów', () => {
+  const m = parseGmailMessage({
+    id: 'm1', internalDate: '1760000000000',
+    payload: { mimeType: 'text/plain', body: { data: b64('Zamawiam') }, headers: [
+      { name: 'From', value: 'biuro@fotogasek.pl' },
+      { name: 'Message-ID', value: '<odp@fotogasek.pl>' },
+      { name: 'In-Reply-To', value: '<kampania@mail.gmail.com>' },
+      { name: 'References', value: '<starszy@x.pl>\r\n <kampania@mail.gmail.com>' },
+    ] },
+  });
+  assert.equal(m.messageId, '<odp@fotogasek.pl>');
+  assert.deepEqual(m.refersTo, ['<kampania@mail.gmail.com>', '<starszy@x.pl>']);
+});
+
+test('messageIdsIn: wyciąga identyfikatory <…>, pusty nagłówek → []', () => {
+  assert.deepEqual(messageIdsIn('<a@b> <c@d>'), ['<a@b>', '<c@d>']);
+  assert.deepEqual(messageIdsIn(''), []);
+});
+
+test('repliesToAny: odpowiedź na nasz mail tak, mail na inny temat nie', () => {
+  const reply: ThreadMessage = { id: '1', from: 'k@x.pl', date: '', text: '', refersTo: ['<kampania@mail.gmail.com>'] };
+  const other: ThreadMessage = { id: '2', from: 'k@x.pl', date: '', text: '', refersTo: [] };
+  assert.equal(repliesToAny(reply, ['<kampania@mail.gmail.com>']), true);
+  assert.equal(repliesToAny(other, ['<kampania@mail.gmail.com>']), false);
+  assert.equal(repliesToAny(reply, []), false);
+});
+
+test('recipientMailQueries: po 25 adresów, małe litery, bez duplikatów i złych adresów', () => {
+  const sent = '2026-10-08T18:00:00.000Z';
+  const emails = Array.from({ length: 30 }, (_, i) => `k${i}@x.pl`).concat(['K0@X.PL', 'zły adres', 'a"b@x.pl']);
+  const qs = recipientMailQueries(emails, [sent]);
+  assert.equal(qs.length, 2);
+  assert.ok(qs[0].startsWith(`after:${Date.parse(sent) / 1000 - 3600} -from:me from:(k0@x.pl OR k1@x.pl`));
+  assert.equal(qs[1], `after:${Date.parse(sent) / 1000 - 3600} -from:me from:(k25@x.pl OR k26@x.pl OR k27@x.pl OR k28@x.pl OR k29@x.pl)`);
+  assert.deepEqual(recipientMailQueries([], [sent]), []);
+  assert.deepEqual(recipientMailQueries(['k@x.pl'], [null]), []);
 });
 
 test('parseGmailMessage: nadawca, data, text/plain z multipart', () => {
@@ -63,6 +103,8 @@ test('extractReplyText: ucina cytat Gmaila PL/EN, Outlooka i podpis', () => {
   assert.equal(extractReplyText('Ok\n-- \nJan Kowalski\ntel. 600'), 'Ok');
   assert.equal(extractReplyText('Tak\n> cytat\n> cytat'), 'Tak');
   assert.equal(extractReplyText('nie\n\nWysłane z mojego iPhone'), 'nie');
+  // Onet / Interia / WP (przypadek z 2026-10-14, fotogasek.pl)
+  assert.equal(extractReplyText('Witam!\n\nW liście datowanym czwartek, 8 października 2026 (21:30:43) napisano:\n\n\n> Antyramy'), 'Witam!');
 });
 
 test('isUnsubscribeReply: NIE vs zwykła odpowiedź', () => {

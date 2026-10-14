@@ -180,21 +180,40 @@ export const getThreadMessages = async (threadId: string): Promise<ThreadMessage
 
 const MAX_LIST_PAGES = 20; // 20 × 500 wiadomości — z zapasem na miesiąc poczty
 
-// Wątki, do których od podanej chwili przyszła jakakolwiek poczta (nie od nas, łącznie ze spamem
-// i koszem — jak threads.get). Jedno–kilka zapytań zamiast osobnego zapytania na każdy wątek.
-export const listThreadIdsWithIncomingMail = async (query: string): Promise<Set<string>> => {
+// Wiadomości pasujące do zapytania (łącznie ze spamem i koszem — jak threads.get).
+export const listMessageRefs = async (query: string): Promise<Array<{ id: string; threadId: string }>> => {
   const gmail = getGmailClient();
-  const ids = new Set<string>();
+  const refs: Array<{ id: string; threadId: string }> = [];
   let pageToken: string | undefined;
   for (let page = 0; page < MAX_LIST_PAGES; page++) {
     const res = await readGmail('lista wiadomości', () =>
       gmail.users.messages.list({ userId: 'me', q: query, maxResults: 500, includeSpamTrash: true, pageToken }));
-    for (const m of res.data.messages ?? []) if (m.threadId) ids.add(m.threadId);
+    for (const m of res.data.messages ?? []) if (m.id && m.threadId) refs.push({ id: m.id, threadId: m.threadId });
     pageToken = res.data.nextPageToken ?? undefined;
-    if (!pageToken) return ids;
+    if (!pageToken) return refs;
   }
-  // Za dużo poczty, by mieć pewność, że lista jest pełna — wywołujący sprawdzi wszystkie wątki
+  // Za dużo poczty, by mieć pewność, że lista jest pełna
   throw new Error('Za dużo wiadomości do przefiltrowania');
+};
+
+// Wątki, do których od podanej chwili przyszła jakakolwiek poczta (nie od nas).
+// Jedno–kilka zapytań zamiast osobnego zapytania na każdy wątek.
+export const listThreadIdsWithIncomingMail = async (query: string): Promise<Set<string>> =>
+  new Set((await listMessageRefs(query)).map(m => m.threadId));
+
+export const getMessage = async (messageId: string): Promise<ThreadMessage> => {
+  const gmail = getGmailClient();
+  const res = await readGmail(`wiadomość ${messageId}`, () =>
+    gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' }));
+  return parseGmailMessage(res.data);
+};
+
+// Message-ID wiadomości w wątku (same nagłówki — tanio). Do rozpoznania odpowiedzi w innym wątku.
+export const getThreadMessageIds = async (threadId: string): Promise<string[]> => {
+  const gmail = getGmailClient();
+  const res = await readGmail(`wątek ${threadId}`, () =>
+    gmail.users.threads.get({ userId: 'me', id: threadId, format: 'metadata', metadataHeaders: ['Message-ID'] }));
+  return (res.data.messages ?? []).map(m => parseGmailMessage(m).messageId ?? '').filter(Boolean);
 };
 
 export const sendBulkEmails = async (
