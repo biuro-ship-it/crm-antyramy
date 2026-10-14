@@ -14,7 +14,7 @@ import {
 import { todayISO, recomputeLastContact } from '../utils/date';
 import { isNotFound } from '../utils/firestore';
 import { checkReplies, recomputeOrders, setOrderStatus } from '../services/campaignMeasure';
-import { GMAIL_READ_SCOPE_ERROR } from '../services/gmail';
+import { GMAIL_READ_SCOPE_ERROR, GMAIL_RATE_LIMIT_ERROR } from '../services/gmail';
 import { createCampaignFollowups } from '../services/campaignFollowups';
 import { heroUrlPolicy, resolveHeroImageInput, planHeroImageChange, releaseCollageFile } from '../services/collageFiles';
 
@@ -686,6 +686,10 @@ router.post('/:id/check-replies', async (req: AuthenticatedRequest, res: Respons
   } catch (err) {
     if ((err as Error).message === GMAIL_READ_SCOPE_ERROR) {
       res.status(400).json({ error: GMAIL_READ_SCOPE_ERROR });
+      return;
+    }
+    if ((err as Error).message === GMAIL_RATE_LIMIT_ERROR) {
+      res.status(429).json({ error: GMAIL_RATE_LIMIT_ERROR });
       return;
     }
     handleError(res, err, 'POST /:id/check-replies', 'Błąd sprawdzania odpowiedzi');

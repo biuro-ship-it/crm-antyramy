@@ -121,16 +121,54 @@ export const isInvalidGrant = (err: unknown): boolean => {
 export const GMAIL_READ_SCOPE_ERROR =
   'Brak uprawnienia do czytania poczty — wygeneruj nowy token Gmail (node scripts/get-gmail-token.js, patrz HANDOVER.md)';
 
+export const GMAIL_RATE_LIMIT_ERROR =
+  'Gmail chwilowo ogranicza liczbę zapytań — spróbuj ponownie za minutę';
+
+type GoogleApiError = { code?: number | string; message?: string; errors?: Array<{ reason?: string }> } | null;
+
+// Limit zapytań Google zwraca jako 429 albo 403 („Quota exceeded…”, rateLimitExceeded) —
+// to NIE jest brak uprawnienia, tylko chwilowa blokada.
+export const isRateLimitError = (err: unknown): boolean => {
+  const e = err as GoogleApiError;
+  if (!e) return false;
+  if (Number(e.code) === 429) return true;
+  const reason = e.errors?.[0]?.reason ?? '';
+  return /rateLimitExceeded|userRateLimitExceeded|quotaExceeded/i.test(reason)
+    || /quota exceeded|rate limit/i.test(e.message ?? '');
+};
+
+export const isMissingScopeError = (err: unknown): boolean => {
+  const e = err as GoogleApiError;
+  if (!e || isRateLimitError(e)) return false;
+  return Number(e.code) === 403 || /insufficient|scope/i.test(e.message ?? '');
+};
+
+const RATE_LIMIT_RETRY_DELAYS_MS = [1000, 2000, 4000];
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
 // Wiadomości wątku (kampanie: wykrywanie odpowiedzi). Wymaga scope gmail.readonly.
+// Przy limicie zapytań ponawia po 1, 2 i 4 s.
 export const getThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
   const gmail = getGmailClient();
-  try {
-    const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'full' });
-    return (res.data.messages ?? []).map(parseGmailMessage);
-  } catch (err) {
-    const e = err as { code?: number; message?: string };
-    if (e.code === 403 || /insufficient|scope/i.test(e.message ?? '')) throw new Error(GMAIL_READ_SCOPE_ERROR);
-    throw err;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'full' });
+      return (res.data.messages ?? []).map(parseGmailMessage);
+    } catch (err) {
+      if (isRateLimitError(err)) {
+        if (attempt < RATE_LIMIT_RETRY_DELAYS_MS.length) {
+          await sleep(RATE_LIMIT_RETRY_DELAYS_MS[attempt]);
+          continue;
+        }
+        console.error(`[gmail] limit zapytań, wątek ${threadId}:`, (err as Error).message);
+        throw new Error(GMAIL_RATE_LIMIT_ERROR);
+      }
+      if (isMissingScopeError(err)) {
+        console.error(`[gmail] brak uprawnienia, wątek ${threadId}:`, (err as Error).message);
+        throw new Error(GMAIL_READ_SCOPE_ERROR);
+      }
+      throw err;
+    }
   }
 };
 

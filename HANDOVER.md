@@ -1,7 +1,7 @@
 # CRM Antyramy – handover
 
 **Ostatnia aktualizacja:** 2026-10-14
-**Wersja produkcyjna:** commit `81b8677` — https://crm.antyramy.eu (deploy 2026-10-08, `/health` = 200). Lokalnie czekają niewypchnięte commity: poprawka komunikatu błędu (`b0d5dc9`) + dokumentacja.
+**Wersja produkcyjna:** commit `bdffc4c` — https://crm.antyramy.eu (deploy 2026-10-14, `/health` = 200; zawiera też `b0d5dc9`). Lokalnie czeka poprawka limitu zapytań Gmaila (DECISIONS #009).
 
 Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
@@ -16,7 +16,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 
 ### 🔧 W trakcie
 - **Dokumentacja według szablonu** (2026-10-14): `SPEC.md` obejmuje już cały CRM, `DECISIONS.md` ma numerowane wpisy #001–#008. Do zrobienia przy okazji: kryteria „działa, gdy…” w `SPEC.md` dla modułów innych niż Kampanie; region bazy Firestore do potwierdzenia w konsoli Firebase.
-- **Token Gmail odnowiony 2026-10-14 ok. 19:10** (powód: w CRM błąd „Brak uprawnienia do czytania poczty”). Weryfikacja: tokeninfo pokazuje `gmail.readonly`, `gmail.send`, `calendar.events`; `getThreadMessages` lokalnie czyta wątek bez 403; na serwerze podmieniona tylko linia `GMAIL_REFRESH_TOKEN` w `public_nodejs/.env` (kopia `.env.bak-2026-10-14`, md5 linii zgodne z lokalnym), `devil www restart` OK, `/health` = 200, w `logs/error.log` brak błędów Gmail. „📬 Sprawdź odpowiedzi” na produkcji po odnowieniu jeszcze nie klikane — to potwierdzi odczyt na serwerze.
+- **Token Gmail odnowiony 2026-10-14 ok. 19:10** (powód: w CRM błąd „Brak uprawnienia do czytania poczty”). Weryfikacja: tokeninfo pokazuje `gmail.readonly`, `gmail.send`, `calendar.events`; `getThreadMessages` lokalnie czyta wątek bez 403; na serwerze podmieniona tylko linia `GMAIL_REFRESH_TOKEN` w `public_nodejs/.env` (kopia `.env.bak-2026-10-14`, md5 linii zgodne z lokalnym), `devil www restart` OK, `/health` = 200, w `logs/error.log` brak błędów Gmail. **Po odnowieniu błąd wrócił — prawdziwa przyczyna to limit zapytań Gmaila** (403 „Quota exceeded … per minute per user” dla 10 z 62 wątków kampanii z 2026-10-08), który kod brał za brak uprawnienia. Poprawka (DECISIONS #009): ponawianie przy limicie, przerwa między wątkami, osobny komunikat; testy 66/66, build OK; commit lokalny, **niewdrożony** — po pushu kliknąć „📬 Sprawdź odpowiedzi” w tej kampanii.
 - W `logs/error.log` po każdym starcie: `[followups] GET /summary` → Firestore „The query requires an index” (kolekcja `followups`, pola `status` + `dueDate`). Niezwiązane z tokenem, nie naprawiane — do zrobienia: utworzyć indeks z linku w logu.
 - **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
 - Lokalny, niewdrożony commit `b0d5dc9`: czytelny komunikat o wygasłym tokenie Gmail i błąd testu / wysyłki pokazywany przy przyciskach w kroku 4 (na produkcji nadal tylko u góry strony, jako samo „invalid_grant”). Testy i build przechodzą (backend 62, frontend 66).

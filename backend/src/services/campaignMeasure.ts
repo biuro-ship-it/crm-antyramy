@@ -2,7 +2,7 @@
 // zamówień. Reguły (czyste funkcje) w campaignResults.ts; tu tylko odczyt/zapis.
 // Nic tu nie wysyła maili — używa tego przycisk w raporcie i skrypt dzienny.
 import { db } from './firebase';
-import { getThreadMessages, GMAIL_READ_SCOPE_ERROR } from './gmail';
+import { getThreadMessages, GMAIL_READ_SCOPE_ERROR, GMAIL_RATE_LIMIT_ERROR } from './gmail';
 import {
   findReply, extractReplyText, isUnsubscribeReply, attributeOrders, computeResults,
   AttributedOrder, AttributionCampaign, ClientOrder, CallOutcome,
@@ -10,6 +10,7 @@ import {
 import { recomputeLastContact } from '../utils/date';
 
 const COLLECTION = 'campaigns';
+const THREAD_PAUSE_MS = 150;
 export const CAMPAIGN_SETTINGS_DOC = 'settings/campaigns';
 export const DEFAULT_ATTRIBUTION_DAYS = 14;
 
@@ -75,6 +76,8 @@ export const checkReplies = async (campaignId: string): Promise<ReplyCheckSummar
   for (const r of c.recipients ?? []) {
     if (r.status !== 'sent' || r.replied || r.unsubscribeRequest) continue;
     if (!r.gmailThreadId) { summary.noThread++; continue; }
+    // Przerwa między wątkami — kampania na kilkadziesiąt adresów nie wyczerpie limitu Gmaila na minutę
+    if (summary.checked > 0) await new Promise(res => setTimeout(res, THREAD_PAUSE_MS));
     summary.checked++;
     try {
       const messages = await getThreadMessages(r.gmailThreadId);
@@ -110,7 +113,8 @@ export const checkReplies = async (campaignId: string): Promise<ReplyCheckSummar
         console.error(`[campaignMeasure] historia klienta ${r.clientId} nie zapisana:`, histErr);
       }
     } catch (err) {
-      if ((err as Error).message === GMAIL_READ_SCOPE_ERROR) throw err;
+      const msg = (err as Error).message;
+      if (msg === GMAIL_READ_SCOPE_ERROR || msg === GMAIL_RATE_LIMIT_ERROR) throw err;
       console.error(`[campaignMeasure] wątek ${r.gmailThreadId} (${r.email}):`, (err as Error).message);
       summary.errors++;
     }

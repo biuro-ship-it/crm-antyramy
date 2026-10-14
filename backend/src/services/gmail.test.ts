@@ -1,6 +1,40 @@
 import { describe, it, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getGmailClient, buildRawMessage, isInvalidGrant } from './gmail';
+import { getGmailClient, buildRawMessage, isInvalidGrant, isRateLimitError, isMissingScopeError } from './gmail';
+
+// 2026-10-14: limit zapytań (403 „Quota exceeded”) był brany za brak uprawnienia
+// i CRM kazał odnawiać token, choć token był dobry.
+describe('isRateLimitError / isMissingScopeError — limit zapytań to nie brak uprawnienia', () => {
+  const quota403 = {
+    code: 403,
+    message: "Quota exceeded for quota metric 'Total Query Cost' and limit 'Units per minute per user' of service 'gmail.googleapis.com'",
+  };
+
+  it('403 „Quota exceeded” to limit, nie brak uprawnienia', () => {
+    assert.equal(isRateLimitError(quota403), true);
+    assert.equal(isMissingScopeError(quota403), false);
+  });
+
+  it('429 i reason rateLimitExceeded / userRateLimitExceeded to limit', () => {
+    assert.equal(isRateLimitError({ code: 429, message: 'Too Many Requests' }), true);
+    assert.equal(isRateLimitError({ code: 403, message: 'x', errors: [{ reason: 'rateLimitExceeded' }] }), true);
+    assert.equal(isRateLimitError({ code: 403, message: 'x', errors: [{ reason: 'userRateLimitExceeded' }] }), true);
+  });
+
+  it('prawdziwy brak gmail.readonly nadal jest brakiem uprawnienia', () => {
+    const scope403 = { code: 403, message: 'Request had insufficient authentication scopes.', errors: [{ reason: 'insufficientPermissions' }] };
+    assert.equal(isRateLimitError(scope403), false);
+    assert.equal(isMissingScopeError(scope403), true);
+  });
+
+  it('inne błędy nie są ani limitem, ani brakiem uprawnienia', () => {
+    const notFound = { code: 404, message: 'Requested entity was not found.' };
+    assert.equal(isRateLimitError(notFound), false);
+    assert.equal(isMissingScopeError(notFound), false);
+    assert.equal(isRateLimitError(null), false);
+    assert.equal(isMissingScopeError(null), false);
+  });
+});
 
 describe('isInvalidGrant — wygasły / cofnięty token', () => {
   it('rozpoznaje odpowiedź Google i sam komunikat', () => {

@@ -9,6 +9,13 @@ zostaje bez zmian w sekcji **Archiwum** na dole pliku.
 
 <!-- Nowe wpisy dodawaj NA GÓRZE -->
 
+## #009 – 2026-10-14 – Limit zapytań Gmaila to nie brak uprawnienia
+- **Status:** obowiązuje
+- **Decyzja:** Przy sprawdzaniu odpowiedzi błąd 429 albo 403 „Quota exceeded” / `rateLimitExceeded` jest traktowany jako limit zapytań: `getThreadMessages` ponawia po 1, 2 i 4 s, a między wątkami jest 150 ms przerwy. Jeśli limit nadal blokuje — komunikat „Gmail chwilowo ogranicza liczbę zapytań” (HTTP 429). Komunikat „Brak uprawnienia do czytania poczty” tylko przy prawdziwym braku `gmail.readonly`. Obie przyczyny trafiają do `logs/error.log`.
+- **Dlaczego:** Każdy 403 był brany za brak uprawnienia — przy kampanii na 62 adresy 10 wątków dostało 403 z limitu na minutę, a CRM kazał odnawiać token, choć token był dobry (token odnowiono 2026-10-14 niepotrzebnie).
+- **Odrzucone opcje:** Zliczanie limitu jako zwykłego błędu wątku i sprawdzanie dalej (kolejne wątki też by trafiały w limit, wynik byłby niepełny bez ostrzeżenia).
+- **Konsekwencje:** Sprawdzanie kampanii trwa dłużej (ok. +0,15 s na wątek). Testy w `backend/src/services/gmail.test.ts`.
+
 ## #008 – 2026-10-14 – Dokumentacja całej aplikacji według szablonu
 - **Status:** obowiązuje
 - **Decyzja:** Wiedza o aplikacji mieszka w repo: `CLAUDE.md` (instrukcja), `SPEC.md` (co robi aplikacja – cały CRM, nie tylko Kampanie), `DECISIONS.md` (ten plik), `HANDOVER.md` (stan). Deploy opisuje `secret/DEPLOY.md` (lokalnie, poza repo) i `deploy.bat`.
