@@ -114,6 +114,22 @@ export const findReply = (
     .find(m => m.from === addr && !SYSTEM_SENDERS.test(m.from) && (!sentAt || m.date > sentAt)) ?? null;
 };
 
+/**
+ * Zapytanie Gmaila o pocztę przychodzącą od najwcześniejszej wysyłki (z godziną zapasu),
+ * żeby pobierać tylko wątki, w których coś przyszło. null = nie da się zawęzić
+ * (brak albo zła data wysyłki) — wtedy sprawdzamy wszystkie wątki.
+ */
+export const incomingMailQuery = (sentAts: Array<string | null | undefined>): string | null => {
+  if (sentAts.length === 0) return null;
+  let earliest = Infinity;
+  for (const s of sentAts) {
+    const t = s ? Date.parse(s) : NaN;
+    if (!Number.isFinite(t)) return null;
+    earliest = Math.min(earliest, t);
+  }
+  return `after:${Math.floor(earliest / 1000) - 3600} -from:me`;
+};
+
 // ─── Zamówienia ─────────────────────────────────────────────────────────────
 
 export type AttributionStatus = 'auto' | 'confirmed' | 'rejected';

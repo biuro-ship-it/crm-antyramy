@@ -2,12 +2,23 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   parseGmailMessage, emailFromHeader, extractReplyText, isUnsubscribeReply, findReply,
-  attributeOrders, computeResults, addWorkingDays, ThreadMessage, AttributionCampaign, ClientOrder,
+  attributeOrders, computeResults, addWorkingDays, incomingMailQuery, ThreadMessage, AttributionCampaign, ClientOrder,
 } from './campaignResults';
 
 const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_');
 
 // ─── Gmail ───
+
+test('incomingMailQuery: od najwcześniejszej wysyłki minus godzina, bez naszych maili', () => {
+  const q = incomingMailQuery(['2026-10-08T19:00:00.000Z', '2026-10-08T18:00:00.000Z']);
+  assert.equal(q, `after:${Date.parse('2026-10-08T18:00:00.000Z') / 1000 - 3600} -from:me`);
+});
+
+test('incomingMailQuery: brak albo zła data → null (sprawdzamy wszystkie wątki)', () => {
+  assert.equal(incomingMailQuery([]), null);
+  assert.equal(incomingMailQuery(['2026-10-08T18:00:00.000Z', null]), null);
+  assert.equal(incomingMailQuery(['2026-10-08T18:00:00.000Z', 'xx']), null);
+});
 
 test('parseGmailMessage: nadawca, data, text/plain z multipart', () => {
   const m = parseGmailMessage({

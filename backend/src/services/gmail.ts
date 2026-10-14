@@ -146,30 +146,55 @@ export const isMissingScopeError = (err: unknown): boolean => {
 const RATE_LIMIT_RETRY_DELAYS_MS = [1000, 2000, 4000];
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-// Wiadomości wątku (kampanie: wykrywanie odpowiedzi). Wymaga scope gmail.readonly.
-// Przy limicie zapytań ponawia po 1, 2 i 4 s.
-export const getThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
-  const gmail = getGmailClient();
+// Odczyt z Gmaila (wymaga scope gmail.readonly). Przy limicie zapytań ponawia po 1, 2 i 4 s;
+// limit i brak uprawnienia zamienia na czytelne komunikaty, prawdziwą przyczynę loguje.
+const readGmail = async <T>(label: string, call: () => Promise<T>): Promise<T> => {
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'full' });
-      return (res.data.messages ?? []).map(parseGmailMessage);
+      return await call();
     } catch (err) {
       if (isRateLimitError(err)) {
         if (attempt < RATE_LIMIT_RETRY_DELAYS_MS.length) {
           await sleep(RATE_LIMIT_RETRY_DELAYS_MS[attempt]);
           continue;
         }
-        console.error(`[gmail] limit zapytań, wątek ${threadId}:`, (err as Error).message);
+        console.error(`[gmail] limit zapytań, ${label}:`, (err as Error).message);
         throw new Error(GMAIL_RATE_LIMIT_ERROR);
       }
       if (isMissingScopeError(err)) {
-        console.error(`[gmail] brak uprawnienia, wątek ${threadId}:`, (err as Error).message);
+        console.error(`[gmail] brak uprawnienia, ${label}:`, (err as Error).message);
         throw new Error(GMAIL_READ_SCOPE_ERROR);
       }
       throw err;
     }
   }
+};
+
+// Wiadomości wątku (kampanie: wykrywanie odpowiedzi).
+export const getThreadMessages = async (threadId: string): Promise<ThreadMessage[]> => {
+  const gmail = getGmailClient();
+  const res = await readGmail(`wątek ${threadId}`, () =>
+    gmail.users.threads.get({ userId: 'me', id: threadId, format: 'full' }));
+  return (res.data.messages ?? []).map(parseGmailMessage);
+};
+
+const MAX_LIST_PAGES = 20; // 20 × 500 wiadomości — z zapasem na miesiąc poczty
+
+// Wątki, do których od podanej chwili przyszła jakakolwiek poczta (nie od nas, łącznie ze spamem
+// i koszem — jak threads.get). Jedno–kilka zapytań zamiast osobnego zapytania na każdy wątek.
+export const listThreadIdsWithIncomingMail = async (query: string): Promise<Set<string>> => {
+  const gmail = getGmailClient();
+  const ids = new Set<string>();
+  let pageToken: string | undefined;
+  for (let page = 0; page < MAX_LIST_PAGES; page++) {
+    const res = await readGmail('lista wiadomości', () =>
+      gmail.users.messages.list({ userId: 'me', q: query, maxResults: 500, includeSpamTrash: true, pageToken }));
+    for (const m of res.data.messages ?? []) if (m.threadId) ids.add(m.threadId);
+    pageToken = res.data.nextPageToken ?? undefined;
+    if (!pageToken) return ids;
+  }
+  // Za dużo poczty, by mieć pewność, że lista jest pełna — wywołujący sprawdzi wszystkie wątki
+  throw new Error('Za dużo wiadomości do przefiltrowania');
 };
 
 export const sendBulkEmails = async (

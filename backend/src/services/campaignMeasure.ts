@@ -2,9 +2,9 @@
 // zamówień. Reguły (czyste funkcje) w campaignResults.ts; tu tylko odczyt/zapis.
 // Nic tu nie wysyła maili — używa tego przycisk w raporcie i skrypt dzienny.
 import { db } from './firebase';
-import { getThreadMessages, GMAIL_READ_SCOPE_ERROR, GMAIL_RATE_LIMIT_ERROR } from './gmail';
+import { getThreadMessages, listThreadIdsWithIncomingMail, GMAIL_READ_SCOPE_ERROR, GMAIL_RATE_LIMIT_ERROR } from './gmail';
 import {
-  findReply, extractReplyText, isUnsubscribeReply, attributeOrders, computeResults,
+  findReply, extractReplyText, incomingMailQuery, isUnsubscribeReply, attributeOrders, computeResults,
   AttributedOrder, AttributionCampaign, ClientOrder, CallOutcome,
 } from './campaignResults';
 import { recomputeLastContact } from '../utils/date';
@@ -73,12 +73,30 @@ export const checkReplies = async (campaignId: string): Promise<ReplyCheckSummar
   const summary: ReplyCheckSummary = { checked: 0, newReplies: 0, newUnsubscribeRequests: 0, noThread: 0, errors: 0 };
   const updates = new Map<string, Partial<MeasuredRecipient>>();
 
-  for (const r of c.recipients ?? []) {
-    if (r.status !== 'sent' || r.replied || r.unsubscribeRequest) continue;
+  const todo = (c.recipients ?? []).filter(r => r.status === 'sent' && !r.replied && !r.unsubscribeRequest);
+
+  // Limit Gmaila to ok. 70 pobrań wątku na minutę (zmierzone 2026-10-14) — dlatego najpierw jedną
+  // listą ustalamy, do których wątków w ogóle coś przyszło, i tylko te pobieramy.
+  // Gdy zawężenie się nie uda, sprawdzamy wszystkie wątki jak dawniej.
+  let withIncoming: Set<string> | null = null;
+  const query = incomingMailQuery(todo.filter(r => r.gmailThreadId).map(r => r.sentAt || c.sentAt));
+  if (query) {
+    try {
+      withIncoming = await listThreadIdsWithIncomingMail(query);
+    } catch (err) {
+      const msg = (err as Error).message;
+      if (msg === GMAIL_READ_SCOPE_ERROR || msg === GMAIL_RATE_LIMIT_ERROR) throw err;
+      console.error('[campaignMeasure] lista wiadomości — sprawdzam wszystkie wątki:', msg);
+    }
+  }
+
+  let fetched = 0;
+  for (const r of todo) {
     if (!r.gmailThreadId) { summary.noThread++; continue; }
-    // Przerwa między wątkami — kampania na kilkadziesiąt adresów nie wyczerpie limitu Gmaila na minutę
-    if (summary.checked > 0) await new Promise(res => setTimeout(res, THREAD_PAUSE_MS));
     summary.checked++;
+    if (withIncoming && !withIncoming.has(r.gmailThreadId)) continue; // nic nie przyszło — brak odpowiedzi
+    // Przerwa między pobraniami — kampania na kilkadziesiąt adresów nie wyczerpie limitu na minutę
+    if (fetched++ > 0) await new Promise(res => setTimeout(res, THREAD_PAUSE_MS));
     try {
       const messages = await getThreadMessages(r.gmailThreadId);
       const reply = findReply(messages, r.email, r.sentAt || c.sentAt || '');

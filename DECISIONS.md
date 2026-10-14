@@ -9,6 +9,13 @@ zostaje bez zmian w sekcji **Archiwum** na dole pliku.
 
 <!-- Nowe wpisy dodawaj NA GÓRZE -->
 
+## #010 – 2026-10-14 – Sprawdzanie odpowiedzi: najpierw lista poczty przychodzącej, potem tylko te wątki
+- **Status:** obowiązuje (uzupełnia #009)
+- **Decyzja:** `checkReplies` jednym zapytaniem `messages.list` (`after:<najwcześniejsza wysyłka − 1 h> -from:me`, ze spamem i koszem) ustala wątki, do których coś przyszło, i pobiera (`threads.get`) tylko te. Gdy zawężenie się nie uda (brak daty wysyłki, ponad 10 000 wiadomości, inny błąd listy) — sprawdza wszystkie wątki jak dawniej.
+- **Dlaczego:** Zmierzony limit Gmaila dla projektu to ok. 70 pobrań wątku na minutę (po minucie ciszy 69 udanych w 26 s, potem 403 „Quota exceeded”); kampania na 62 adresy zjadała go w całości nawet z ponawianiem (#009). Po zmianie kampania z 2026-10-08: 5 pobrań zamiast 62, lista 0,8 s; porównanie z pełnym sprawdzeniem — te same wątki, żadna odpowiedź nie pominięta.
+- **Odrzucone opcje:** Tylko wolniejsze sprawdzanie (1 s/wątek) — kampania 62 adresów > 1 min, większa przekroczyłaby czas żądania HTTP; podniesienie limitu w Google Cloud Console — niezależne od kodu, nie usuwa problemu przy większych kampaniach.
+- **Konsekwencje:** Funkcje `listThreadIdsWithIncomingMail` (gmail.ts), `incomingMailQuery` (campaignResults.ts, testy). Odpowiedź z innego adresu w tym samym wątku nadal nie jest liczona (bez zmian).
+
 ## #009 – 2026-10-14 – Limit zapytań Gmaila to nie brak uprawnienia
 - **Status:** obowiązuje
 - **Decyzja:** Przy sprawdzaniu odpowiedzi błąd 429 albo 403 „Quota exceeded” / `rateLimitExceeded` jest traktowany jako limit zapytań: `getThreadMessages` ponawia po 1, 2 i 4 s, a między wątkami jest 150 ms przerwy. Jeśli limit nadal blokuje — komunikat „Gmail chwilowo ogranicza liczbę zapytań” (HTTP 429). Komunikat „Brak uprawnienia do czytania poczty” tylko przy prawdziwym braku `gmail.readonly`. Obie przyczyny trafiają do `logs/error.log`.
