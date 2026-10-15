@@ -1,7 +1,7 @@
 # CRM Antyramy – handover
 
 **Ostatnia aktualizacja:** 2026-10-15
-**Wersja produkcyjna:** commit `19a35c9` — https://crm.antyramy.eu (deploy 2026-10-15, `/health` = 200; historia zamówień #012). Lokalnie, niewdrożone: #013 („Oznacz jako wysłane”, admin).
+**Wersja produkcyjna:** commit `7d5a8fe` — https://crm.antyramy.eu (deploy 2026-10-15, `/health` = 200). Brak niewypchniętych zmian w kodzie.
 
 Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
@@ -12,10 +12,11 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - Kampanie: edytor w 4 krokach (**Produkty i kolaż → Treść → Odbiorcy → Wysyłka**), szkice, duplikat, import JSON, test A/B, wysyłka partiami po 10, wznowienie. Kampania z samym kolażem albo samym tekstem (produkty opcjonalne). Obowiązkowa wysyłka testowa na info@pluszek.pl.
 - Kolaż „Oferta tygodnia” z 3 zdjęć (krok 1), pomiar wyników (odpowiedzi, zamówienia, follow-upy, ranking), automat dzienny 6:45.
 - **Token Gmail odnowiony 2026-10-14 ok. 19:10** — scope'y `gmail.readonly`, `gmail.send`, `calendar.events` (tokeninfo); na serwerze podmieniona tylko linia `GMAIL_REFRESH_TOKEN` (kopia `public_nodejs/.env.bak-2026-10-14`), restart OK.
+- **Zamówienia do dostawców + Historia zamówień (2026-10-15, wdrożone `19a35c9` i `7d5a8fe`):** dwie drogi — wysyłka z CRM przez Gmail z PDF w załączniku (#012) albo „⬇️ Pobierz PDF” → wysyłka własnym programem → „✅ Oznacz jako wysłane” z datą wysyłki i notatką (#013). Sekcja „🧾 Historia zamówień” w karcie dostawcy (rozwijane szczegóły, „Pobierz PDF”), wpisy niezmienne; błędny wpis usuwa tylko administrator (`ADMIN_EMAILS`, na serwerze brak zmiennej = tylko biuro@antyramy.eu). Usunięcie dostawcy kasuje wszystkie jego pliki. Trasy chronione (bez logowania 401). **Testy ręczne na produkcji jeszcze niezrobione** — lista w sekcji „Historia zamówień do dostawców” niżej.
 - **„Sprawdź odpowiedzi” naprawione (2026-10-14):** komunikat „Brak uprawnienia do czytania poczty” był fałszywy — blokował limit zapytań Gmaila (ok. 70 pobrań wątku/min). Teraz: lista poczty przychodzącej i pobieranie tylko wątków z nową pocztą (#010), ponawianie przy limicie i osobny komunikat (#009), odpowiedzi ze zmienionym tematem w nowym wątku rozpoznawane po `In-Reply-To`/`References` (#011). Na produkcji potwierdzone dla `67c557e` („Sprawdzono 62 wątków … 0”); `8fd19e8` (#011) sprawdzone na sucho na prawdziwych danych — 1 nowa odpowiedź (biuro@fotogasek.pl, 12.10).
 
 ### 🔧 W trakcie
-- **Historia zamówień do dostawców (2026-10-15).** Wdrożone `19a35c9`: wysyłka z CRM przez Gmail z PDF, sekcja „🧾 Historia zamówień” (DECISIONS #012). **Lokalnie, niewdrożone** (DECISIONS #013): „⬇️ Pobierz PDF” + „✅ Oznacz jako wysłane” (wysyłka poza CRM, data wysyłki i notatka), usuwanie błędnego wpisu przez administratora (`ADMIN_EMAILS`, domyślnie biuro@antyramy.eu — zmienną w `.env` na serwerze dopisujesz tylko, gdy chcesz innych adminów), usunięcie dostawcy kasuje wszystkie jego pliki. Testy: backend 94/94, frontend 82/82, build OK; widok historii sprawdzony na stronie testowej. Okna „Oznacz jako wysłane” i prawdziwych wysyłek nie testowałem — testy ręczne niżej.
+- **Testy ręczne historii zamówień** (obie drogi, admin, usuwanie dostawcy) — niezrobione; lista w sekcji „Historia zamówień do dostawców” niżej. Prawdziwej wysyłki zamówienia ani okna „Oznacz jako wysłane” nikt jeszcze nie sprawdził.
 - **Kliknięcie „📬 Sprawdź odpowiedzi” po wdrożeniu `8fd19e8` nie zostało potwierdzone** — w kampanii z 8.10 powinna dojść 1 odpowiedź (FotoGAsek), w historii kontaktów klienta wpis „Odpowiedź na kampanię: Kampania bez nazwy” z 12.10.
 - **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
 - Dokumentacja według szablonu: do zrobienia przy okazji kryteria „działa, gdy…” w `SPEC.md` dla modułów innych niż Kampanie; region bazy Firestore do potwierdzenia w konsoli Firebase.
@@ -30,7 +31,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - Outlook blokuje kolaż do kliknięcia „Pokaż obrazy” (inline CID — osobne zadanie). Pliki-sieroty kolażu nie są sprzątane.
 
 ## Następne kroki (kolejność = priorytet)
-- **Najpierw:** wypchnięcie (`! git push origin main` = deploy) i testy ręczne historii zamówień (sekcja niżej) — na dostawcy testowym z Twoim adresem e-mail.
+- **Najpierw:** testy ręczne historii zamówień (sekcja „Historia zamówień do dostawców” niżej, punkty 1–10) — na dostawcy testowym z Twoim adresem e-mail; po usunięciu dostawcy testowego Claude sprawdza przez SSH, czy jego pliki zniknęły.
 0. **Google Cloud Console:** status aplikacji OAuth („Testing” → „Internal” albo „Publish app”), żeby token nie wygasał co 7 dni; przy okazji limity Gmail API („per minute per user”). Gdy poczta znów stanie: `node backend/scripts/get-gmail-token.js` → linia `GMAIL_REFRESH_TOKEN` do `public_nodejs/.env` na serwerze → `devil www restart crm.antyramy.eu`.
 1. Kliknąć „📬 Sprawdź odpowiedzi” w kampanii z 8.10 i potwierdzić odpowiedź FotoGAska (wyżej).
 2. Utworzyć indeks Firestore dla `followups` (link w `logs/error.log`).
@@ -45,7 +46,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - Kolaże i uploady testować tylko na produkcji (plik wgrany lokalnie nie wyświetli się w mailu).
 
 ## Historia sesji
-- **2026-10-15** — Historia zamówień do dostawców: wysyłka przez Gmail z PDF (zamiast `mailto:`), podkolekcja `orders`, sekcja w karcie (#012, wdrożone `19a35c9`); potem „Pobierz PDF” + „Oznacz jako wysłane”, usuwanie wpisu przez admina (`ADMIN_EMAILS`), sprzątanie wszystkich plików dostawcy (#013, niewdrożone).
+- **2026-10-15** — Historia zamówień do dostawców: wysyłka przez Gmail z PDF (zamiast `mailto:`), podkolekcja `orders`, sekcja w karcie (#012, wdrożone `19a35c9`); potem „Pobierz PDF” + „Oznacz jako wysłane”, usuwanie wpisu przez admina (`ADMIN_EMAILS`), sprzątanie wszystkich plików dostawcy (#013). Oba etapy wdrożone (`19a35c9`, `7d5a8fe`), testy ręczne czekają.
 - **2026-10-14 (wieczór)** — Błąd „Brak uprawnienia do czytania poczty”: token Gmail odnowiony i przeniesiony na serwer, ale prawdziwą przyczyną był limit zapytań Gmaila. Poprawki „Sprawdź odpowiedzi”: #009 ponawianie i osobny komunikat (`fb0a428`), #010 pobieranie tylko wątków z nową pocztą (`67c557e`, potwierdzone na produkcji), #011 odpowiedzi ze zmienionym tematem (`8fd19e8`, sprawdzone na sucho). Wdrożony też `b0d5dc9` i dokumentacja (`bdffc4c`).
 - **2026-10-14** — Dokumentacja całej aplikacji według szablonu: `SPEC.md` rozszerzony z modułu Kampanie na cały CRM, `DECISIONS.md` z numerowanymi wpisami #001–#008 (stary dziennik Kampanii zachowany jako archiwum), `HANDOVER.md` i `CLAUDE.md` uzupełnione. Bez zmian w kodzie.
 - **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`). Wieczorem: test nie doszedł, bo wygasł token Gmail (`invalid_grant`) — token odnowiony i przeniesiony na serwer; lokalnie czytelniejszy komunikat błędu (`b0d5dc9`, niewdrożone).
@@ -55,7 +56,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 
 # Szczegóły
 
-## Historia zamówień do dostawców — 2026-10-15 (droga A wdrożona `19a35c9`, droga B i admin — po wdrożeniu #013)
+## Historia zamówień do dostawców — 2026-10-15, wdrożone (`19a35c9`, `7d5a8fe`), testy ręczne niezrobione
 
 Testy ręczne na produkcji. Używaj dostawcy testowego z **własnym** adresem e-mail (droga A to prawdziwa wysyłka).
 
