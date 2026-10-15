@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import {
   Supplier, SupplierMaterial, SupplierOrder, Interaction,
-  updateSupplier, sendSupplierOrder,
+  updateSupplier, sendSupplierOrder, downloadSupplierOrderPdf, markSupplierOrderSent,
 } from '../services/api';
-import { buildOrderSendItems } from '../utils/supplierOrders';
+import { buildOrderSendItems, orderPdfKey } from '../utils/supplierOrders';
+import { todayISO } from '../utils/date';
 
 interface SupplierMaterialsProps {
   supplier: Supplier;
@@ -57,6 +58,15 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentInfo, setSentInfo] = useState<string | null>(null);
+
+  // Droga B: „Pobierz PDF” → wysyłka poza CRM → „Oznacz jako wysłane” (CRM niczego nie wysyła).
+  const [lastPdf, setLastPdf] = useState<{ key: string; pdfDate: string } | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [markOpen, setMarkOpen] = useState(false);
+  const [markDate, setMarkDate] = useState(todayISO());
+  const [markNote, setMarkNote] = useState('');
+  const [marking, setMarking] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
 
   // Zapis katalogu surowców przez istniejące PUT /api/suppliers/:id (wzorzec files[]).
   const persist = async (next: SupplierMaterial[]) => {
@@ -122,6 +132,62 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
   const handleClear = () => {
     setQuantities({});
     setOrderNotes('');
+    setLastPdf(null);
+  };
+
+  const currentItems = buildOrderSendItems(materials, quantities);
+  const currentKey = orderPdfKey(currentItems, orderNotes);
+  // „Oznacz jako wysłane” tylko dla zamówienia, którego PDF właśnie pobrano (zapisana kopia = wysłany PDF)
+  const pdfReady = !!lastPdf && lastPdf.key === currentKey && currentItems.length > 0;
+
+  const handleDownloadPdf = async () => {
+    if (currentItems.length === 0) {
+      alert('Wpisz ilość przy co najmniej jednym surowcu.');
+      return;
+    }
+    setDownloading(true);
+    setError(null);
+    setSentInfo(null);
+    try {
+      const { pdfDate } = await downloadSupplierOrderPdf(supplier.id, { items: currentItems, notes: orderNotes.trim() });
+      setLastPdf({ key: currentKey, pdfDate });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się przygotować PDF zamówienia.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const handleOpenMark = () => {
+    if (!pdfReady) return;
+    setMarkDate(todayISO());
+    setMarkNote('');
+    setMarkError(null);
+    setMarkOpen(true);
+  };
+
+  // Zapis tylko po kliknięciu „Zapisz jako wysłane” w oknie potwierdzenia.
+  const handleConfirmMark = async () => {
+    if (!lastPdf || marking) return;
+    setMarking(true);
+    setMarkError(null);
+    try {
+      const { order, interaction } = await markSupplierOrderSent(supplier.id, {
+        items: currentItems,
+        notes: orderNotes.trim(),
+        sentDate: markDate,
+        note: markNote.trim(),
+        pdfDate: lastPdf.pdfDate,
+      });
+      onOrderSent?.(order, interaction);
+      setMarkOpen(false);
+      handleClear();
+      setSentInfo('Zamówienie zapisane w Historii zamówień jako wysłane poza CRM (z kopią PDF).');
+    } catch (err) {
+      setMarkError(err instanceof Error ? err.message : 'Nie udało się zapisać zamówienia.');
+    } finally {
+      setMarking(false);
+    }
   };
 
   // Mail NIE zawiera cen — tylko nazwy, ilości i jednostki.
@@ -310,18 +376,81 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
           className="w-full bg-canvas border border-hairline rounded-lg p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm font-light resize-none mb-3"
         />
 
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-body-sm text-ink/70">
-            Wartość wybranych pozycji:{' '}
-            <span className="font-black text-ink">{zl(orderTotal)} zł netto</span>
-            <span className="text-xs text-ink/40 ml-1">(podgląd — nie trafia do maila)</span>
-          </p>
-          <div className="flex gap-2">
-            <button type="button" onClick={handleClear} className="btn-secondary px-4 py-2 text-sm">Wyczyść</button>
-            <button type="button" onClick={handleOpenPreview} className="btn-primary px-5 py-2 text-sm">✉️ Wyślij zamówienie mailem</button>
+        <p className="text-body-sm text-ink/70 mb-3">
+          Wartość wybranych pozycji:{' '}
+          <span className="font-black text-ink">{zl(orderTotal)} zł netto</span>
+          <span className="text-xs text-ink/40 ml-1">(podgląd — nie trafia do maila ani PDF)</span>
+        </p>
+
+        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
+          <button type="button" onClick={handleOpenPreview} className="btn-primary px-5 py-2.5 text-sm">✉️ Wyślij zamówienie mailem</button>
+          <button type="button" onClick={handleDownloadPdf} disabled={downloading} className="btn-secondary px-4 py-2.5 text-sm disabled:opacity-60">
+            {downloading ? 'Przygotowuję PDF...' : '⬇️ Pobierz PDF'}
+          </button>
+          <button
+            type="button"
+            onClick={handleOpenMark}
+            disabled={!pdfReady}
+            title={pdfReady ? '' : 'Najpierw pobierz PDF aktualnego zamówienia'}
+            className="px-4 py-2.5 text-sm font-bold rounded-lg border-2 border-accent-magenta text-ink hover:bg-block-pink disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            ✅ Oznacz jako wysłane
+          </button>
+          <button type="button" onClick={handleClear} className="btn-secondary px-4 py-2.5 text-sm sm:ml-auto">Wyczyść</button>
+        </div>
+        <p className="text-xs text-ink/50 mt-2">
+          Wysyłasz sam? <b>Pobierz PDF</b> → wyślij go swoim programem pocztowym → <b>Oznacz jako wysłane</b>.
+          {lastPdf && !pdfReady && currentItems.length > 0 && (
+            <span className="block text-ink/70 mt-1">⚠️ Zamówienie zmieniło się po pobraniu PDF — pobierz PDF ponownie.</span>
+          )}
+        </p>
+      </div>
+
+      {/* OZNACZ JAKO WYSŁANE (wysyłka poza CRM) */}
+      {markOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
+          <div className="bg-canvas rounded-t-2xl sm:rounded-lg shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 border-b border-hairline-soft">
+              <h3 className="text-lg font-bold text-ink">✅ Oznacz jako wysłane</h3>
+              <button type="button" onClick={() => !marking && setMarkOpen(false)} className="text-ink font-light text-2xl leading-none" aria-label="Zamknij">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              {markError && (
+                <div className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3">⚠️ {markError}</div>
+              )}
+              <p className="text-body-sm text-ink/70">
+                {currentItems.length} poz. · CRM <b>nie wysyła</b> maila — zapisze w Historii zamówień kopię pobranego PDF.
+              </p>
+              <label className="block">
+                <span className="block text-xs font-bold text-ink/60 uppercase tracking-wider mb-1">Data wysyłki</span>
+                <input
+                  type="date"
+                  value={markDate}
+                  max={todayISO()}
+                  onChange={e => setMarkDate(e.target.value)}
+                  className="w-full bg-canvas border border-hairline rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs font-bold text-ink/60 uppercase tracking-wider mb-1">Notatka (opcjonalnie)</span>
+                <textarea
+                  rows={3}
+                  value={markNote}
+                  onChange={e => setMarkNote(e.target.value)}
+                  placeholder="Np. wysłane z Outlooka do pani Ani"
+                  className="w-full bg-canvas border border-hairline rounded-lg p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm resize-none"
+                />
+              </label>
+            </div>
+            <div className="px-5 py-4 border-t border-hairline-soft flex flex-col-reverse sm:flex-row justify-end gap-2">
+              <button type="button" onClick={() => setMarkOpen(false)} disabled={marking} className="btn-secondary px-4 py-2.5 text-sm disabled:opacity-60">Anuluj</button>
+              <button type="button" onClick={handleConfirmMark} disabled={marking || !markDate} className="btn-primary px-5 py-2.5 text-sm disabled:opacity-60">
+                {marking ? 'Zapisuję...' : 'Zapisz jako wysłane'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* PODGLĄD ZAMÓWIENIA PRZED WYSYŁKĄ */}
       {preview && (

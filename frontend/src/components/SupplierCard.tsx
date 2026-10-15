@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Supplier, SupplierFile, SupplierOrder, Interaction, InteractionFormData, getSupplierInteractions, getSupplierOrders, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage, deleteUpload } from '../services/api';
+import { Supplier, SupplierFile, SupplierOrder, Interaction, InteractionFormData, getSupplierInteractions, getSupplierOrders, deleteSupplierOrder, getMe, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage, deleteUpload } from '../services/api';
 import SupplierMaterials from './SupplierMaterials';
 import SupplierOrderHistory from './SupplierOrderHistory';
 import { sortOrdersNewestFirst } from '../utils/supplierOrders';
@@ -31,6 +31,18 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
   const [orders, setOrders] = useState<SupplierOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    getMe().then(me => setIsAdmin(me.isAdmin)).catch(() => setIsAdmin(false));
+  }, []);
+
+  // Usunięcie błędnego wpisu (admin) — backend kasuje też kopię PDF i powiązany wpis w kontaktach
+  const handleDeleteOrder = async (order: SupplierOrder) => {
+    await deleteSupplierOrder(supplier.id, order.id);
+    setOrders(prev => prev.filter(o => o.id !== order.id));
+    setInteractions(prev => prev.filter(i => (i as Interaction & { orderId?: string }).orderId !== order.id));
+  };
 
   useEffect(() => {
     getSupplierInteractions(supplier.id)
@@ -277,7 +289,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
       />
 
       {/* 3.6 HISTORIA ZAMÓWIEŃ */}
-      <SupplierOrderHistory orders={orders} loading={ordersLoading} error={ordersError} />
+      <SupplierOrderHistory orders={orders} loading={ordersLoading} error={ordersError} isAdmin={isAdmin} onDelete={handleDeleteOrder} />
 
       {/* 4. OŚ CZASU (ROZMOWY I USTALENIA) */}
       <div className="mt-8">

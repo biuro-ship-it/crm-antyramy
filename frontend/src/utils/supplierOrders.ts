@@ -10,8 +10,14 @@ export const buildOrderSendItems = (
     .filter(m => (quantities[m.id] ?? 0) > 0)
     .map(m => ({ materialId: m.id, name: m.name, quantity: quantities[m.id], unit: m.unit }));
 
-/** „15.10.2026, 10:30” — zawsze czas polski. */
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** „15.10.2026, 10:30” — zawsze czas polski; sama data (wpis „Oznacz jako wysłane”) → „15.10.2026”. */
 export const formatOrderDateTime = (iso: string): string => {
+  if (DATE_ONLY_RE.test(iso)) {
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
+  }
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
   return new Intl.DateTimeFormat('pl-PL', {
@@ -28,5 +34,16 @@ export const positionsLabel = (n: number): string => {
   return `${n} pozycji`;
 };
 
+/** Od najnowszej daty wysyłki (porównanie po dniu w Polsce, potem chwili zapisu). */
 export const sortOrdersNewestFirst = (orders: SupplierOrder[]): SupplierOrder[] =>
-  [...orders].sort((a, b) => b.sentAt.localeCompare(a.sentAt));
+  [...orders].sort((a, b) =>
+    sentDay(b).localeCompare(sentDay(a)) || (b.recordedAt ?? b.sentAt).localeCompare(a.recordedAt ?? a.sentAt));
+
+const sentDay = (o: SupplierOrder): string =>
+  DATE_ONLY_RE.test(o.sentAt)
+    ? o.sentAt
+    : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Warsaw' }).format(new Date(o.sentAt));
+
+/** Odcisk zamówienia (pozycje + uwagi) — „Oznacz jako wysłane” tylko dla zamówienia, którego PDF pobrano. */
+export const orderPdfKey = (items: SupplierOrderSendData['items'], notes: string): string =>
+  JSON.stringify({ items: items.map(i => [i.materialId ?? '', i.name, i.quantity, i.unit]), notes: notes.trim() });

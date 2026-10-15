@@ -10,9 +10,11 @@ import { sendEmail, GMAIL_TOKEN_ERROR } from '../services/gmail';
 import { generateSupplierOrderPdf } from '../services/pdf';
 import { saveUploadFile, deleteUploadFile } from '../services/uploadStore';
 import {
-  ORDER_UNITS, buildOrderItems, buildOrderEntry, orderInteraction, orderPdfLayout,
-  orderPdfFilename, orderPdfFilenameFromUrl, orderBodyToHtml,
+  ORDER_UNITS, OrderItem, SupplierOrderEntry, buildOrderItems, buildOrderEntry, buildManualOrderEntry, orderInteraction,
+  orderPdfLayout, orderPdfFilename, orderPdfFilenameFromUrl, orderBodyToHtml, sentDateError, pdfDateFrom, warsawDate,
 } from '../services/supplierOrders';
+import { isAdmin } from '../services/admins';
+import { uploadFilenameOf } from '../services/collageFiles';
 
 const router = Router();
 router.use(authenticate);
@@ -149,6 +151,17 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
       await batch.commit();
     }
 
+    // Pliki z karty dostawcy (cenniki i inne załączniki) — też znikają z serwera
+    const supplierSnap = await db.collection(COLLECTION).doc(id).get();
+    const files: Array<{ url?: string }> = Array.isArray(supplierSnap.data()?.files) ? supplierSnap.data()!.files : [];
+    for (const f of files) {
+      const filename = uploadFilenameOf(f.url);
+      if (filename) {
+        await deleteUploadFile(filename).catch(err =>
+          console.error(`[suppliers] nie usunięto pliku dostawcy ${filename}:`, err));
+      }
+    }
+
     await db.collection(COLLECTION).doc(id).delete();
     res.status(204).send();
   } catch (err) {
@@ -210,19 +223,165 @@ router.put('/:id/interactions/:interactionId', async (req: AuthenticatedRequest,
 });
 
 // --- HISTORIA ZAMÓWIEŃ (SPEC.md, „Zamówienia do dostawców”) ---
-// Wpis powstaje tylko po udanej wysyłce i potem się go nie zmienia — dlatego nie ma tu PUT ani DELETE.
+// Wpis powstaje po udanej wysyłce z CRM albo po „Oznacz jako wysłane” i potem się go nie zmienia
+// (brak PUT). Błędny wpis usuwa tylko administrator (ADMIN_EMAILS).
+
+const OrderItemsSchema = z.array(z.object({
+  materialId: z.string().max(100).optional(),
+  name: z.string().trim().min(1).max(300),
+  quantity: z.number().positive().max(1_000_000),
+  unit: z.enum(ORDER_UNITS),
+})).min(1, 'Zamówienie musi mieć co najmniej jedną pozycję').max(200);
 
 const OrderSendSchema = z.object({
   subject: z.string().trim().min(1, 'Temat jest wymagany').max(300),
   body: z.string().trim().min(1, 'Treść maila jest wymagana').max(20000),
   notes: z.string().max(5000).optional(),
-  items: z.array(z.object({
-    materialId: z.string().max(100).optional(),
-    name: z.string().trim().min(1).max(300),
-    quantity: z.number().positive().max(1_000_000),
-    unit: z.enum(ORDER_UNITS),
-  })).min(1, 'Zamówienie musi mieć co najmniej jedną pozycję').max(200),
+  items: OrderItemsSchema,
 });
+
+const OrderPdfSchema = z.object({
+  notes: z.string().max(5000).optional(),
+  items: OrderItemsSchema,
+});
+
+const OrderMarkSentSchema = z.object({
+  notes: z.string().max(5000).optional(),
+  items: OrderItemsSchema,
+  sentDate: z.string().max(10),
+  note: z.string().max(2000).optional(),
+  pdfDate: z.string().max(40).optional(), // chwila pobrania PDF — ta sama data na zapisanej kopii
+});
+
+type SupplierDoc = FirebaseFirestore.DocumentData;
+
+const loadSupplier = async (id: string): Promise<SupplierDoc | null> => {
+  const snap = await db.collection(COLLECTION).doc(id).get();
+  return snap.exists ? (snap.data() ?? {}) : null;
+};
+
+const buildSupplierOrderPdf = (supplier: SupplierDoc, items: OrderItem[], notes: string, date: Date) =>
+  generateSupplierOrderPdf(orderPdfLayout({
+    supplier: { companyName: String(supplier.companyName ?? ''), email: String(supplier.email ?? ''), address: supplier.address },
+    items, notes, date,
+  }));
+
+const catalogOf = (supplier: SupplierDoc) => (Array.isArray(supplier.materials) ? supplier.materials : []);
+
+// POST /:id/orders/pdf — sam PDF do pobrania (przed wysyłką poza CRM). Nic nie zapisuje.
+router.post('/:id/orders/pdf', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = OrderPdfSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+  try {
+    const supplier = await loadSupplier(req.params.id);
+    if (!supplier) return res.status(404).json({ error: 'Dostawca nie istnieje' });
+    const items = buildOrderItems(parsed.data.items, catalogOf(supplier));
+    if (items.length === 0) return res.status(400).json({ error: 'Zamówienie musi mieć co najmniej jedną pozycję' });
+    const now = new Date();
+    const pdf = await buildSupplierOrderPdf(supplier, items, parsed.data.notes ?? '', now);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Zamowienie-${warsawDate(now)}.pdf"`);
+    res.setHeader('X-Pdf-Date', now.toISOString());
+    res.send(pdf);
+  } catch (err) {
+    console.error('[suppliers] POST /:id/orders/pdf błąd:', err);
+    res.status(500).json({ error: 'Nie udało się przygotować PDF zamówienia' });
+  }
+});
+
+// POST /:id/orders/mark-sent — „Oznacz jako wysłane” (zamówienie poszło poza CRM). Niczego nie wysyła.
+router.post('/:id/orders/mark-sent', async (req: AuthenticatedRequest, res: Response) => {
+  const parsed = OrderMarkSentSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
+  const now = new Date();
+  const dateError = sentDateError(parsed.data.sentDate, now);
+  if (dateError) return res.status(400).json({ error: dateError });
+  const { id } = req.params;
+
+  let supplier: SupplierDoc | null;
+  try {
+    supplier = await loadSupplier(id);
+  } catch (err) {
+    console.error('[suppliers] POST /:id/orders/mark-sent — odczyt dostawcy:', err);
+    return res.status(500).json({ error: 'Błąd odczytu dostawcy' });
+  }
+  if (!supplier) return res.status(404).json({ error: 'Dostawca nie istnieje' });
+
+  const items = buildOrderItems(parsed.data.items, catalogOf(supplier));
+  if (items.length === 0) return res.status(400).json({ error: 'Zamówienie musi mieć co najmniej jedną pozycję' });
+  const notes = parsed.data.notes ?? '';
+
+  // Kopia PDF taka jak pobrana: te same pozycje, uwagi i data z chwili pobrania
+  const pdfFilename = orderPdfFilename(now, crypto.randomBytes(12).toString('hex'));
+  try {
+    const pdf = await buildSupplierOrderPdf(supplier, items, notes, pdfDateFrom(parsed.data.pdfDate, now));
+    await saveUploadFile(pdfFilename, pdf);
+  } catch (err) {
+    console.error('[suppliers] POST /:id/orders/mark-sent — PDF:', err);
+    return res.status(500).json({ error: 'Nie udało się zapisać kopii PDF — wpis nie powstał' });
+  }
+
+  const entry = buildManualOrderEntry({
+    sentDate: parsed.data.sentDate, recordedAt: now, to: String(supplier.email ?? '').trim(), items, notes,
+    note: parsed.data.note ?? '', recordedBy: req.user?.email,
+    pdfUrl: `${req.protocol}://${req.get('host')}/uploads/${pdfFilename}`, pdfFilename,
+  });
+
+  const supplierRef = db.collection(COLLECTION).doc(id);
+  let orderId: string;
+  try {
+    orderId = (await supplierRef.collection(ORDERS).add(entry)).id;
+  } catch (err) {
+    await deleteUploadFile(pdfFilename).catch(() => undefined);
+    console.error('[suppliers] POST /:id/orders/mark-sent — zapis:', err);
+    return res.status(500).json({ error: 'Nie udało się zapisać wpisu w historii' });
+  }
+
+  const interaction = await addOrderInteraction(supplierRef, entry, orderId);
+  res.status(201).json({ order: { id: orderId, ...entry }, interaction });
+});
+
+// DELETE /:id/orders/:orderId — błędny wpis, tylko administrator; sprząta kopię PDF i krótki wpis w kontaktach.
+router.delete('/:id/orders/:orderId', async (req: AuthenticatedRequest, res: Response) => {
+  if (!isAdmin(req.user?.email)) return res.status(403).json({ error: 'Wpis z historii zamówień może usunąć tylko administrator' });
+  const { id, orderId } = req.params;
+  try {
+    const supplierRef = db.collection(COLLECTION).doc(id);
+    const orderRef = supplierRef.collection(ORDERS).doc(orderId);
+    const snap = await orderRef.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Wpis nie istnieje' });
+    const filename = orderPdfFilenameFromUrl(snap.data()?.pdfUrl);
+    if (filename) await deleteUploadFile(filename);
+
+    const linked = await supplierRef.collection('interactions').where('orderId', '==', orderId).get();
+    const batch = db.batch();
+    linked.docs.forEach(d => batch.delete(d.ref));
+    batch.delete(orderRef);
+    await batch.commit();
+    if (!linked.empty) await recomputeLastContact(supplierRef);
+
+    console.log(`[suppliers] wpis zamówienia ${orderId} dostawcy ${id} usunięty przez ${req.user?.email}`);
+    res.status(204).send();
+  } catch (err) {
+    console.error('[suppliers] DELETE /:id/orders/:orderId błąd:', err);
+    res.status(500).json({ error: 'Błąd usuwania wpisu' });
+  }
+});
+
+// Krótki wpis w historii kontaktów — jego błąd nie cofa zamówienia
+const addOrderInteraction = async (
+  supplierRef: FirebaseFirestore.DocumentReference, entry: SupplierOrderEntry, orderId: string,
+): Promise<Record<string, unknown> | null> => {
+  try {
+    const data = { ...orderInteraction(entry), orderId, createdBy: entry.recordedBy, createdAt: entry.recordedAt };
+    const ref = await supplierRef.collection('interactions').add(data);
+    await recomputeLastContact(supplierRef);
+    return { id: ref.id, ...data };
+  } catch (err) {
+    console.error(`[suppliers] wpis w historii kontaktów (zamówienie ${orderId}):`, err);
+    return null;
+  }
+};
 
 const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
 
@@ -311,17 +470,7 @@ router.post('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
     });
   }
 
-  // Krótki wpis w historii kontaktów — jego błąd nie cofa zamówienia
-  let interaction: Record<string, unknown> | null = null;
-  try {
-    const data = { ...orderInteraction(entry), orderId, createdBy: entry.sentBy, createdAt: entry.sentAt };
-    const ref = await supplierRef.collection('interactions').add(data);
-    await recomputeLastContact(supplierRef);
-    interaction = { id: ref.id, ...data };
-  } catch (err) {
-    console.error(`[suppliers] POST /:id/orders — wpis w historii kontaktów (zamówienie ${orderId}):`, err);
-  }
-
+  const interaction = await addOrderInteraction(supplierRef, entry, orderId);
   res.status(201).json({ order: { id: orderId, ...entry }, interaction });
 });
 

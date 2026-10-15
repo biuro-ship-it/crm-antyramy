@@ -56,13 +56,19 @@ export const estimatedTotalNet = (items: OrderItem[]): number | null => {
   return Math.round(priced.reduce((sum, i) => sum + i.quantity * (i.unitPriceNet as number), 0) * 100) / 100;
 };
 
+export type OrderMethod = 'gmail' | 'manual'; // wysłane z CRM przez Gmail / wysłane poza CRM i oznaczone ręcznie
+
 export interface SupplierOrderEntry {
-  sentAt: string;
+  method: OrderMethod;
+  sentAt: string;        // gmail: pełny czas ISO; manual: sama data RRRR-MM-DD wybrana w oknie
+  recordedAt: string;    // kiedy wpis zapisano w CRM (ISO)
+  recordedBy: string;    // kto wysłał z CRM / kto oznaczył jako wysłane
   to: string;
-  subject: string;
-  body: string;
+  subject: string | null; // tylko gmail
+  body: string | null;    // tylko gmail
   items: OrderItem[];
-  notes: string;
+  notes: string;          // uwagi do zamówienia (są w PDF)
+  note: string;           // notatka do wpisu historii (tylko manual, nie ma jej w PDF)
   estimatedTotalNet: number | null;
   sentBy: string;
   gmailMessageId: string | null;
@@ -71,7 +77,7 @@ export interface SupplierOrderEntry {
   pdfFilename: string;
 }
 
-/** Wpis Historii zamówień — powstaje dopiero po udanej wysyłce, potem się go nie zmienia. */
+/** Wpis Historii zamówień po wysyłce z CRM — powstaje dopiero po udanej wysyłce, potem się go nie zmienia. */
 export const buildOrderEntry = (p: {
   sentAt: Date;
   to: string;
@@ -84,12 +90,16 @@ export const buildOrderEntry = (p: {
   pdfUrl: string;
   pdfFilename: string;
 }): SupplierOrderEntry => ({
+  method: 'gmail',
   sentAt: p.sentAt.toISOString(),
+  recordedAt: p.sentAt.toISOString(),
+  recordedBy: p.sentBy || 'Nieznany',
   to: p.to,
   subject: p.subject,
   body: p.body,
   items: p.items,
   notes: p.notes.trim(),
+  note: '',
   estimatedTotalNet: estimatedTotalNet(p.items),
   sentBy: p.sentBy || 'Nieznany',
   gmailMessageId: p.gmail.id,
@@ -98,13 +108,72 @@ export const buildOrderEntry = (p: {
   pdfFilename: p.pdfFilename,
 });
 
+/** Wpis po „Oznacz jako wysłane” — zamówienie poszło poza CRM, CRM niczego nie wysyła. */
+export const buildManualOrderEntry = (p: {
+  sentDate: string;
+  recordedAt: Date;
+  to: string;
+  items: OrderItem[];
+  notes: string;
+  note: string;
+  recordedBy: string | undefined;
+  pdfUrl: string;
+  pdfFilename: string;
+}): SupplierOrderEntry => ({
+  method: 'manual',
+  sentAt: p.sentDate,
+  recordedAt: p.recordedAt.toISOString(),
+  recordedBy: p.recordedBy || 'Nieznany',
+  to: p.to,
+  subject: null,
+  body: null,
+  items: p.items,
+  notes: p.notes.trim(),
+  note: p.note.trim(),
+  estimatedTotalNet: estimatedTotalNet(p.items),
+  sentBy: p.recordedBy || 'Nieznany',
+  gmailMessageId: null,
+  gmailThreadId: null,
+  pdfUrl: p.pdfUrl,
+  pdfFilename: p.pdfFilename,
+});
+
 /** Krótki wpis w historii kontaktów dostawcy (pełne szczegóły są w Historii zamówień). */
 export const orderInteraction = (entry: SupplierOrderEntry) => ({
-  contactDate: entry.sentAt.slice(0, 10),
+  contactDate: entry.method === 'manual' ? entry.sentAt : warsawDate(new Date(entry.sentAt)),
   channel: 'mail' as const,
-  notes: `📦 Zamówienie wysłane: ${entry.items.length} poz. — szczegóły i PDF w „Historii zamówień”`,
-  tradeNotes: `Do: ${entry.to} · ${entry.subject}`,
+  notes: entry.method === 'manual'
+    ? `📦 Zamówienie wysłane poza CRM (oznaczone ręcznie): ${entry.items.length} poz. — szczegóły i PDF w „Historii zamówień”`
+    : `📦 Zamówienie wysłane: ${entry.items.length} poz. — szczegóły i PDF w „Historii zamówień”`,
+  tradeNotes: entry.method === 'manual'
+    ? (entry.note ? `Notatka: ${entry.note}` : '')
+    : `Do: ${entry.to} · ${entry.subject}`,
 });
+
+/** Data RRRR-MM-DD w strefie Warszawy. */
+export const warsawDate = (d: Date): string =>
+  new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Warsaw', year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
+
+/** Data wysyłki z okna „Oznacz jako wysłane”: poprawna RRRR-MM-DD, nie z przyszłości, nie starsza niż rok. */
+export const sentDateError = (sentDate: string, now: Date): string | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(sentDate)) return 'Nieprawidłowa data wysyłki';
+  const d = new Date(`${sentDate}T12:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== sentDate) return 'Nieprawidłowa data wysyłki';
+  if (sentDate > warsawDate(now)) return 'Data wysyłki nie może być z przyszłości';
+  const yearAgo = new Date(now.getTime() - 366 * 24 * 3600 * 1000);
+  if (sentDate < warsawDate(yearAgo)) return 'Data wysyłki starsza niż rok';
+  return null;
+};
+
+/**
+ * Data na PDF przy „Oznacz jako wysłane” = chwila pobrania PDF (z przeglądarki), żeby zapisana kopia
+ * była taka sama jak wysłana. Spoza okna (30 dni wstecz … 5 min naprzód) → teraz.
+ */
+export const pdfDateFrom = (iso: string | undefined, now: Date): Date => {
+  const t = iso ? Date.parse(iso) : NaN;
+  if (!Number.isFinite(t) || t > now.getTime() + 5 * 60_000 || t < now.getTime() - 30 * 24 * 3600_000) return now;
+  return new Date(t);
+};
 
 // Data po polsku w strefie Warszawy — serwer może mieć inną strefę.
 const plDate = (d: Date) =>

@@ -972,12 +972,16 @@ export interface SupplierOrderItem {
 
 export interface SupplierOrder {
   id: string;
-  sentAt: string;
+  method?: 'gmail' | 'manual';   // brak = gmail (wpisy sprzed 2026-10-15)
+  sentAt: string;                // gmail: czas ISO; manual: data RRRR-MM-DD
+  recordedAt?: string;
+  recordedBy?: string;
   to: string;
-  subject: string;
-  body: string;
+  subject: string | null;
+  body: string | null;
   items: SupplierOrderItem[];
   notes: string;
+  note?: string;
   estimatedTotalNet: number | null;
   sentBy: string;
   gmailMessageId: string | null;
@@ -992,6 +996,49 @@ export interface SupplierOrderSendData {
   notes?: string;
   items: Array<{ materialId?: string; name: string; quantity: number; unit: SupplierMaterial['unit'] }>;
 }
+
+export interface SupplierOrderPdfData {
+  notes?: string;
+  items: SupplierOrderSendData['items'];
+}
+
+/** PDF zamówienia do wysłania poza CRM — nic nie zapisuje. Zwraca chwilę wygenerowania (data na PDF). */
+export const downloadSupplierOrderPdf = async (supplierId: string, data: SupplierOrderPdfData): Promise<{ pdfDate: string }> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders/pdf`, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) await fail(response, 'Nie udało się przygotować PDF zamówienia');
+  const pdfDate = response.headers.get('X-Pdf-Date') ?? new Date().toISOString();
+  const url = URL.createObjectURL(await response.blob());
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return { pdfDate };
+};
+
+/** „Oznacz jako wysłane” — zapis w historii po jawnym potwierdzeniu; CRM niczego nie wysyła. */
+export const markSupplierOrderSent = async (
+  supplierId: string,
+  data: SupplierOrderPdfData & { sentDate: string; note?: string; pdfDate?: string },
+): Promise<{ order: SupplierOrder; interaction: Interaction | null }> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders/mark-sent`, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) await fail(response, 'Nie udało się zapisać zamówienia jako wysłanego');
+  return response.json();
+};
+
+/** Usunięcie błędnego wpisu historii — tylko administrator (sprawdza backend). */
+export const deleteSupplierOrder = async (supplierId: string, orderId: string): Promise<void> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders/${orderId}`, { method: 'DELETE', headers });
+  if (!response.ok) await fail(response, 'Nie udało się usunąć wpisu');
+};
+
+/** Zalogowany użytkownik i czy jest administratorem (ADMIN_EMAILS w backendzie). */
+export const getMe = async (): Promise<{ email: string | null; isAdmin: boolean }> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${API_URL}/api/settings/me`, { headers });
+  if (!response.ok) await fail(response, 'Nie udało się sprawdzić uprawnień');
+  return response.json();
+};
 
 export const getSupplierOrders = async (supplierId: string): Promise<SupplierOrder[]> => {
   const headers = await getHeaders();

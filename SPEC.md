@@ -28,8 +28,8 @@ do klientów z mierzeniem, co przyniosły. Zamiast notatek w arkuszach i skrzync
 - ☑ **Szablony maili** — edytor z wersjonowaniem treści, kategorie, wysyłka z szablonu do klienta.
 - ☑ **Notatki** — notatki z kolorami (etykiety kolorów ustawiane w Administracji).
 - ☑ **Dostawcy** — karta dostawcy (kontakty, ustalenia: rabat / termin płatności / dostawy, materiały z cenami, pliki, historia kontaktów)
-  oraz kalkulator HDF (cena z m² i cięcia, zapis ceny do materiałów dostawcy). Zamówienie z karty wychodzi z CRM (Gmail) z PDF
-  w załączniku i trafia do **Historii zamówień** — opis niżej, „Zamówienia do dostawców”.
+  oraz kalkulator HDF (cena z m² i cięcia, zapis ceny do materiałów dostawcy). Zamówienie z karty: wysyłka z CRM (Gmail, PDF
+  w załączniku) albo „Pobierz PDF” + „Oznacz jako wysłane”; obie drogi trafiają do **Historii zamówień** — opis niżej.
 - ☑ **Archiwum** — pełna kopia danych (JSON odtwarzalny skryptem `backup restore`), paczka ZIP z plikami, eksport do Excela.
 - ☑ **Administracja** — etykiety kolorów (klienci, notatki), analityka (rozkład Kanban, klienci, sprzedaż wg klientów),
   podpis w mailach, ustawienia kampanii.
@@ -58,7 +58,7 @@ Zakładki w górnym pasku (na telefonie — menu dolne):
 | Kampanie (id `promotions`) | lista kampanii, ranking, ustawienia | edytor w 4 krokach, wysyłka, raport, duplikat |
 | Szablony maili | lista szablonów, edytor, historia wersji | utwórz, edytuj, wyślij |
 | Notatki | lista notatek | dodaj / edytuj / usuń |
-| Dostawcy | lista i karta dostawcy, kalkulator HDF, historia zamówień | dodaj dostawcę, kontakt, materiał, plik; wyślij zamówienie, pobierz PDF zamówienia |
+| Dostawcy | lista i karta dostawcy, kalkulator HDF, historia zamówień | dodaj dostawcę, kontakt, materiał, plik; wyślij zamówienie / pobierz PDF i oznacz jako wysłane, pobierz PDF z historii, usuń wpis (admin) |
 | Archiwum | eksporty danych | pobierz JSON / ZIP / Excel |
 | Administracja | etykiety kolorów, analityka, podpis, ustawienia kampanii | edytuj ustawienia |
 
@@ -92,24 +92,37 @@ Dodatkowo: szkice, „Duplikuj kampanię”, „Wklej z JSON” (wypełnia formu
 - Automatyczna wysyłka bez kliknięcia „Wyślij”.
 
 ## Zamówienia do dostawców
-Karta dostawcy → „📦 Surowce i zamówienia”: ilości przy surowcach, uwagi → **podgląd** (treść maila można poprawić) → **„Wyślij”**.
+Karta dostawcy → „📦 Surowce i zamówienia”: ilości przy surowcach (nazwa, ilość, jednostka) i uwagi. Dalej **dwie drogi**:
+A) **„✉️ Wyślij zamówienie mailem”** — podgląd → „Wyślij” → mail wychodzi z CRM (Gmail) z PDF w załączniku;
+B) **„⬇️ Pobierz PDF”** → wysyłasz PDF sam, swoim programem pocztowym → **„✅ Oznacz jako wysłane”**.
+Obie drogi zapisują zamówienie w tej samej **Historii zamówień** (z oznaczeniem drogi).
 
-### Wysyłka
-- Mail wychodzi przez Gmail API z biuro@antyramy.eu na adres zapisany w karcie dostawcy (adres bierze backend z bazy, nie z formularza).
-  W mailu: treść z podglądu (bez cen) + **PDF zamówienia w załączniku**. Mail jest też w „Wysłanych” w Gmailu.
-- Nic nie wychodzi bez kliknięcia „Wyślij” w podglądzie; żadnej automatycznej wysyłki.
-- PDF (backend, `pdf-lib`, font LiberationSans): pasek i nagłówki w kolorze `#1a56db`, dane zamawiającego (Pluszek sp. z o.o. / Antyramy,
+### PDF zamówienia
+- Backend (`pdf-lib`, font LiberationSans): pasek i nagłówki `#1a56db`, dane zamawiającego (Pluszek sp. z o.o. / Antyramy,
   ul. Monopolowa 11, 33-100 Tarnów, NIP 993-068-10-97, biuro@antyramy.eu, tel. 500 601 601), dane dostawcy (firma, adres, e-mail),
-  data, tabela pozycji (lp., nazwa, ilość, jednostka — bez cen), uwagi. Zapisany jako plik w `uploads/` (`zamowienie-….pdf`).
-- Działa, gdy: po udanej wysyłce powstaje wpis w Historii zamówień i krótki wpis w historii kontaktów („📦 Zamówienie wysłane: N poz.”,
-  aktualizuje „ostatni kontakt”); gdy wysyłka się nie uda — **nie powstaje nic** (ani wpis, ani plik), a w podglądzie widać błąd.
+  data, tabela pozycji (lp., nazwa, ilość, jednostka — bez cen), uwagi.
+- „⬇️ Pobierz PDF” można klikać wielokrotnie — nic się nie zapisuje.
+
+### A) Wysyłka z CRM (Gmail)
+- Mail z biuro@antyramy.eu na adres z karty dostawcy (backend bierze go z bazy), treść z podglądu (bez cen) + PDF w załączniku;
+  mail jest też w „Wysłanych” w Gmailu. Nic nie wychodzi bez kliknięcia „Wyślij” w podglądzie.
+- Działa, gdy: po udanej wysyłce powstaje wpis w historii (kopia PDF w `uploads/`, identyfikator Gmail); gdy wysyłka się nie uda — nie powstaje nic.
+
+### B) Wysyłka poza CRM — „Oznacz jako wysłane”
+- CRM **nie wysyła** żadnego maila. „✅ Oznacz jako wysłane” jest aktywne dopiero po pobraniu PDF **aktualnego** zamówienia
+  (zmiana ilości lub uwag wymaga ponownego pobrania) — dzięki temu zapisana kopia to dokładnie to, co poszło do dostawcy.
+- Okno potwierdzenia: data wysyłki (domyślnie dziś, do zmiany; nie z przyszłości), opcjonalna notatka → „Zapisz jako wysłane”.
+  Zapis tylko po tym kliknięciu; żadnych automatów.
+- Działa, gdy: powstaje wpis w historii z kopią PDF (taką samą jak pobrana), ilości i uwagi się czyszczą.
 
 ### Historia zamówień (sekcja w karcie dostawcy)
-- Lista od najnowszych: data i godzina, temat, liczba pozycji. Klik rozwija: adresat, pozycje (nazwa, ilość, jednostka), uwagi,
-  wartość wg cennika CRM (tylko informacyjnie — nie ma jej w mailu ani w PDF), treść maila, kto wysłał, identyfikator wiadomości Gmail,
-  przycisk **„Pobierz PDF”**. Pusty stan: „Brak wysłanych zamówień”.
-- Wpis jest **niezmienny** — w CRM nie ma edycji ani usuwania pojedynczego wpisu. Znika tylko razem z dostawcą (razem z PDF-ami)
-  albo po świadomym usunięciu przez administratora w konsoli Firestore.
+- Wpis: data wysyłki, data zapisu, kto zapisał, droga (Gmail z CRM / poza CRM), pozycje (nazwa, ilość, jednostka), uwagi, notatka,
+  kopia PDF; przy drodze A także adresat, temat, treść maila i identyfikator Gmail. Wartość wg cennika CRM tylko informacyjnie.
+- Lista od najnowszych (data wysyłki), klik rozwija szczegóły, **„Pobierz PDF”**. Pusty stan: „Brak wysłanych zamówień”.
+- Wpis jest **niezmienny** (bez edycji). Błędny wpis może usunąć tylko **administrator** (konta z `ADMIN_EMAILS` w `.env`
+  backendu, domyślnie biuro@antyramy.eu), po potwierdzeniu — razem z kopią PDF i krótkim wpisem w historii kontaktów.
+- Każdy wpis dodaje krótki wpis w historii kontaktów dostawcy („📦 Zamówienie …”, aktualizuje „ostatni kontakt”).
+- Usunięcie dostawcy kasuje jego historię zamówień i **wszystkie jego pliki** (PDF-y zamówień, cenniki i inne załączniki z karty).
 - Mobile-first, czerń/biel + akcent magenta, tryb ciemny.
 
 ## Dane

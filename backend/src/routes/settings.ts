@@ -5,11 +5,17 @@ import { AuthenticatedRequest } from '../types';
 import { z } from 'zod';
 import { SIGNATURE_DOC, getSignature } from '../services/emailSignature';
 import { CAMPAIGN_SETTINGS_DOC, getAttributionDays } from '../services/campaignMeasure';
+import { isAdmin } from '../services/admins';
 
 const router = Router();
 router.use(authenticate);
 
 const DOC = 'settings/colorLabels';
+
+// GET /api/settings/me — kto jest zalogowany i czy jest administratorem (ADMIN_EMAILS); front ukrywa przyciski admina.
+router.get('/me', (req: AuthenticatedRequest, res: Response) => {
+  res.json({ email: req.user?.email ?? null, isAdmin: isAdmin(req.user?.email) });
+});
 
 const ColorLabelsSchema = z.object({
   clients: z.object({

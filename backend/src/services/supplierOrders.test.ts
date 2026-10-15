@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   buildOrderItems, estimatedTotalNet, buildOrderEntry, orderInteraction, orderPdfLayout,
   orderPdfFilename, orderPdfFilenameFromUrl, orderBodyToHtml, ORDERING_COMPANY, OrderItem,
+  buildManualOrderEntry, sentDateError, pdfDateFrom, warsawDate,
 } from './supplierOrders';
 
 const catalog = [
@@ -49,8 +50,9 @@ describe('buildOrderEntry — wpis Historii zamówień', () => {
   };
   it('zawiera wszystkie wymagane pola', () => {
     assert.deepEqual(buildOrderEntry(base), {
-      sentAt: '2026-10-15T08:30:00.000Z', to: 'dostawca@x.pl', subject: base.subject, body: base.body, items,
-      notes: 'Dostawa do piątku', estimatedTotalNet: 479, sentBy: 'biuro@antyramy.eu',
+      method: 'gmail', sentAt: '2026-10-15T08:30:00.000Z', recordedAt: '2026-10-15T08:30:00.000Z', recordedBy: 'biuro@antyramy.eu',
+      to: 'dostawca@x.pl', subject: base.subject, body: base.body, items,
+      notes: 'Dostawa do piątku', note: '', estimatedTotalNet: 479, sentBy: 'biuro@antyramy.eu',
       gmailMessageId: 'g1', gmailThreadId: 't1', pdfUrl: base.pdfUrl, pdfFilename: base.pdfFilename,
     });
   });
@@ -104,5 +106,69 @@ describe('orderBodyToHtml — treść maila', () => {
   it('zabezpiecza znaki HTML i zachowuje nowe linie', () => {
     const html = orderBodyToHtml('Dzień dobry,\r\n<b>10 szt</b> & "pilne"');
     assert.ok(html.includes('Dzień dobry,<br>&lt;b&gt;10 szt&lt;/b&gt; &amp; &quot;pilne&quot;'));
+  });
+});
+
+describe('„Oznacz jako wysłane” — wpis bez wysyłki z CRM', () => {
+  const manual = buildManualOrderEntry({
+    sentDate: '2026-10-14', recordedAt: new Date('2026-10-15T09:00:00.000Z'), to: 'dostawca@x.pl', items,
+    notes: ' Uwagi ', note: ' Wysłane z Outlooka ', recordedBy: 'krzysiekgodek@gmail.com',
+    pdfUrl: 'https://crm.antyramy.eu/uploads/zamowienie-2026-10-15-abcdef12.pdf', pdfFilename: 'zamowienie-2026-10-15-abcdef12.pdf',
+  });
+  it('data wysyłki osobno od daty zapisu, kto oznaczył, notatka, bez danych maila', () => {
+    assert.equal(manual.method, 'manual');
+    assert.equal(manual.sentAt, '2026-10-14');
+    assert.equal(manual.recordedAt, '2026-10-15T09:00:00.000Z');
+    assert.equal(manual.recordedBy, 'krzysiekgodek@gmail.com');
+    assert.equal(manual.note, 'Wysłane z Outlooka');
+    assert.equal(manual.notes, 'Uwagi');
+    assert.equal(manual.subject, null);
+    assert.equal(manual.body, null);
+    assert.equal(manual.gmailMessageId, null);
+    assert.equal(manual.estimatedTotalNet, 479);
+  });
+  it('wpis w kontaktach z datą wysyłki i notatką', () => {
+    const i = orderInteraction(manual);
+    assert.equal(i.contactDate, '2026-10-14');
+    assert.match(i.notes, /poza CRM/);
+    assert.equal(i.tradeNotes, 'Notatka: Wysłane z Outlooka');
+  });
+  it('wpis gmail w kontaktach z datą polską (po północy w Polsce)', () => {
+    const e = buildOrderEntry({
+      sentAt: new Date('2026-10-14T22:30:00.000Z'), to: 'a@b.pl', subject: 'S', body: 'B', items, notes: '', sentBy: 'x',
+      gmail: { id: null, threadId: null }, pdfUrl: '', pdfFilename: '',
+    });
+    assert.equal(orderInteraction(e).contactDate, '2026-10-15');
+  });
+});
+
+describe('sentDateError — data wysyłki z okna', () => {
+  const now = new Date('2026-10-15T10:00:00.000Z');
+  it('dziś i wczoraj są poprawne', () => {
+    assert.equal(sentDateError('2026-10-15', now), null);
+    assert.equal(sentDateError('2026-10-14', now), null);
+  });
+  it('przyszłość, zły format, nieistniejąca data, starsza niż rok', () => {
+    assert.match(sentDateError('2026-10-16', now) ?? '', /przyszłości/);
+    assert.match(sentDateError('15.10.2026', now) ?? '', /Nieprawidłowa/);
+    assert.match(sentDateError('2026-02-30', now) ?? '', /Nieprawidłowa/);
+    assert.match(sentDateError('2025-01-01', now) ?? '', /starsza/);
+  });
+  it('o 00:30 w Polsce „dziś” to już nowy dzień', () => {
+    assert.equal(sentDateError('2026-10-16', new Date('2026-10-15T22:30:00.000Z')), null);
+    assert.equal(warsawDate(new Date('2026-10-15T22:30:00.000Z')), '2026-10-16');
+  });
+});
+
+describe('pdfDateFrom — data na kopii PDF', () => {
+  const now = new Date('2026-10-15T10:00:00.000Z');
+  it('chwila pobrania z ostatnich 30 dni zostaje', () => {
+    assert.equal(pdfDateFrom('2026-10-15T08:00:00.000Z', now).toISOString(), '2026-10-15T08:00:00.000Z');
+  });
+  it('brak, śmieci, przyszłość lub stara data → teraz', () => {
+    assert.equal(pdfDateFrom(undefined, now), now);
+    assert.equal(pdfDateFrom('xx', now), now);
+    assert.equal(pdfDateFrom('2026-10-16T10:00:00.000Z', now), now);
+    assert.equal(pdfDateFrom('2026-08-01T10:00:00.000Z', now), now);
   });
 });
