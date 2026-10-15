@@ -101,28 +101,38 @@ Obie drogi zapisują zamówienie w tej samej **Historii zamówień** (z oznaczen
 - Backend (`pdf-lib`, font LiberationSans): pasek i nagłówki `#1a56db`, dane zamawiającego (Pluszek sp. z o.o. / Antyramy,
   ul. Monopolowa 11, 33-100 Tarnów, NIP 993-068-10-97, biuro@antyramy.eu, tel. 500 601 601), dane dostawcy (firma, adres, e-mail),
   data, tabela pozycji (lp., nazwa, ilość, jednostka — bez cen), uwagi.
-- „⬇️ Pobierz PDF” można klikać wielokrotnie — nic się nie zapisuje.
+- „⬇️ Pobierz PDF” pobiera plik `Zamowienie-RRRR-MM-DD.pdf` (data polska) i można go klikać wielokrotnie — nic się nie zapisuje.
+- Kopie PDF z historii leżą w `uploads/orders/` (starsze wpisy — w samym `uploads/`); ogólna trasa usuwania plików ich nie dosięga.
 
 ### A) Wysyłka z CRM (Gmail)
 - Mail z biuro@antyramy.eu na adres z karty dostawcy (backend bierze go z bazy), treść z podglądu (bez cen) + PDF w załączniku;
   mail jest też w „Wysłanych” w Gmailu. Nic nie wychodzi bez kliknięcia „Wyślij” w podglądzie.
+- Jeden podgląd = jedna wysyłka: drugie „Wyślij” z tego samego podglądu (np. po zerwanym połączeniu) backend rozpoznaje
+  i nie wysyła ponownie. Gdy mail wyszedł, a zapis historii się nie udał — podgląd się zamyka, zamówienie czyści, zostaje
+  ostrzeżenie „nie wysyłaj ponownie”.
 - Działa, gdy: po udanej wysyłce powstaje wpis w historii (kopia PDF w `uploads/`, identyfikator Gmail); gdy wysyłka się nie uda — nie powstaje nic.
 
 ### B) Wysyłka poza CRM — „Oznacz jako wysłane”
 - CRM **nie wysyła** żadnego maila. „✅ Oznacz jako wysłane” jest aktywne dopiero po pobraniu PDF **aktualnego** zamówienia
   (zmiana ilości lub uwag wymaga ponownego pobrania) — dzięki temu zapisana kopia to dokładnie to, co poszło do dostawcy.
-- Okno potwierdzenia: data wysyłki (domyślnie dziś, do zmiany; nie z przyszłości), opcjonalna notatka → „Zapisz jako wysłane”.
+- Okno potwierdzenia: data wysyłki (domyślnie dziś, do zmiany; nie z przyszłości i nie starsza niż rok), opcjonalna notatka →
+  „Zapisz jako wysłane”. Okno zamyka „Anuluj”, ✕ albo Esc.
   Zapis tylko po tym kliknięciu; żadnych automatów.
 - Działa, gdy: powstaje wpis w historii z kopią PDF (taką samą jak pobrana), ilości i uwagi się czyszczą.
 
 ### Historia zamówień (sekcja w karcie dostawcy)
 - Wpis: data wysyłki, data zapisu, kto zapisał, droga (Gmail z CRM / poza CRM), pozycje (nazwa, ilość, jednostka), uwagi, notatka,
-  kopia PDF; przy drodze A także adresat, temat, treść maila i identyfikator Gmail. Wartość wg cennika CRM tylko informacyjnie.
-- Lista od najnowszych (data wysyłki), klik rozwija szczegóły, **„Pobierz PDF”**. Pusty stan: „Brak wysłanych zamówień”.
+  kopia PDF; przy drodze A także adresat, temat, treść maila i identyfikator Gmail (przy drodze B adresata nie pokazujemy —
+  CRM nie wie, na jaki adres poszedł mail). Wartość wg cennika CRM tylko informacyjnie.
+- Lista od najnowszych (data wysyłki), klik rozwija szczegóły, **„Pobierz PDF”**. Pusty stan: „Brak wysłanych zamówień”
+  (tylko gdy historia się wczytała — przy błędzie sam komunikat błędu).
 - Wpis jest **niezmienny** (bez edycji). Błędny wpis może usunąć tylko **administrator** (konta z `ADMIN_EMAILS` w `.env`
   backendu, domyślnie biuro@antyramy.eu), po potwierdzeniu — razem z kopią PDF i krótkim wpisem w historii kontaktów.
 - Każdy wpis dodaje krótki wpis w historii kontaktów dostawcy („📦 Zamówienie …”, aktualizuje „ostatni kontakt”).
-- Usunięcie dostawcy kasuje jego historię zamówień i **wszystkie jego pliki** (PDF-y zamówień, cenniki i inne załączniki z karty).
+- Usunięcie dostawcy kasuje jego historię zamówień i **wszystkie jego pliki** (PDF-y zamówień, cenniki i inne załączniki z karty,
+  zdjęcia towarów). **Dostawcę z zamówieniami w historii usuwa tylko administrator** (potwierdzenie z liczbą zamówień);
+  dostawcę bez zamówień — każde konto.
+- Historia zamówień jest w kopii zapasowej (`backup.js`) i w Archiwum (ZIP).
 - Mobile-first, czerń/biel + akcent magenta, tryb ciemny.
 
 ## Zdjęcia towarów dostawcy
@@ -133,10 +143,12 @@ Karta dostawcy → „📦 Surowce i zamówienia”: każdy towar (surowiec) mo�
 - **Edycja towaru (✎ Edytuj) → sekcja „Zdjęcie”:** „Wgraj zdjęcie” (na telefonie także „📷 Zrób zdjęcie” aparatem),
   pole „Link do zdjęcia” + „Zapisz link”, podgląd bieżącego zdjęcia z „Zmień” i „Usuń” (z potwierdzeniem),
   stan ładowania i czytelny komunikat błędu. Zdjęcie dodaje się do towaru już zapisanego w katalogu.
-- **Wgranie pliku:** JPG, PNG, WebP (telefon może dać też HEIC — przeglądarka przerabia na JPG). Przeglądarka zmniejsza
+- **Wgranie pliku:** JPG, PNG, WebP (telefon może dać też HEIC — przeglądarka przerabia na JPG), plik źródłowy do 30 MB. Przeglądarka zmniejsza
   zdjęcie (dłuższy bok do 1600 px) i robi miniaturę (krótszy bok 160 px), oba jako JPG — jak kolaż, bez bibliotek na serwerze.
   Serwer przyjmuje do 8 MB na plik, sprawdza typ po zawartości (nie po rozszerzeniu) i wymiary, nadaje losową nazwę.
-- **Link:** tylko `https://`, poprawny adres bez loginu/hasła. Linku nie pobieramy na serwer — przeglądarka wyświetla go wprost.
+- **Link:** tylko `https://`, poprawny adres bez loginu/hasła, do 2000 znaków (po zakodowaniu polskich liter). Linku nie pobieramy
+  na serwer — przeglądarka wyświetla go wprost, bez wysyłania adresu CRM (`referrerPolicy="no-referrer"`). Gdy nie wczyta się
+  miniatura, próbujemy pełnego zdjęcia; gdy nic — ikona, a w edycji napis „Zdjęcie się nie wczytuje”.
 - Nowe zdjęcie (plik albo link) **zastępuje** poprzednie; jeśli poprzednie było wgranym plikiem — oba jego pliki znikają z serwera.
   Usunięcie zdjęcia, towaru albo dostawcy też kasuje pliki. Zdjęcia nie trafiają do PDF ani maila zamówienia.
 - Działa, gdy: po wgraniu na liście widać miniaturkę, a w `uploads/suppliers/` leżą 2 pliki (zdjęcie + miniatura);

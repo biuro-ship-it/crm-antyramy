@@ -63,6 +63,7 @@ const webpSize = (buf: Buffer): { width: number; height: number } | null => {
   const chunk = buf.toString('ascii', 12, 16);
   if (chunk === 'VP8 ') return { width: buf.readUInt16LE(26) & 0x3fff, height: buf.readUInt16LE(28) & 0x3fff };
   if (chunk === 'VP8L') {
+    if (buf[20] !== 0x2f) return null; // sygnatura bezstratnego WebP
     const [b0, b1, b2, b3] = [buf[21], buf[22], buf[23], buf[24]];
     return { width: 1 + (((b1 & 0x3f) << 8) | b0), height: 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6)) };
   }
@@ -142,7 +143,10 @@ export const validateImageLink = (raw: unknown): CheckedLink => {
   if (u.username || u.password) return { ok: false, error: 'Link nie może zawierać loginu ani hasła' };
   const host = u.hostname.toLowerCase();
   if (!host.includes('.') || host.startsWith('.') || host.endsWith('.')) return { ok: false, error: 'Nieprawidłowy adres serwera w linku' };
-  return { ok: true, url: u.toString() };
+  // Długość po normalizacji: polskie litery w ścieżce rosną do %C4%85 (×6) — zapisujemy wersję znormalizowaną
+  const url = u.toString();
+  if (url.length > IMAGE_LINK_MAX_LENGTH) return { ok: false, error: 'Link jest za długi' };
+  return { ok: true, url };
 };
 
 // ─── Pole `image` ────────────────────────────────────────────────────────────
@@ -154,9 +158,9 @@ export const buildLinkImage = (url: string, now: string): MaterialImage =>
   ({ source: 'link', url, createdAt: now });
 
 /** Kopia towaru bez pola image (Firestore nie przyjmuje `undefined`). */
-const withoutImage = <T extends MaterialWithImage>(m: T): T => {
+const withoutImage = <T extends { image?: unknown }>(m: T): Omit<T, 'image'> => {
   const { image: _image, ...rest } = m;
-  return rest as T;
+  return rest;
 };
 
 /**
@@ -164,10 +168,10 @@ const withoutImage = <T extends MaterialWithImage>(m: T): T => {
  * zostaje zdjęcie z bazy, nowy towar jest bez zdjęcia. Zdjęcia towarów usuniętych z katalogu
  * wracają w `orphaned` (do skasowania plików po zapisie).
  */
-export const mergeMaterialImages = <T extends MaterialWithImage>(stored: MaterialWithImage[] | undefined, incoming: T[]) => {
+export const mergeMaterialImages = <T extends { id: string; image?: unknown }>(stored: MaterialWithImage[] | undefined, incoming: T[]) => {
   const byId = new Map((stored ?? []).map(m => [m.id, m]));
   const incomingIds = new Set(incoming.map(m => m.id));
-  const materials = incoming.map((m): T & { image?: MaterialImage } => {
+  const materials = incoming.map((m): Omit<T, 'image'> & { image?: MaterialImage } => {
     const image = byId.get(m.id)?.image;
     return image ? { ...withoutImage(m), image } : withoutImage(m);
   });
@@ -181,7 +185,7 @@ export const mergeMaterialImages = <T extends MaterialWithImage>(stored: Materia
 export const replaceMaterialImage = <T extends MaterialWithImage>(materials: T[], materialId: string, image: MaterialImage | null) => {
   const current = materials.find(m => m.id === materialId);
   if (!current) return null;
-  const next = materials.map((m): T & { image?: MaterialImage } => {
+  const next = materials.map((m): Omit<T, 'image'> & { image?: MaterialImage } => {
     if (m.id !== materialId) return m;
     return image ? { ...withoutImage(m), image } : withoutImage(m);
   });

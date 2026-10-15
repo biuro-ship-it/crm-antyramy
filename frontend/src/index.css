@@ -76,6 +76,11 @@ html.dark {
     @apply inline-flex items-center justify-center gap-2 bg-primary text-on-primary font-medium text-btn rounded-pill px-5 py-2.5 min-h-[44px] transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
+  /* Akcja wyróżniona ramką magenta (np. „Oznacz jako wysłane”, „Wgraj zdjęcie”) — tekst w kolorze ink, dobry kontrast w obu motywach */
+  .btn-accent {
+    @apply inline-flex items-center justify-center gap-2 bg-canvas text-ink font-bold text-btn rounded-pill border-2 border-accent-magenta px-[18px] py-2 min-h-[44px] transition-colors hover:bg-block-pink disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
   .btn-secondary {
     @apply inline-flex items-center justify-center gap-2 bg-canvas text-ink font-medium text-btn rounded-pill border border-hairline px-[18px] py-2 min-h-[44px] transition-colors hover:bg-surface-soft disabled:opacity-40 disabled:cursor-not-allowed;
   }

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
-  Supplier, SupplierMaterial, SupplierOrder, Interaction,
+  Supplier, SupplierMaterial, SupplierOrder, Interaction, OrderAlreadySentError,
   updateSupplier, sendSupplierOrder, downloadSupplierOrderPdf, markSupplierOrderSent,
 } from '../services/api';
 import { buildOrderSendItems, orderPdfKey } from '../utils/supplierOrders';
-import { todayISO } from '../utils/date';
+import { todayISO, daysAgoISO } from '../utils/date';
+import { zl } from '../utils/sales';
 import MaterialThumb from './MaterialThumb';
 import MaterialImageEditor from './MaterialImageEditor';
 
@@ -23,22 +24,21 @@ const parsePrice = (v: string): number => {
   return Number.isFinite(n) && n >= 0 ? n : 0;
 };
 
-const zl = (n: number) =>
-  new Intl.NumberFormat('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
-
 const todayPl = () => {
   const d = new Date();
   const p = (x: number) => String(x).padStart(2, '0');
   return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()}`;
 };
 
-
+// Data wysyłki „poza CRM”: od dziś do roku wstecz (backend przyjmuje najwyżej 366 dni)
+const MARK_DATE_MAX_DAYS_BACK = 365;
 
 type Draft = { name: string; unit: SupplierMaterial['unit']; price: string };
 const emptyDraft: Draft = { name: '', unit: 'szt', price: '' };
 
 // Podgląd zamówienia przed wysyłką — treść maila można jeszcze poprawić.
-type OrderPreview = { subject: string; body: string; lines: string[]; total: number };
+// requestId: jeden na podgląd — ponowne „Wyślij” (np. po zerwanym połączeniu) backend rozpozna i nie wyśle drugi raz.
+type OrderPreview = { subject: string; body: string; lines: string[]; total: number; requestId: string };
 
 export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrderSent }: SupplierMaterialsProps) {
   const materials: SupplierMaterial[] = supplier.materials ?? [];
@@ -50,6 +50,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
   const [newDraft, setNewDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(emptyDraft);
+  const [imageBusy, setImageBusy] = useState(false); // zdjęcie edytowanego towaru właśnie się zapisuje
 
   // Zamówienie: ilości per surowiec + uwagi.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -60,6 +61,8 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentInfo, setSentInfo] = useState<string | null>(null);
+  const [sentWarning, setSentWarning] = useState<string | null>(null); // mail wyszedł, ale coś poszło nie tak
+  const [orderError, setOrderError] = useState<string | null>(null); // błąd „Pobierz PDF” — przy przyciskach
 
   // Droga B: „Pobierz PDF” → wysyłka poza CRM → „Oznacz jako wysłane” (CRM niczego nie wysyła).
   const [lastPdf, setLastPdf] = useState<{ key: string; pdfDate: string } | null>(null);
@@ -148,13 +151,13 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
       return;
     }
     setDownloading(true);
-    setError(null);
+    setOrderError(null);
     setSentInfo(null);
     try {
       const { pdfDate } = await downloadSupplierOrderPdf(supplier.id, { items: currentItems, notes: orderNotes.trim() });
       setLastPdf({ key: currentKey, pdfDate });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się przygotować PDF zamówienia.');
+      setOrderError(err instanceof Error ? err.message : 'Nie udało się przygotować PDF zamówienia.');
     } finally {
       setDownloading(false);
     }
@@ -207,7 +210,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
       `${lines.join('\n')}` +
       `${notesPart}\n\n` +
       signature;
-    return { subject: `Zamówienie — Antyramy (${todayPl()})`, body, lines, total: orderTotal };
+    return { subject: `Zamówienie — Antyramy (${todayPl()})`, body, lines, total: orderTotal, requestId: crypto.randomUUID() };
   };
 
   const handleOpenPreview = () => {
@@ -221,6 +224,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
     }
     setSendError(null);
     setSentInfo(null);
+    setSentWarning(null);
     setPreview(buildPreview());
   };
 
@@ -236,13 +240,22 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
         body: preview.body,
         notes: orderNotes.trim(),
         items: buildOrderSendItems(materials, quantities),
+        requestId: preview.requestId,
       });
       onOrderSent?.(order, interaction);
       setPreview(null);
       handleClear();
       setSentInfo(`Zamówienie wysłane do ${order.to} — zapisane w Historii zamówień.`);
     } catch (err) {
-      setSendError(err instanceof Error ? err.message : 'Nie udało się wysłać zamówienia.');
+      if (err instanceof OrderAlreadySentError) {
+        // Mail wyszedł — zamykamy podgląd i czyścimy zamówienie, żeby nie dało się go wysłać drugi raz
+        setPreview(null);
+        handleClear();
+        setSentWarning(err.message);
+      } else {
+        // Ten sam requestId przy ponownej próbie: jeśli mail jednak wyszedł, backend odpowie 409 zamiast wysłać
+        setSendError(err instanceof Error ? err.message : 'Nie udało się wysłać zamówienia.');
+      }
     } finally {
       setSending(false);
     }
@@ -250,11 +263,23 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
 
   const closePreview = () => { if (!sending) { setPreview(null); setSendError(null); } };
 
+  // Esc zamyka okno podglądu i „Oznacz jako wysłane” (nie w trakcie wysyłki/zapisu)
+  useEffect(() => {
+    if (!preview && !markOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (markOpen && !marking) setMarkOpen(false);
+      else if (preview && !sending) { setPreview(null); setSendError(null); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [preview, markOpen, marking, sending]);
+
   return (
     <div className="bg-white/70 dark:bg-white/5 rounded-xl p-5 border border-hairline-soft shadow-sm mb-6">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <h3 className="text-xs font-bold text-ink font-light uppercase tracking-wider">📦 Surowce i zamówienia</h3>
-        {saving && <span className="text-xs text-ink/40 italic">Zapisuję...</span>}
+        {saving && <span className="text-xs text-ink/40 italic">Zapisuję…</span>}
       </div>
 
       {error && (
@@ -263,7 +288,13 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
       {sentInfo && (
         <div className="bg-block-mint border border-hairline text-ink text-body-sm rounded-md p-3 mb-4 flex justify-between gap-3">
           <span>✅ {sentInfo}</span>
-          <button type="button" onClick={() => setSentInfo(null)} className="text-ink/60 font-bold" aria-label="Zamknij">✕</button>
+          <button type="button" onClick={() => setSentInfo(null)} className="w-11 h-11 -my-2 -mr-2 shrink-0 text-ink/60 font-bold" aria-label="Zamknij">✕</button>
+        </div>
+      )}
+      {sentWarning && (
+        <div role="alert" className="bg-block-pink border-2 border-accent-magenta text-ink text-body-sm rounded-md p-3 mb-4 flex justify-between gap-3">
+          <span>⚠️ {sentWarning}</span>
+          <button type="button" onClick={() => setSentWarning(null)} className="w-11 h-11 -my-2 -mr-2 shrink-0 text-ink/60 font-bold" aria-label="Zamknij">✕</button>
         </div>
       )}
 
@@ -307,11 +338,12 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
                         className="w-28 bg-canvas border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
                       />
                       <div className="flex gap-2">
-                        <button type="button" onClick={handleEditSave} disabled={saving} className="btn-primary px-4 py-1.5 text-xs disabled:opacity-60">Zapisz</button>
-                        <button type="button" onClick={() => { setEditingId(null); setEditDraft(emptyDraft); }} className="btn-secondary px-4 py-1.5 text-xs">Anuluj</button>
+                        <button type="button" onClick={handleEditSave} disabled={saving || imageBusy} className="btn-primary px-4 py-1.5 text-xs disabled:opacity-60">Zapisz</button>
+                        <button type="button" onClick={() => { setEditingId(null); setEditDraft(emptyDraft); }} disabled={imageBusy} className="btn-secondary px-4 py-1.5 text-xs">Anuluj</button>
                       </div>
                     </div>
-                    <MaterialImageEditor supplierId={supplier.id} material={m} onSupplierUpdated={onSupplierUpdated} />
+                    {imageBusy && <p className="text-xs text-ink/50 mt-1 sm:text-right">Poczekaj, aż zdjęcie się zapisze.</p>}
+                    <MaterialImageEditor supplierId={supplier.id} material={m} onSupplierUpdated={onSupplierUpdated} onBusyChange={setImageBusy} />
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3">
@@ -319,7 +351,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
                       <MaterialThumb key={m.image?.url ?? 'brak'} image={m.image} name={m.name} />
                       <div className="min-w-0">
                         <span className="font-bold text-body-sm text-ink">{m.name}</span>
-                        <span className="text-xs text-ink/50 ml-2">{zl(m.price)} zł netto / {m.unit}</span>
+                        <span className="text-xs text-ink/50 ml-2">{zl(m.price)} netto / {m.unit}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -381,32 +413,35 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
           rows={2}
           value={orderNotes}
           onChange={e => setOrderNotes(e.target.value)}
-          placeholder="Np. termin dostawy, sposób pakowania..."
+          placeholder="Np. termin dostawy, sposób pakowania…"
           className="w-full bg-canvas border border-hairline rounded-lg p-3 outline-none focus:ring-2 focus:ring-ink text-body-sm font-light resize-none mb-3"
         />
 
         <p className="text-body-sm text-ink/70 mb-3">
           Wartość wybranych pozycji:{' '}
-          <span className="font-black text-ink">{zl(orderTotal)} zł netto</span>
+          <span className="font-black text-ink">{zl(orderTotal)} netto</span>
           <span className="text-xs text-ink/40 ml-1">(podgląd — nie trafia do maila ani PDF)</span>
         </p>
 
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
           <button type="button" onClick={handleOpenPreview} className="btn-primary px-5 py-2.5 text-sm">✉️ Wyślij zamówienie mailem</button>
           <button type="button" onClick={handleDownloadPdf} disabled={downloading} className="btn-secondary px-4 py-2.5 text-sm disabled:opacity-60">
-            {downloading ? 'Przygotowuję PDF...' : '⬇️ Pobierz PDF'}
+            {downloading ? 'Przygotowuję PDF…' : '⬇️ Pobierz PDF'}
           </button>
           <button
             type="button"
             onClick={handleOpenMark}
             disabled={!pdfReady}
             title={pdfReady ? '' : 'Najpierw pobierz PDF aktualnego zamówienia'}
-            className="px-4 py-2.5 text-sm font-bold rounded-lg border-2 border-accent-magenta text-ink hover:bg-block-pink disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-accent px-4 py-2.5 text-sm"
           >
             ✅ Oznacz jako wysłane
           </button>
           <button type="button" onClick={handleClear} className="btn-secondary px-4 py-2.5 text-sm sm:ml-auto">Wyczyść</button>
         </div>
+        {orderError && (
+          <div role="alert" className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3 mt-3">⚠️ {orderError}</div>
+        )}
         <p className="text-xs text-ink/50 mt-2">
           Wysyłasz sam? <b>Pobierz PDF</b> → wyślij go swoim programem pocztowym → <b>Oznacz jako wysłane</b>.
           {lastPdf && !pdfReady && currentItems.length > 0 && (
@@ -418,14 +453,14 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
       {/* OZNACZ JAKO WYSŁANE (wysyłka poza CRM) */}
       {markOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in">
-          <div className="bg-canvas rounded-t-2xl sm:rounded-lg shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+          <div role="dialog" aria-modal="true" aria-labelledby="mark-sent-title" className="bg-canvas rounded-t-2xl sm:rounded-lg shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
             <div className="flex justify-between items-center px-5 py-4 border-b border-hairline-soft">
-              <h3 className="text-lg font-bold text-ink">✅ Oznacz jako wysłane</h3>
-              <button type="button" onClick={() => !marking && setMarkOpen(false)} className="text-ink font-light text-2xl leading-none" aria-label="Zamknij">✕</button>
+              <h3 id="mark-sent-title" className="text-lg font-bold text-ink">✅ Oznacz jako wysłane</h3>
+              <button type="button" onClick={() => !marking && setMarkOpen(false)} className="w-11 h-11 -mr-3 text-ink font-light text-2xl leading-none" aria-label="Zamknij">✕</button>
             </div>
             <div className="p-5 space-y-4">
               {markError && (
-                <div className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3">⚠️ {markError}</div>
+                <div role="alert" className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3">⚠️ {markError}</div>
               )}
               <p className="text-body-sm text-ink/70">
                 {currentItems.length} poz. · CRM <b>nie wysyła</b> maila — zapisze w Historii zamówień kopię pobranego PDF.
@@ -433,8 +468,10 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
               <label className="block">
                 <span className="block text-xs font-bold text-ink/60 uppercase tracking-wider mb-1">Data wysyłki</span>
                 <input
+                  autoFocus
                   type="date"
                   value={markDate}
+                  min={daysAgoISO(MARK_DATE_MAX_DAYS_BACK)}
                   max={todayISO()}
                   onChange={e => setMarkDate(e.target.value)}
                   className="w-full bg-canvas border border-hairline rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-ink text-body-sm"
@@ -454,7 +491,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
             <div className="px-5 py-4 border-t border-hairline-soft flex flex-col-reverse sm:flex-row justify-end gap-2">
               <button type="button" onClick={() => setMarkOpen(false)} disabled={marking} className="btn-secondary px-4 py-2.5 text-sm disabled:opacity-60">Anuluj</button>
               <button type="button" onClick={handleConfirmMark} disabled={marking || !markDate} className="btn-primary px-5 py-2.5 text-sm disabled:opacity-60">
-                {marking ? 'Zapisuję...' : 'Zapisz jako wysłane'}
+                {marking ? 'Zapisuję…' : 'Zapisz jako wysłane'}
               </button>
             </div>
           </div>
@@ -464,21 +501,21 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
       {/* PODGLĄD ZAMÓWIENIA PRZED WYSYŁKĄ */}
       {preview && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-canvas rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+          <div role="dialog" aria-modal="true" aria-labelledby="order-preview-title" className="bg-canvas rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
             <div className="flex justify-between items-center px-6 py-4 border-b border-hairline-soft">
-              <h3 className="text-lg font-bold text-ink">📦 Podgląd zamówienia</h3>
-              <button type="button" onClick={closePreview} className="text-ink font-light text-2xl leading-none" aria-label="Zamknij">✕</button>
+              <h3 id="order-preview-title" className="text-lg font-bold text-ink">📦 Podgląd zamówienia</h3>
+              <button type="button" onClick={closePreview} className="w-11 h-11 -mr-3 text-ink font-light text-2xl leading-none" aria-label="Zamknij">✕</button>
             </div>
 
             <div className="flex-1 overflow-y-auto p-6">
               {sendError && (
-                <div className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3 mb-4">⚠️ {sendError}</div>
+                <div role="alert" className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3 mb-4">⚠️ {sendError}</div>
               )}
 
               <p className="text-xs font-bold text-ink/60 uppercase">Do: {supplier.email}</p>
               <p className="text-xs font-bold text-ink/60 uppercase mb-3">Temat: {preview.subject}</p>
               <p className="text-xs text-ink/50 mb-3">
-                Pozycji: {preview.lines.length} · wartość wg cennika {zl(preview.total)} zł netto
+                Pozycji: {preview.lines.length} · wartość wg cennika {zl(preview.total)} netto
                 <span className="text-ink/40 ml-1">(ceny trafiają tylko do historii, nie do maila ani PDF)</span>
               </p>
 
@@ -500,7 +537,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
                 ← Wróć do edycji
               </button>
               <button type="button" onClick={handleConfirmSend} disabled={sending} className="btn-primary px-5 py-2 text-sm disabled:opacity-60">
-                {sending ? 'Wysyłam...' : '✉️ Wyślij'}
+                {sending ? 'Wysyłam…' : '✉️ Wyślij'}
               </button>
             </div>
           </div>

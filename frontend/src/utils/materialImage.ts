@@ -12,8 +12,10 @@ const JPEG_QUALITY = 0.85;
 const THUMB_QUALITY = 0.8;
 
 // HEIC/HEIF z iPhone'a — Safari je dekoduje, a my i tak wysyłamy JPG
-const SOURCE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-export const SOURCE_ACCEPT = 'image/jpeg,image/png,image/webp,image/heic,image/heif';
+// `image/jpg` — niestandardowy typ, który podaje część telefonów z Androidem
+const SOURCE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+export const SOURCE_ACCEPT = 'image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif';
+export const IMAGE_LINK_MAX_LENGTH = 2000; // jak na serwerze, liczone po normalizacji adresu
 
 /** Komunikat błędu albo null, gdy plik można spróbować zmniejszyć. Pusty typ (część telefonów) przepuszczamy. */
 export const sourceFileError = (file: { type: string; size: number }): string | null => {
@@ -34,7 +36,7 @@ export const fitShortSide = (w: number, h: number, shortSide: number, maxLong = 
   return { width: Math.max(1, Math.round(w * scale)), height: Math.max(1, Math.round(h * scale)) };
 };
 
-/** To samo co serwer: tylko https://, host z kropką, bez loginu/hasła i spacji. Zwraca błąd albo null. */
+/** Te same reguły co serwer (supplierImages.ts → validateImageLink). Zwraca błąd albo null. */
 export const imageLinkError = (raw: string): string | null => {
   const s = raw.trim();
   if (!s) return 'Wpisz link do zdjęcia.';
@@ -43,7 +45,10 @@ export const imageLinkError = (raw: string): string | null => {
   try { u = new URL(s); } catch { return 'To nie jest poprawny adres.'; }
   if (u.protocol !== 'https:') return 'Dozwolone tylko linki https://';
   if (u.username || u.password) return 'Link nie może zawierać loginu ani hasła.';
-  if (!u.hostname.includes('.')) return 'Nieprawidłowy adres serwera w linku.';
+  const host = u.hostname.toLowerCase();
+  if (!host.includes('.') || host.startsWith('.') || host.endsWith('.')) return 'Nieprawidłowy adres serwera w linku.';
+  // Długość po normalizacji: polskie litery w ścieżce rosną do %C4%85
+  if (u.toString().length > IMAGE_LINK_MAX_LENGTH) return 'Link jest za długi.';
   return null;
 };
 

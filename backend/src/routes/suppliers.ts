@@ -9,10 +9,11 @@ import { isNotFound } from '../utils/firestore';
 import * as crypto from 'crypto';
 import { sendEmail, GMAIL_TOKEN_ERROR } from '../services/gmail';
 import { generateSupplierOrderPdf } from '../services/pdf';
-import { saveUploadFile, deleteUploadFile } from '../services/uploadStore';
+import { saveUploadFile, deleteUploadFile, isUserUploadFilename } from '../services/uploadStore';
 import {
   ORDER_UNITS, OrderItem, SupplierOrderEntry, buildOrderItems, buildOrderEntry, buildManualOrderEntry, orderInteraction,
-  orderPdfLayout, orderPdfFilename, orderPdfFilenameFromUrl, orderBodyToHtml, sentDateError, pdfDateFrom, warsawDate,
+  orderPdfLayout, orderPdfFilename, orderPdfLocationFromUrl, orderBodyToHtml, sentDateError, pdfDateFrom,
+  orderAttachmentName, isValidRecipient,
 } from '../services/supplierOrders';
 import { isAdmin } from '../services/admins';
 import { uploadFilenameOf } from '../services/collageFiles';
@@ -26,6 +27,24 @@ router.use(authenticate);
 
 const COLLECTION = 'suppliers';
 const ORDERS = 'orders';
+const ORDER_LOCKS = 'orderLocks'; // znaczniki wysyłki (requestId) — ten sam podgląd nie wyśle maila dwa razy
+const ORDERS_DIR = 'orders';      // kopie PDF zamówień: uploads/orders/
+
+// Kasuje dokumenty porcjami — batch Firestore przyjmuje najwyżej 500 operacji.
+const deleteDocs = async (docs: FirebaseFirestore.QueryDocumentSnapshot[]): Promise<void> => {
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = db.batch();
+    docs.slice(i, i + 400).forEach(d => batch.delete(d.ref));
+    await batch.commit();
+  }
+};
+
+const deleteOrderPdf = async (pdfUrl: unknown): Promise<void> => {
+  const loc = orderPdfLocationFromUrl(typeof pdfUrl === 'string' ? pdfUrl : null);
+  if (!loc) return;
+  await deleteUploadFile(loc.filename, loc.subdir).catch(err =>
+    console.error(`[suppliers] nie usunięto PDF zamówienia ${loc.filename}:`, err));
+};
 
 const FileSchema = z.object({
   id: z.string(),
@@ -40,14 +59,10 @@ const MaterialSchema = z.object({
   name: z.string().min(1),
   unit: z.enum(['szt', 'm²', 'ark.', 'kpl']).default('szt'),
   price: z.number().nonnegative().default(0),
-  // Samo .optional(): formularz, który nie wysyła zdjęcia, nie może go wyczyścić. I tak serwer bierze
-  // zdjęcie z bazy (mergeMaterialImages) — zmieniają je tylko trasy …/materials/:materialId/image niżej.
-  image: z.object({
-    source: z.enum(['upload', 'link']),
-    url: z.string().max(2000),
-    thumbUrl: z.string().max(2000).optional(),
-    createdAt: z.string(),
-  }).optional(),
+  // Samo .optional() i bez walidacji: serwer i tak ignoruje to pole i bierze zdjęcie z bazy
+  // (mergeMaterialImages) — zmieniają je tylko trasy …/materials/:materialId/image niżej.
+  // Walidacja tutaj blokowałaby zapis dostawcy, gdyby zapisane zdjęcie jej nie spełniało.
+  image: z.unknown().optional(),
 });
 
 const SupplierSchema = z.object({
@@ -160,46 +175,41 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
 router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params;
-    // Firestore nie usuwa subkolekcji automatycznie — bez tego historia kontaktów
-    // usuniętego dostawcy zostawała w bazie na zawsze (tak jak w clients.ts).
-    const interactionsSnap = await db
-      .collection(COLLECTION).doc(id).collection('interactions').get();
+    const ref = db.collection(COLLECTION).doc(id);
+    const supplierSnap = await ref.get();
+    if (!supplierSnap.exists) return res.status(404).json({ error: 'Dostawca nie istnieje' });
 
-    if (!interactionsSnap.empty) {
-      const batch = db.batch();
-      interactionsSnap.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
+    // Historia zamówień jest niezmienna — dostawcę z zamówieniami usuwa tylko administrator (#015)
+    const ordersSnap = await ref.collection(ORDERS).get();
+    if (!ordersSnap.empty && !isAdmin(req.user?.email)) {
+      return res.status(403).json({
+        error: `Ten dostawca ma ${ordersSnap.size} zamówień w historii — usunąć go może tylko administrator`,
+      });
     }
 
-    // Historia zamówień znika razem z dostawcą — razem z PDF-ami z uploads.
-    const ordersSnap = await db.collection(COLLECTION).doc(id).collection(ORDERS).get();
-    for (const doc of ordersSnap.docs) {
-      const filename = orderPdfFilenameFromUrl(doc.data().pdfUrl);
-      if (filename) {
-        await deleteUploadFile(filename).catch(err =>
-          console.error(`[suppliers] nie usunięto PDF zamówienia ${filename}:`, err));
-      }
-    }
-    if (!ordersSnap.empty) {
-      const batch = db.batch();
-      ordersSnap.docs.forEach(doc => batch.delete(doc.ref));
-      await batch.commit();
-    }
+    // Najpierw lista plików, potem dokumenty (Firestore nie usuwa podkolekcji sam), na końcu pliki —
+    // błąd w połowie nie zostawi wpisów bez plików.
+    const data = supplierSnap.data() ?? {};
+    const pdfUrls = ordersSnap.docs.map(d => d.data().pdfUrl);
+    const materials: Array<{ image?: MaterialImage }> = Array.isArray(data.materials) ? data.materials : [];
+    const files: Array<{ url?: string }> = Array.isArray(data.files) ? data.files : [];
 
-    // Pliki z karty dostawcy (cenniki i inne załączniki) — też znikają z serwera
-    const supplierSnap = await db.collection(COLLECTION).doc(id).get();
-    const materials: Array<{ image?: MaterialImage }> = Array.isArray(supplierSnap.data()?.materials) ? supplierSnap.data()!.materials : [];
+    const interactionsSnap = await ref.collection('interactions').get();
+    const locksSnap = await ref.collection(ORDER_LOCKS).get();
+    await deleteDocs([...interactionsSnap.docs, ...ordersSnap.docs, ...locksSnap.docs]);
+    await ref.delete();
+
+    for (const url of pdfUrls) await deleteOrderPdf(url);
     for (const m of materials) await deleteImageFiles(m.image);
-    const files: Array<{ url?: string }> = Array.isArray(supplierSnap.data()?.files) ? supplierSnap.data()!.files : [];
+    // Pliki z karty dostawcy (cenniki, załączniki) — tylko wgrane przez /api/upload (`produkt-…`),
+    // żeby adres podsunięty w `files` nie skasował np. kolażu wysłanej kampanii.
     for (const f of files) {
       const filename = uploadFilenameOf(f.url);
-      if (filename) {
-        await deleteUploadFile(filename).catch(err =>
-          console.error(`[suppliers] nie usunięto pliku dostawcy ${filename}:`, err));
-      }
+      if (!isUserUploadFilename(filename)) continue;
+      await deleteUploadFile(filename).catch(err =>
+        console.error(`[suppliers] nie usunięto pliku dostawcy ${filename}:`, err));
     }
 
-    await db.collection(COLLECTION).doc(id).delete();
     res.status(204).send();
   } catch (err) {
     console.error('[suppliers] DELETE /:id błąd:', err);
@@ -383,6 +393,9 @@ const OrderSendSchema = z.object({
   body: z.string().trim().min(1, 'Treść maila jest wymagana').max(20000),
   notes: z.string().max(5000).optional(),
   items: OrderItemsSchema,
+  // Identyfikator podglądu (UUID z przeglądarki) — drugie „Wyślij” z tym samym id nie wyśle maila ponownie.
+  // Opcjonalny tylko dla starszej wersji frontu w pamięci PWA.
+  requestId: z.string().regex(/^[A-Za-z0-9-]{8,64}$/).optional(),
 });
 
 const OrderPdfSchema = z.object({
@@ -425,7 +438,7 @@ router.post('/:id/orders/pdf', async (req: AuthenticatedRequest, res: Response) 
     const now = new Date();
     const pdf = await buildSupplierOrderPdf(supplier, items, parsed.data.notes ?? '', now);
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="Zamowienie-${warsawDate(now)}.pdf"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${orderAttachmentName(now)}"`);
     res.setHeader('X-Pdf-Date', now.toISOString());
     res.send(pdf);
   } catch (err) {
@@ -460,7 +473,7 @@ router.post('/:id/orders/mark-sent', async (req: AuthenticatedRequest, res: Resp
   const pdfFilename = orderPdfFilename(now, crypto.randomBytes(12).toString('hex'));
   try {
     const pdf = await buildSupplierOrderPdf(supplier, items, notes, pdfDateFrom(parsed.data.pdfDate, now));
-    await saveUploadFile(pdfFilename, pdf);
+    await saveUploadFile(pdfFilename, pdf, ORDERS_DIR);
   } catch (err) {
     console.error('[suppliers] POST /:id/orders/mark-sent — PDF:', err);
     return res.status(500).json({ error: 'Nie udało się zapisać kopii PDF — wpis nie powstał' });
@@ -469,7 +482,7 @@ router.post('/:id/orders/mark-sent', async (req: AuthenticatedRequest, res: Resp
   const entry = buildManualOrderEntry({
     sentDate: parsed.data.sentDate, recordedAt: now, to: String(supplier.email ?? '').trim(), items, notes,
     note: parsed.data.note ?? '', recordedBy: req.user?.email,
-    pdfUrl: `${req.protocol}://${req.get('host')}/uploads/${pdfFilename}`, pdfFilename,
+    pdfUrl: `${req.protocol}://${req.get('host')}/uploads/${ORDERS_DIR}/${pdfFilename}`, pdfFilename,
   });
 
   const supplierRef = db.collection(COLLECTION).doc(id);
@@ -477,7 +490,7 @@ router.post('/:id/orders/mark-sent', async (req: AuthenticatedRequest, res: Resp
   try {
     orderId = (await supplierRef.collection(ORDERS).add(entry)).id;
   } catch (err) {
-    await deleteUploadFile(pdfFilename).catch(() => undefined);
+    await deleteUploadFile(pdfFilename, ORDERS_DIR).catch(() => undefined);
     console.error('[suppliers] POST /:id/orders/mark-sent — zapis:', err);
     return res.status(500).json({ error: 'Nie udało się zapisać wpisu w historii' });
   }
@@ -495,17 +508,17 @@ router.delete('/:id/orders/:orderId', async (req: AuthenticatedRequest, res: Res
     const orderRef = supplierRef.collection(ORDERS).doc(orderId);
     const snap = await orderRef.get();
     if (!snap.exists) return res.status(404).json({ error: 'Wpis nie istnieje' });
-    const filename = orderPdfFilenameFromUrl(snap.data()?.pdfUrl);
-    if (filename) await deleteUploadFile(filename);
 
     const linked = await supplierRef.collection('interactions').where('orderId', '==', orderId).get();
     const batch = db.batch();
     linked.docs.forEach(d => batch.delete(d.ref));
     batch.delete(orderRef);
     await batch.commit();
+    // Plik dopiero po udanym zapisie w bazie — wpis nigdy nie zostaje bez swojego PDF
+    await deleteOrderPdf(snap.data()?.pdfUrl);
     if (!linked.empty) await recomputeLastContact(supplierRef);
 
-    console.log(`[suppliers] wpis zamówienia ${orderId} dostawcy ${id} usunięty przez ${req.user?.email}`);
+    console.info(`[suppliers] wpis zamówienia ${orderId} dostawcy ${id} usunięty przez ${req.user?.email}`);
     res.status(204).send();
   } catch (err) {
     console.error('[suppliers] DELETE /:id/orders/:orderId błąd:', err);
@@ -528,8 +541,6 @@ const addOrderInteraction = async (
   }
 };
 
-const EMAIL_RE = /^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/;
-
 router.get('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
   try {
     const snapshot = await db.collection(COLLECTION).doc(req.params.id).collection(ORDERS).orderBy('sentAt', 'desc').get();
@@ -541,39 +552,56 @@ router.get('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
 });
 
 // POST /:id/orders — wysyła zamówienie (po kliknięciu „Wyślij” w podglądzie) i zapisuje je w historii.
+// Odpowiedź z `sent: true` = mail wyszedł (albo mógł wyjść) — front blokuje wtedy ponowną wysyłkę.
 router.post('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
   const parsed = OrderSendSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   const { id } = req.params;
+  const supplierRef = db.collection(COLLECTION).doc(id);
 
-  let supplier: FirebaseFirestore.DocumentData | undefined;
+  let supplier: SupplierDoc | null;
   try {
-    const snap = await db.collection(COLLECTION).doc(id).get();
-    if (!snap.exists) return res.status(404).json({ error: 'Dostawca nie istnieje' });
-    supplier = snap.data();
+    supplier = await loadSupplier(id);
   } catch (err) {
     console.error('[suppliers] POST /:id/orders — odczyt dostawcy:', err);
     return res.status(500).json({ error: 'Błąd odczytu dostawcy' });
   }
+  if (!supplier) return res.status(404).json({ error: 'Dostawca nie istnieje' });
 
   // Adresat zawsze z karty dostawcy w bazie, nie z formularza
-  const to = String(supplier?.email ?? '').trim();
-  if (!EMAIL_RE.test(to)) return res.status(400).json({ error: 'Ten dostawca nie ma poprawnego adresu e-mail' });
+  const to = String(supplier.email ?? '').trim();
+  if (!isValidRecipient(to)) return res.status(400).json({ error: 'Ten dostawca nie ma poprawnego adresu e-mail' });
 
-  const items = buildOrderItems(parsed.data.items, Array.isArray(supplier?.materials) ? supplier.materials : []);
+  const items = buildOrderItems(parsed.data.items, catalogOf(supplier));
   if (items.length === 0) return res.status(400).json({ error: 'Zamówienie musi mieć co najmniej jedną pozycję' });
+
+  // Znacznik wysyłki: create() się nie uda, jeśli ten podgląd już raz wysłał (np. odpowiedź nie dotarła do przeglądarki)
+  const lockRef = parsed.data.requestId ? supplierRef.collection(ORDER_LOCKS).doc(parsed.data.requestId) : null;
+  if (lockRef) {
+    try {
+      await lockRef.create({ status: 'sending', createdAt: new Date().toISOString(), by: req.user?.email ?? null });
+    } catch (err) {
+      if ((err as { code?: number }).code === 6) { // ALREADY_EXISTS
+        return res.status(409).json({
+          error: 'To zamówienie zostało już wysłane (albo właśnie się wysyła). Sprawdź Historię zamówień i „Wysłane” w Gmailu — nie wysyłaj ponownie.',
+          sent: true,
+        });
+      }
+      console.error('[suppliers] POST /:id/orders — znacznik wysyłki:', err);
+      return res.status(500).json({ error: 'Nie udało się przygotować wysyłki — nic nie zostało wysłane' });
+    }
+  }
+  const releaseLock = () => lockRef?.delete().catch(err => console.error('[suppliers] zwolnienie znacznika wysyłki:', err));
 
   const now = new Date();
   const notes = parsed.data.notes ?? '';
   const pdfFilename = orderPdfFilename(now, crypto.randomBytes(12).toString('hex'));
   let pdf: Buffer;
   try {
-    pdf = await generateSupplierOrderPdf(orderPdfLayout({
-      supplier: { companyName: String(supplier?.companyName ?? ''), email: to, address: supplier?.address },
-      items, notes, date: now,
-    }));
-    await saveUploadFile(pdfFilename, pdf);
+    pdf = await buildSupplierOrderPdf(supplier, items, notes, now);
+    await saveUploadFile(pdfFilename, pdf, ORDERS_DIR);
   } catch (err) {
+    await releaseLock();
     console.error('[suppliers] POST /:id/orders — PDF:', err);
     return res.status(500).json({ error: 'Nie udało się przygotować PDF zamówienia — nic nie zostało wysłane' });
   }
@@ -585,25 +613,26 @@ router.post('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
       subject: parsed.data.subject,
       htmlBody: orderBodyToHtml(parsed.data.body),
       pdfBuffer: pdf,
-      pdfFilename: `Zamowienie-${now.toISOString().slice(0, 10)}.pdf`,
+      pdfFilename: orderAttachmentName(now),
     });
   } catch (err) {
-    // Mail nie wyszedł — nic nie zapisujemy, PDF sprzątamy
-    await deleteUploadFile(pdfFilename).catch(() => undefined);
+    // Mail nie wyszedł — nic nie zapisujemy, PDF i znacznik sprzątamy (można spróbować ponownie)
+    await deleteUploadFile(pdfFilename, ORDERS_DIR).catch(() => undefined);
+    await releaseLock();
     const msg = (err as Error).message;
     console.error('[suppliers] POST /:id/orders — wysyłka:', msg);
     return res.status(502).json({
       error: msg === GMAIL_TOKEN_ERROR ? msg : `Nie udało się wysłać zamówienia (${msg}) — nic nie zostało zapisane`,
     });
   }
+  await lockRef?.update({ status: 'sent', gmailMessageId: gmail.id }).catch(() => undefined);
 
   const entry = buildOrderEntry({
     sentAt: now, to, subject: parsed.data.subject, body: parsed.data.body, items, notes,
     sentBy: req.user?.email, gmail,
-    pdfUrl: `${req.protocol}://${req.get('host')}/uploads/${pdfFilename}`, pdfFilename,
+    pdfUrl: `${req.protocol}://${req.get('host')}/uploads/${ORDERS_DIR}/${pdfFilename}`, pdfFilename,
   });
 
-  const supplierRef = db.collection(COLLECTION).doc(id);
   let orderId: string;
   try {
     orderId = (await supplierRef.collection(ORDERS).add(entry)).id;
@@ -612,6 +641,7 @@ router.post('/:id/orders', async (req: AuthenticatedRequest, res: Response) => {
     console.error('[suppliers] POST /:id/orders — zamówienie WYSŁANE, zapis historii nieudany:', JSON.stringify({ supplierId: id, entry }), err);
     return res.status(500).json({
       error: 'Zamówienie zostało WYSŁANE, ale nie zapisało się w historii. Nie wysyłaj go ponownie — szczegóły są w logu serwera.',
+      sent: true,
     });
   }
 

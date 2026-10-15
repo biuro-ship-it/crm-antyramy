@@ -1,107 +1,80 @@
 import { Router, Response } from 'express';
 import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
+import * as crypto from 'crypto';
 import { authenticate } from '../middleware/auth';
 import { AuthenticatedRequest } from '../types';
+import { saveUploadFile, deleteUploadFile, detectUploadType, isUserUploadFilename } from '../services/uploadStore';
 
 const router = Router();
 router.use(authenticate);
 
-// Zawsze public/uploads/ — zarówno lokalnie jak i na serwerze
-// __dirname w dev (ts-node): backend/src/routes/ → ../../public/uploads = backend/public/uploads/
-// __dirname na serwerze (compiled): public_nodejs/dist/routes/ → ../../public/uploads = public_nodejs/public/uploads/ ✓
-const UPLOAD_DIR = path.join(__dirname, '../../public/uploads');
-
-// Utwórz katalog jeśli nie istnieje
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    const ext = path.extname(file.originalname).toLowerCase();
-    // ?kind=kolaz → kolaz-…; cokolwiek innego (lub brak) → produkt-… jak dotąd.
-    // Stała lista prefiksów — wartość z zapytania nigdy nie trafia do nazwy pliku.
-    const prefix = req.query.kind === 'kolaz' ? 'kolaz' : 'produkt';
-    cb(null, `${prefix}-${uniqueSuffix}${ext}`);
-  },
-});
-const fileFilter = (_req: Express.Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-  const allowed = [
-    'image/jpeg', 
-    'image/jpg', 
-    'image/png', 
-    'image/webp', 
-    'application/pdf', 
-    'application/msword', 
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ];
-  
-  if (allowed.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('Dozwolone formaty: JPG, PNG, WebP, PDF, DOCX'));
-  }
-};
-
+// Pliki trafiają do public/uploads/ (lokalnie backend/public/uploads/, na serwerze public_nodejs/public/uploads/
+// — poza repo i poza rsync). Plik najpierw w pamięci: typ sprawdzamy po zawartości, dopiero potem zapis na dysk.
 const upload = multer({
-  storage,
-  fileFilter,
-  limits: { fileSize: 5 * 1024 * 1024 }, // max 5 MB
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 }, // max 5 MB
 });
 
-// POST /api/upload — prześlij zdjęcie produktu
+// POST /api/upload — zdjęcie produktu, dokument klienta/dostawcy/notatki, kolaż (?kind=kolaz)
 router.post('/', (req: AuthenticatedRequest, res: Response) => {
-  upload.single('image')(req, res, (err) => {
+  upload.single('image')(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
-      res.status(400).json({ error: `Błąd uploadu: ${err.message}` });
+      const msg = err.code === 'LIMIT_FILE_SIZE' ? 'Plik większy niż 5 MB' : `Błąd uploadu: ${err.message}`;
+      res.status(400).json({ error: msg });
       return;
     }
     if (err) {
       console.error('[upload] błąd multer:', err);
-      res.status(400).json({ error: err.message || 'Nie udało się zapisać pliku' });
+      res.status(400).json({ error: 'Nie udało się odebrać pliku' });
       return;
     }
     if (!req.file) {
-      res.status(400).json({ error: 'Brak pliku lub niedozwolony format' });
+      res.status(400).json({ error: 'Brak pliku' });
       return;
     }
 
-    // Zdjęcia serwowane przez Passenger z public_nodejs/public/uploads/
-    // URL wyprowadzony z request (działa zarówno lokalnie jak i na produkcji)
-    const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const imageUrl = `${baseUrl}/uploads/${req.file.filename}`;
+    // Rozszerzenie z zawartości, nie z nazwy od przeglądarki (np. HTML udający .jpg → odrzucony)
+    const kind = detectUploadType(req.file.buffer);
+    if (!kind) {
+      res.status(400).json({ error: 'Dozwolone formaty: JPG, PNG, WebP, PDF, DOC, DOCX' });
+      return;
+    }
+    // Kolaż to zawsze JPG z przeglądarki; stała lista prefiksów — wartość z zapytania nie trafia do nazwy pliku
+    const isCollage = req.query.kind === 'kolaz';
+    if (isCollage && kind !== 'jpg') {
+      res.status(400).json({ error: 'Kolaż musi być plikiem JPG' });
+      return;
+    }
+    const prefix = isCollage ? 'kolaz' : 'produkt';
+    const filename = `${prefix}-${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${kind}`;
 
-    res.json({ imageUrl });
+    try {
+      await saveUploadFile(filename, req.file.buffer);
+    } catch (saveErr) {
+      console.error('[upload] zapis pliku:', saveErr);
+      res.status(500).json({ error: 'Nie udało się zapisać pliku' });
+      return;
+    }
+
+    // URL wyprowadzony z żądania (działa zarówno lokalnie, jak i na produkcji)
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json({ imageUrl: `${baseUrl}/uploads/${filename}` });
   });
 });
 
-// DELETE /api/upload/:filename — usuń zdjęcie
-router.delete('/:filename', (req: AuthenticatedRequest, res: Response) => {
+// DELETE /api/upload/:filename — usuwa plik wgrany przez POST /api/upload (tylko `produkt-…`).
+// PDF-y zamówień, kolaże i zdjęcia towarów mają własne sprzątanie i nie da się ich skasować tą trasą.
+router.delete('/:filename', async (req: AuthenticatedRequest, res: Response) => {
   const { filename } = req.params;
-
-  // Zabezpieczenie przed path traversal
-  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
-    res.status(400).json({ error: 'Nieprawidłowa nazwa pliku' });
+  if (!isUserUploadFilename(filename)) {
+    res.status(400).json({ error: 'Tego pliku nie można usunąć tą drogą' });
     return;
   }
-
-  const filePath = path.join(UPLOAD_DIR, filename);
-
-  if (!fs.existsSync(filePath)) {
-    res.status(404).json({ error: 'Plik nie istnieje' });
-    return;
-  }
-
   try {
-    fs.unlinkSync(filePath);
+    await deleteUploadFile(filename);
     res.json({ ok: true });
-  } catch {
+  } catch (err) {
+    console.error('[upload] usuwanie pliku:', err);
     res.status(500).json({ error: 'Błąd usuwania pliku' });
   }
 });

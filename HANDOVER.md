@@ -1,7 +1,8 @@
 # CRM Antyramy – handover
 
 **Ostatnia aktualizacja:** 2026-10-15
-**Wersja produkcyjna:** commit `7d5a8fe` — https://crm.antyramy.eu (deploy 2026-10-15, `/health` = 200). **Niewypchnięte:** zdjęcia towarów dostawców (#014, commit lokalny z 2026-10-15).
+**Wersja produkcyjna:** `origin/main` = `69f4730` (kod = `7d5a8fe`, deploy 2026-10-15, `/health` = 200) — https://crm.antyramy.eu.
+**Do wypchnięcia (lokalnie):** `c465209` (zdjęcia towarów, #014) + commit poprawek po przeglądzie kodu (#015). Testy: backend 147/147, frontend 108/108, build OK.
 
 Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
@@ -16,6 +17,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - **„Sprawdź odpowiedzi” naprawione (2026-10-14):** komunikat „Brak uprawnienia do czytania poczty” był fałszywy — blokował limit zapytań Gmaila (ok. 70 pobrań wątku/min). Teraz: lista poczty przychodzącej i pobieranie tylko wątków z nową pocztą (#010), ponawianie przy limicie i osobny komunikat (#009), odpowiedzi ze zmienionym tematem w nowym wątku rozpoznawane po `In-Reply-To`/`References` (#011). Na produkcji potwierdzone dla `67c557e` („Sprawdzono 62 wątków … 0”); `8fd19e8` (#011) sprawdzone na sucho na prawdziwych danych — 1 nowa odpowiedź (biuro@fotogasek.pl, 12.10).
 
 ### 🔧 W trakcie
+- **Poprawki po przeglądzie kodu (#015) — zrobione lokalnie, niewdrożone.** 3 agentów (backend/bezpieczeństwo, frontend/UX, testy/dokumentacja), 25 punktów, wszystkie zatwierdzone: m.in. jedna wysyłka na podgląd (`orderLocks`), dostawcę z zamówieniami usuwa tylko admin, PDF-y zamówień w `uploads/orders/`, `/api/upload` sprawdza typ po zawartości i kasuje tylko `produkt-…`, historia zamówień w kopii i Archiwum, „Pobierz PDF” przez `<a download>`. Bez testów ręcznych — lista „Po przeglądzie kodu” niżej.
 - **Zdjęcia towarów dostawców (#014) — zrobione lokalnie, niewdrożone.** Testy automatyczne i build przechodzą; ekran sprawdzony na tymczasowej stronie testowej (zmniejszenie 4000×3000 → 1600×1200 + miniatura 213×160, powiększenie: ✕ / tło / Esc, powrót fokusu, błędny link, tryb ciemny). Po pushu: testy ręczne na produkcji — sekcja „Zdjęcia towarów dostawców” niżej.
 - **Testy ręczne historii zamówień** (obie drogi, admin, usuwanie dostawcy) — niezrobione; lista w sekcji „Historia zamówień do dostawców” niżej. Prawdziwej wysyłki zamówienia ani okna „Oznacz jako wysłane” nikt jeszcze nie sprawdził.
 - **Kliknięcie „📬 Sprawdź odpowiedzi” po wdrożeniu `8fd19e8` nie zostało potwierdzone** — w kampanii z 8.10 powinna dojść 1 odpowiedź (FotoGAsek), w historii kontaktów klienta wpis „Odpowiedź na kampanię: Kampania bez nazwy” z 12.10.
@@ -32,31 +34,53 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - Outlook blokuje kolaż do kliknięcia „Pokaż obrazy” (inline CID — osobne zadanie). Pliki-sieroty kolażu nie są sprzątane.
 
 ## Następne kroki (kolejność = priorytet)
-- **Po pushu `#014`:** testy ręczne zdjęć towarów (sekcja „Zdjęcia towarów dostawców” niżej); Claude sprawdza przez SSH, czy pliki w `uploads/suppliers/` znikają.
-- **Najpierw:** testy ręczne historii zamówień (sekcja „Historia zamówień do dostawców” niżej, punkty 1–10) — na dostawcy testowym z Twoim adresem e-mail; po usunięciu dostawcy testowego Claude sprawdza przez SSH, czy jego pliki zniknęły.
-0. **Google Cloud Console:** status aplikacji OAuth („Testing” → „Internal” albo „Publish app”), żeby token nie wygasał co 7 dni; przy okazji limity Gmail API („per minute per user”). Gdy poczta znów stanie: `node backend/scripts/get-gmail-token.js` → linia `GMAIL_REFRESH_TOKEN` do `public_nodejs/.env` na serwerze → `devil www restart crm.antyramy.eu`.
-1. Kliknąć „📬 Sprawdź odpowiedzi” w kampanii z 8.10 i potwierdzić odpowiedź FotoGAska (wyżej).
-2. Utworzyć indeks Firestore dla `followups` (link w `logs/error.log`).
-3. Testy ręczne wysyłki testowej na produkcji (sekcja „Kolaż w kroku 1…”, punkty 1–7) — najpierw punkt 1–2: sam kolaż → test → mail `[TEST]` w info@pluszek.pl.
-4. Testy ręczne kolażu z telefonu i w Gmailu/Outlooku (sekcja „Kolaż z 3 zdjęć”, punkty 1–8).
-5. Opcjonalnie: adres testowy jako ustawienie w Administracji; kolaż ze zdjęć produktów z katalogu (odłożone 2026-10-08).
+1. **Push** `c465209` + commit #015 (`! git push origin main`), potem `/health` i nowa nazwa `assets/index-*.js`.
+2. **Testy ręczne na produkcji, na jednym dostawcy testowym z Twoim adresem e-mail** (kolejno sekcje niżej):
+   „Historia zamówień do dostawców” (1–10) → „Zdjęcia towarów dostawców” (1–11) → „Po przeglądzie kodu” (1–12).
+   Po usunięciu dostawcy testowego Claude sprawdza przez SSH, czy zniknęły pliki w `uploads/orders/` i `uploads/suppliers/`.
+3. **Google Cloud Console:** status aplikacji OAuth („Testing” → „Internal” albo „Publish app”), żeby token nie wygasał co 7 dni; przy okazji limity Gmail API („per minute per user”). Gdy poczta znów stanie: `node backend/scripts/get-gmail-token.js` → linia `GMAIL_REFRESH_TOKEN` do `public_nodejs/.env` na serwerze → `devil www restart crm.antyramy.eu`.
+4. Kliknąć „📬 Sprawdź odpowiedzi” w kampanii z 8.10 i potwierdzić odpowiedź FotoGAska (wyżej).
+5. Utworzyć indeks Firestore dla `followups` (link w `logs/error.log`).
+6. Testy ręczne wysyłki testowej na produkcji (sekcja „Kolaż w kroku 1…”, punkty 1–7) — najpierw punkt 1–2: sam kolaż → test → mail `[TEST]` w info@pluszek.pl.
+7. Testy ręczne kolażu z telefonu i w Gmailu/Outlooku (sekcja „Kolaż z 3 zdjęć”, punkty 1–8).
+8. Opcjonalnie: adres testowy jako ustawienie w Administracji; kolaż ze zdjęć produktów z katalogu (odłożone 2026-10-08).
 
 ## Ważne do zapamiętania
 - **Push robi Krzysiek** (`! git push origin main`) — hook blokuje `git push` u Claude. Push na `main` = deploy przez GitHub Actions (ok. 2 min). Status bez logowania: `https://api.github.com/repos/biuro-ship-it/crm-antyramy/actions/runs?per_page=3`; potem `/health` i nowa nazwa `assets/index-*.js`.
 - Lokalna aplikacja wymaga logowania Google — Claude sprawdza ekrany na tymczasowej stronie testowej (komponent + podstawiony `fetch`), którą po sprawdzeniu usuwa.
 - Wysyłka testowa niczego nie zapisuje (ani w kampanii, ani w historii klienta) — tak ma zostać, inaczej zaburzy pomiar i ostrzeżenie „kampania w ostatnich 7 dniach”.
 - Kolaże i uploady testować tylko na produkcji (plik wgrany lokalnie nie wyświetli się w mailu).
+- `logs/error.log` przy „zamówienie WYSŁANE, zapis historii nieudany” zawiera cały wpis (adres dostawcy, treść, pozycje) — celowo, żeby go odtworzyć; log traktować jak dane firmy.
 
 ## Historia sesji
+- **2026-10-15 (noc)** — Przegląd kodu historii zamówień i zdjęć towarów przez 3 agentów; 25 poprawek (#015): blokada podwójnej wysyłki, uprawnienia przy usuwaniu dostawcy, PDF-y w `orders/`, bezpieczny `/api/upload`, `orders` w kopii, testy brzegowe + test PDF. CSP z #014 cofnięte (nie działało na `index.html`). Commit lokalny, niewdrożone.
 - **2026-10-15 (wieczór)** — Zdjęcie towaru dostawcy (#014): plik (zmniejszany w przeglądarce) albo link https://, miniaturka na liście, powiększenie, sekcja „Zdjęcie” w edycji towaru; pliki w `uploads/suppliers/` poza repo, sprzątanie przy zastąpieniu / usunięciu zdjęcia, towaru i dostawcy; CSP `img-src https:`. Commit lokalny, niewdrożone.
 - **2026-10-15** — Historia zamówień do dostawców: wysyłka przez Gmail z PDF (zamiast `mailto:`), podkolekcja `orders`, sekcja w karcie (#012, wdrożone `19a35c9`); potem „Pobierz PDF” + „Oznacz jako wysłane”, usuwanie wpisu przez admina (`ADMIN_EMAILS`), sprzątanie wszystkich plików dostawcy (#013). Oba etapy wdrożone (`19a35c9`, `7d5a8fe`), testy ręczne czekają.
 - **2026-10-14 (wieczór)** — Błąd „Brak uprawnienia do czytania poczty”: token Gmail odnowiony i przeniesiony na serwer, ale prawdziwą przyczyną był limit zapytań Gmaila. Poprawki „Sprawdź odpowiedzi”: #009 ponawianie i osobny komunikat (`fb0a428`), #010 pobieranie tylko wątków z nową pocztą (`67c557e`, potwierdzone na produkcji), #011 odpowiedzi ze zmienionym tematem (`8fd19e8`, sprawdzone na sucho). Wdrożony też `b0d5dc9` i dokumentacja (`bdffc4c`).
 - **2026-10-14** — Dokumentacja całej aplikacji według szablonu: `SPEC.md` rozszerzony z modułu Kampanie na cały CRM, `DECISIONS.md` z numerowanymi wpisami #001–#008 (stary dziennik Kampanii zachowany jako archiwum), `HANDOVER.md` i `CLAUDE.md` uzupełnione. Bez zmian w kodzie.
-- **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`). Wieczorem: test nie doszedł, bo wygasł token Gmail (`invalid_grant`) — token odnowiony i przeniesiony na serwer; lokalnie czytelniejszy komunikat błędu (`b0d5dc9`, niewdrożone).
 
 ---
 
 # Szczegóły
+
+## Po przeglądzie kodu — 2026-10-15, niewdrożone (#015)
+
+Testy ręczne na produkcji po pushu. Ten sam dostawca testowy co niżej.
+
+1. **PDF z polskimi znakami:** nazwa dostawcy, pozycje i uwagi z „ąćęłńóśźż”; zamówienie na ponad jedną stronę (dużo pozycji — nagłówek tabeli na 2. stronie); w uwagach długi link bez spacji → nie wychodzi poza tabelę.
+2. **„⬇️ Pobierz PDF” na iPhonie** (Safari i zainstalowana PWA) oraz na Androidzie: plik `Zamowienie-RRRR-MM-DD.pdf` się pobiera/otwiera, potem „Oznacz jako wysłane” jest aktywne.
+3. **Jedna wysyłka na podgląd:** „✉️ Wyślij” → w trakcie wyłącz Wi-Fi/sieć w telefonie, żeby odpowiedź nie dotarła → włącz sieć → „Wyślij” jeszcze raz w tym samym podglądzie → komunikat „zostało już wysłane”, podgląd się zamyka; w skrzynce **jeden** mail.
+4. **Usuwanie dostawcy z zamówieniami:** jako krzysiekgodek@gmail.com (nie admin) → komunikat „usunąć może tylko administrator”, nic nie znika. Jako biuro@antyramy.eu → potwierdzenie z liczbą zamówień → dostawca znika.
+5. **Konto bez uprawnień admina** wywołuje `DELETE …/orders/:id` z narzędzi przeglądarki → 403 (przycisk jest tylko ukryty).
+6. **Data wysyłki starsza niż rok** w oknie „Oznacz jako wysłane” — kalendarz jej nie pozwala wybrać; Esc zamyka okno.
+7. **Adres wgranego zdjęcia** zaczyna się od `https://crm.antyramy.eu/uploads/suppliers/`, a nowego PDF z historii od `…/uploads/orders/` (bez `http://`).
+8. **Zdjęcie z aparatu telefonu** stoi prosto (EXIF) w miniaturce i w powiększeniu; PNG z przezroczystością ma białe tło.
+9. **Link do obrazka z serwisu blokującego osadzanie** (hotlink) → ikona na liście, w edycji „Zdjęcie się nie wczytuje”. Długi link (~1000 znaków z polskimi literami) → „Link jest za długi”, edycja dostawcy dalej działa.
+10. **Stare pliki:** wgranie dokumentu klienta (PDF/DOCX) i zdjęcia produktu nadal działa; plik `.html` przemianowany na `.jpg` → „Dozwolone formaty…”.
+11. **Dwie karty przeglądarki:** zdjęcie wgrane w karcie B, potem „Zapisz” nazwy towaru w nieodświeżonej karcie A → zdjęcie zostaje.
+12. **Kopia zapasowa:** `backup.js --include-uploads` (na serwerze) zawiera `uploads/suppliers/` i `uploads/orders/`, a JSON — `_sub_orders` u dostawców.
+    Znane: po usunięciu wpisu przez admina „ostatni kontakt” na otwartej karcie odświeży się dopiero po ponownym otwarciu karty.
+
 
 ## Zdjęcia towarów dostawców — 2026-10-15, niewdrożone (#014)
 

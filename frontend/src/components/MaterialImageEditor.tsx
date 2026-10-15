@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Supplier, SupplierMaterial,
   uploadSupplierMaterialImage, setSupplierMaterialImageLink, deleteSupplierMaterialImage,
@@ -10,6 +10,8 @@ interface MaterialImageEditorProps {
   supplierId: string;
   material: SupplierMaterial;
   onSupplierUpdated: (s: Supplier) => void;
+  // Rodzic blokuje „Zapisz”/„Anuluj” edycji towaru, dopóki zdjęcie się zapisuje
+  onBusyChange?: (busy: boolean) => void;
 }
 
 type Busy = null | 'upload' | 'link' | 'delete';
@@ -18,14 +20,17 @@ const hostOf = (url: string) => { try { return new URL(url).hostname; } catch { 
 
 // Sekcja „Zdjęcie” w edycji towaru. Każda zmiana zapisuje się od razu (osobne trasy …/image),
 // niezależnie od przycisku „Zapisz” nazwy i ceny. Nowe zdjęcie zastępuje poprzednie.
-export default function MaterialImageEditor({ supplierId, material, onSupplierUpdated }: MaterialImageEditorProps) {
+export default function MaterialImageEditor({ supplierId, material, onSupplierUpdated, onBusyChange }: MaterialImageEditorProps) {
   const image = material.image;
   const [changing, setChanging] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState('');
+  const [broken, setBroken] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { onBusyChange?.(busy !== null); }, [busy, onBusyChange]);
 
   const showControls = !image || changing;
 
@@ -66,7 +71,7 @@ export default function MaterialImageEditor({ supplierId, material, onSupplierUp
     await run('delete', () => deleteSupplierMaterialImage(supplierId, material.id));
   };
 
-  const busyText = busy === 'upload' ? 'Przygotowuję i wgrywam zdjęcie…' : busy === 'link' ? 'Zapisuję link…' : busy === 'delete' ? 'Usuwam zdjęcie…' : null;
+  const busyText = busy === 'upload' ? 'Przygotowuję i wgrywam zdjęcie…' : busy === 'link' ? 'Zapisuję link…' : busy === 'delete' ? 'Usuwam zdjęcie…' : '';
 
   return (
     <section className="mt-3 pt-3 border-t border-hairline-soft" aria-label="Zdjęcie towaru">
@@ -76,19 +81,20 @@ export default function MaterialImageEditor({ supplierId, material, onSupplierUp
       </div>
 
       {error && (
-        <div role="alert" className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md p-3 mb-3 flex justify-between gap-3">
-          <span>⚠️ {error}</span>
-          <button type="button" onClick={() => setError(null)} className="text-ink/60 font-bold" aria-label="Zamknij komunikat">✕</button>
+        <div role="alert" className="bg-block-pink border border-hairline text-ink text-body-sm rounded-md pl-3 mb-3 flex items-center justify-between gap-2">
+          <span className="py-2">⚠️ {error}</span>
+          <button type="button" onClick={() => setError(null)} className="w-11 h-11 shrink-0 text-ink/60 font-bold" aria-label="Zamknij komunikat">✕</button>
         </div>
       )}
 
       {image && !changing && (
         <div className="flex items-center gap-3">
-          <MaterialThumb image={image} name={material.name} size="lg" />
+          <MaterialThumb image={image} name={material.name} size="lg" onBrokenChange={setBroken} />
           <div className="min-w-0 flex-1">
             <p className="text-body-sm text-ink truncate">
               {image.source === 'upload' ? 'Wgrane zdjęcie' : <>Link: <span className="text-ink/60">{hostOf(image.url)}</span></>}
             </p>
+            {broken && <p className="text-xs text-ink/60">⚠️ Zdjęcie się nie wczytuje — zmień je albo usuń.</p>}
             <div className="flex flex-wrap gap-2 mt-2">
               <button type="button" onClick={() => { setChanging(true); setError(null); }} disabled={!!busy} className="btn-secondary px-4 py-1.5 text-xs">Zmień</button>
               <button type="button" onClick={handleDelete} disabled={!!busy} className="px-4 py-1.5 min-h-[44px] text-xs font-bold rounded-pill border border-hairline text-red-500 hover:bg-block-pink disabled:opacity-40">
@@ -105,12 +111,7 @@ export default function MaterialImageEditor({ supplierId, material, onSupplierUp
             <input ref={fileRef} type="file" accept={SOURCE_ACCEPT} onChange={handleFile} className="hidden" />
             {/* Na telefonie osobno aparat (capture) — „Wgraj zdjęcie” otwiera galerię/pliki */}
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" />
-            <button
-              type="button"
-              onClick={() => fileRef.current?.click()}
-              disabled={!!busy}
-              className="px-4 py-2 min-h-[44px] text-sm font-bold rounded-pill border-2 border-accent-magenta text-ink hover:bg-block-pink disabled:opacity-40 disabled:cursor-not-allowed"
-            >
+            <button type="button" onClick={() => fileRef.current?.click()} disabled={!!busy} className="btn-accent text-sm">
               {busy === 'upload' ? 'Wgrywam…' : '⬆️ Wgraj zdjęcie'}
             </button>
             <button type="button" onClick={() => cameraRef.current?.click()} disabled={!!busy} className="btn-secondary text-sm sm:hidden">
@@ -141,14 +142,15 @@ export default function MaterialImageEditor({ supplierId, material, onSupplierUp
             {image && ' Nowe zdjęcie zastąpi obecne.'}
           </p>
           {image && changing && (
-            <button type="button" onClick={() => { setChanging(false); setError(null); setLink(''); }} disabled={!!busy} className="text-xs font-bold text-ink/60 hover:underline">
+            <button type="button" onClick={() => { setChanging(false); setError(null); setLink(''); }} disabled={!!busy} className="min-h-[44px] px-2 text-xs font-bold text-ink/60 hover:underline">
               Anuluj zmianę
             </button>
           )}
         </div>
       )}
 
-      {busyText && <p className="text-xs text-ink/60 italic mt-2" aria-live="polite">{busyText}</p>}
+      {/* Kontener zawsze w DOM — czytnik ekranu odczyta zmianę tekstu */}
+      <p className={busyText ? 'text-xs text-ink/60 italic mt-2' : 'sr-only'} aria-live="polite">{busyText}</p>
     </section>
   );
 }

@@ -9,18 +9,47 @@ zostaje bez zmian w sekcji **Archiwum** na dole pliku.
 
 <!-- Nowe wpisy dodawaj NA GÓRZE -->
 
+## #015 – 2026-10-15 – Poprawki po przeglądzie kodu (3 agentów): pliki zamówień w `orders/`, typ uploadu po zawartości, jedna wysyłka na podgląd
+- **Status:** obowiązuje (uzupełnia #012–#014)
+- **Decyzja:**
+  - **Usunięcie dostawcy z zamówieniami** — tylko administrator (`DELETE /suppliers/:id` → 403 dla innych); potwierdzenie podaje liczbę
+    zamówień. Najpierw znikają dokumenty (porcjami ≤ 400 — limit batcha Firestore), na końcu pliki.
+  - **Kopie PDF zamówień** w `uploads/orders/` (stare wpisy zostają w `uploads/`, sprzątanie rozpoznaje oba miejsca: `orderPdfLocationFromUrl`).
+    `DELETE /api/upload/:plik` kasuje tylko pliki `produkt-…` (z `/api/upload`); usunięcie dostawcy kasuje z jego listy plików też tylko takie.
+  - **`POST /api/upload`:** typ i rozszerzenie z zawartości (JPG/PNG/WebP/PDF/DOCX/DOC — `detectUploadType`), losowa nazwa z `crypto`;
+    kolaż musi być JPG. Wcześniej rozszerzenie szło z nazwy od przeglądarki, a typ z jej nagłówka — dało się wgrać `.html`/`.svg`.
+  - **Jedna wysyłka na podgląd:** front wysyła `requestId` (UUID podglądu), backend zakłada znacznik `suppliers/{id}/orderLocks/{requestId}`
+    (`create()` — atomowo); drugie „Wyślij” z tym samym id → 409 `sent: true`. Gdy wysyłka się nie uda — znacznik znika (można ponowić).
+    Odpowiedź `sent: true` (także „wysłane, ale nie zapisane”) → front zamyka podgląd, czyści zamówienie, zostawia ostrzeżenie.
+  - **„Pobierz PDF”** przez `<a download>` zamiast `window.open` po `await` (Safari/PWA blokuje okna otwierane nie wprost z kliknięcia).
+  - **Zapis dostawcy:** pole `image` towaru w zod jako `z.unknown().optional()` — i tak ignorowane; walidacja blokowała zapis, gdy zapisany
+    link miał po zakodowaniu ponad 2000 znaków. Długość linku liczona po normalizacji (serwer i front).
+  - **Kopia zapasowa i Archiwum** obejmują podkolekcję `orders`. DELETE wpisu historii: najpierw baza, potem plik PDF.
+  - Daty w nazwach PDF i załącznika — polskie (`warsawDate`), nie UTC. Długie słowa w PDF łamane po znakach (`wrapLines`).
+  - Cofnięta zmiana CSP z #014 (patrz sprostowanie tam).
+- **Dlaczego:** Przegląd 3 niezależnych agentów (backend/bezpieczeństwo, frontend/UX, testy/dokumentacja) — Krzysiek zatwierdził wszystkie
+  25 punktów. Najważniejsze: podwójna wysyłka zamówienia przy zerwanym połączeniu, możliwość skasowania „niezmiennej” historii przez każde
+  konto (hurtem z dostawcą albo pojedynczy PDF ogólną trasą), zapisany XSS przez stary upload, brak historii zamówień w kopiach.
+- **Odrzucone opcje:** Optymistyczna blokada zapisu dostawcy (`updatedAt`) przeciw „ostatni zapis wygrywa” w dwóch kartach — `recomputeLastContact`
+  zmienia `updatedAt` po każdej notatce i zamówieniu, więc dawałaby fałszywe konflikty; do zrobienia osobno, jeśli problem się pojawi.
+  Przeniesienie starych PDF-ów do `orders/` (zmiana adresów w zapisanych wpisach — niepotrzebne ryzyko).
+- **Konsekwencje:** Kolekcja znaczników `orderLocks` rośnie o 1 dokument na wysłane zamówienie (sprzątana z dostawcą). Starsza wersja
+  frontu w pamięci PWA wysyła bez `requestId` — działa, ale bez ochrony przed podwójną wysyłką, do odświeżenia. Testy: `uploadStore.test.ts`,
+  `pdf.test.ts` (nowe), rozszerzone `supplierImages`, `supplierOrders`, `materialImage`, `date`, `supplierOrders` (front).
+
 ## #014 – 2026-10-15 – Zdjęcie towaru dostawcy: zmniejszanie w przeglądarce, pliki w `uploads/suppliers/`, zdjęcie zmieniają tylko osobne trasy
 - **Status:** obowiązuje
 - **Decyzja:** Towar (`materials[]` w dokumencie dostawcy) ma opcjonalne pole `image: { source: 'upload' | 'link', url, thumbUrl?, createdAt }`.
   Zdjęcie zmniejsza **przeglądarka** (Canvas, jak kolaż; dłuższy bok ≤ 1600 px + miniatura z krótszym bokiem 160 px, JPG) i wysyła oba pliki
   na `POST /api/suppliers/:id/materials/:materialId/image`. Serwer sprawdza typ **po zawartości** (JPG/PNG/WebP), wymiary z nagłówka
-  (≤ 1600 / ≤ 640 px), limit 8 MB na plik i nadaje losową nazwę `towar-<32 hex>[-min].jpg`. Link: `PUT …/image/link`, tylko `https://`,
+  (≤ 1600 / ≤ 640 px), limit 8 MB na plik i nadaje losową nazwę `towar-<32 hex>[-min].<jpg|png|webp>` (rozszerzenie z zawartości;
+  front zawsze wysyła JPG). Link: `PUT …/image/link`, tylko `https://`,
   nie pobierany na serwer. Usunięcie: `DELETE …/image`. Nowe zdjęcie zastępuje stare, a pliki starego (wgranego) kasuje serwer.
   Pliki leżą w `public_nodejs/public/uploads/suppliers/` (lokalnie `backend/public/uploads/suppliers/`) — **poza repo**.
   `PUT /suppliers/:id` (formularz, katalog, kalkulator HDF) **nie zmienia zdjęć**: `image` w zod ma samo `.optional()`, a serwer
   w transakcji bierze zdjęcie z bazy po `id` towaru (`mergeMaterialImages`); zdjęcia towarów usuniętych z katalogu kasuje po zapisie.
-  Usunięcie dostawcy kasuje też zdjęcia jego towarów. CSP (helmet): `img-src` rozszerzone o `https:` i `blob:` — inaczej linki z innych stron
-  byłyby blokowane na produkcji (było `'self' data:`).
+  Usunięcie dostawcy kasuje też zdjęcia jego towarów. ~~CSP (helmet): `img-src` rozszerzone o `https:`~~ — **sprostowanie (#015):**
+  zmiana cofnięta; `index.html` na produkcji serwuje sam serwer WWW, bez nagłówka CSP z helmeta, więc linki do zdjęć działają i bez niej.
 - **Dlaczego:** Pliki użytkownika w repo trafiałyby do deployu i historii gita (push na main = deploy), a `rsync --delete` mógłby je kasować;
   katalog uploadów jest już wyłączony z rsync (`--exclude='uploads/'`), dlatego zostaje tam, a lokalny `backend/public/uploads/` dopisany do
   `.gitignore`. W backendzie nie ma biblioteki do obrazów, a `sharp` nie ma gotowych binarek na FreeBSD (mydevil) i wymaga systemowego libvips —

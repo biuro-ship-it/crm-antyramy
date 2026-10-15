@@ -31,8 +31,6 @@ app.set('trust proxy', 1);
 // Bezpieczeństwo (COOP ustawione na unsafe-none — wymagane dla Google Sign-In popup)
 app.use(helmet({
   crossOriginOpenerPolicy: { policy: 'unsafe-none' },
-  // Zdjęcia towarów dostawców mogą być linkami https:// z innych stron — tylko obrazki, reszta CSP bez zmian.
-  contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'blob:', 'https:'] } },
 }));
 
 // CORS
@@ -47,6 +45,8 @@ app.use(cors({
   ],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  // „Pobierz PDF” czyta datę i nazwę pliku z nagłówków (lokalnie front i API to różne originy)
+  exposedHeaders: ['X-Pdf-Date', 'Content-Disposition'],
 }));
 
 // Rate limiting

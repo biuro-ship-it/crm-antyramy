@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { todayISO, isPastDate } from './date';
+import { todayISO, isPastDate, daysAgoISO } from './date';
+
+describe('daysAgoISO — najwcześniejsza data wysyłki zamówienia', () => {
+  it('365 dni wstecz, przez przełom roku i rok przestępny', () => {
+    expect(daysAgoISO(365, new Date(2026, 9, 15, 12))).toBe('2025-10-15');
+    expect(daysAgoISO(1, new Date(2026, 0, 1, 12))).toBe('2025-12-31');
+    expect(daysAgoISO(0, new Date(2028, 1, 29, 12))).toBe('2028-02-29');
+  });
+});
 
 describe('todayISO — data lokalna, nie UTC', () => {
   it('formatuje jako YYYY-MM-DD z wiodącymi zerami', () => {

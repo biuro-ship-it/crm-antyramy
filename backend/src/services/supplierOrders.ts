@@ -214,20 +214,34 @@ export const orderPdfLayout = (p: { supplier: SupplierForPdf; items: OrderItem[]
 export const formatQuantity = (n: number): string =>
   new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 3 }).format(n);
 
-/** Nazwa pliku PDF w uploads — losowa końcówka, bo /uploads jest dostępne bez logowania. */
+/** Nazwa kopii PDF w uploads/orders/ — data polska (jak na PDF), losowa końcówka 8–32 znaków hex
+ *  (/uploads jest dostępne bez logowania). */
 export const orderPdfFilename = (date: Date, randomHex: string): string => {
   const safe = randomHex.replace(/[^a-f0-9]/gi, '').slice(0, 32);
-  return `zamowienie-${date.toISOString().slice(0, 10)}-${safe}.pdf`;
+  if (safe.length < 8) throw new Error('Za krótka losowa końcówka nazwy PDF');
+  return `zamowienie-${warsawDate(date)}-${safe}.pdf`;
 };
+
+/** Nazwa załącznika w mailu i pliku z „Pobierz PDF” — data polska (przed 2:00 UTC dawał wczoraj). */
+export const orderAttachmentName = (date: Date): string => `Zamowienie-${warsawDate(date)}.pdf`;
 
 const ORDER_PDF_RE = /^zamowienie-\d{4}-\d{2}-\d{2}-[a-f0-9]{8,32}\.pdf$/i;
 
-/** Nazwa pliku PDF zamówienia z adresu albo null — do sprzątania przy usuwaniu dostawcy. */
-export const orderPdfFilenameFromUrl = (url: string | null | undefined): string | null => {
+/**
+ * Położenie kopii PDF zamówienia z adresu albo null — do sprzątania. Nowe PDF-y leżą w uploads/orders/
+ * (DELETE /api/upload ich nie dosięgnie), starsze wpisy mają PDF w samym uploads/.
+ */
+export const orderPdfLocationFromUrl = (url: string | null | undefined): { filename: string; subdir?: 'orders' } | null => {
   if (typeof url !== 'string') return null;
-  const m = /\/uploads\/([^/?#]+)$/.exec(url.trim());
-  return m && ORDER_PDF_RE.test(m[1]) ? m[1] : null;
+  const m = /\/uploads\/(?:(orders)\/)?([^/?#]+)$/.exec(url.trim());
+  if (!m || !ORDER_PDF_RE.test(m[2])) return null;
+  return m[1] ? { filename: m[2], subdir: 'orders' } : { filename: m[2] };
 };
+
+const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
+
+/** Adres dostawcy nadaje się na adresata maila: jeden adres, bez spacji, przecinków i nawiasów (nagłówek To:). */
+export const isValidRecipient = (email: string): boolean => email.length <= 254 && EMAIL_RE.test(email);
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

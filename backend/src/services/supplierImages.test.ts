@@ -174,3 +174,89 @@ describe('replaceMaterialImage', () => {
     assert.equal(replaceMaterialImage(list, 'm2', linked)!.previous, null);
   });
 });
+
+// ─── Przypadki brzegowe z przeglądu kodu ─────────────────────────────────────
+
+const webpVp8l = (w: number, h: number, signature = 0x2f) => {
+  const b = Buffer.alloc(30);
+  b.write('RIFF', 0, 'ascii');
+  b.write('WEBP', 8, 'ascii');
+  b.write('VP8L', 12, 'ascii');
+  b[20] = signature;
+  const W = w - 1, H = h - 1; // 14 bitów szerokości, 14 bitów wysokości
+  b[21] = W & 0xff;
+  b[22] = ((W >> 8) & 0x3f) | ((H & 0x03) << 6);
+  b[23] = (H >> 2) & 0xff;
+  b[24] = (H >> 10) & 0x0f;
+  return b;
+};
+
+const seg = (marker: number, payload: number[]) => [0xff, marker, (payload.length + 2) >> 8, (payload.length + 2) & 0xff, ...payload];
+const sof = (marker: number, w: number, h: number) =>
+  seg(marker, [0x08, h >> 8, h & 0xff, w >> 8, w & 0xff, 0x03, 0x01, 0x22, 0x00, 0x02, 0x11, 0x01, 0x03, 0x11, 0x01]);
+
+describe('imageDimensions — trudniejsze pliki', () => {
+  it('WebP bezstratny (VP8L); zła sygnatura → null', () => {
+    assert.deepEqual(imageDimensions(webpVp8l(1600, 1200), 'webp'), { width: 1600, height: 1200 });
+    assert.deepEqual(imageDimensions(webpVp8l(1, 16384), 'webp'), { width: 1, height: 16384 });
+    assert.equal(imageDimensions(webpVp8l(100, 100, 0x00), 'webp'), null);
+  });
+  it('JPEG z telefonu: EXIF (APP1), ICC (APP2), DQT, bajty wypełnienia, potem SOF0', () => {
+    const buf = Buffer.from([0xff, 0xd8,
+      ...seg(0xe1, Array(300).fill(0x45)), ...seg(0xe2, Array(40).fill(0x11)), ...seg(0xdb, Array(65).fill(1)),
+      0xff, 0xff, ...sof(0xc0, 4032, 3024), 0xff, 0xd9]);
+    assert.deepEqual(imageDimensions(buf, 'jpg'), { width: 4032, height: 3024 });
+  });
+  it('JPEG progresywny (SOF2)', () => {
+    const buf = Buffer.from([0xff, 0xd8, ...seg(0xe0, Array(14).fill(0)), ...sof(0xc2, 800, 600), 0xff, 0xd9]);
+    assert.deepEqual(imageDimensions(buf, 'jpg'), { width: 800, height: 600 });
+  });
+  it('JPEG: dane obrazu (SOS) przed SOF, ucięty SOF, długość segmentu < 2 → null', () => {
+    assert.equal(imageDimensions(Buffer.from([0xff, 0xd8, ...seg(0xda, [1, 2, 3]), ...sof(0xc0, 10, 10)]), 'jpg'), null);
+    assert.equal(imageDimensions(Buffer.from([0xff, 0xd8, 0xff, 0xc0, 0x00, 0x11, 0x08, 0x00]), 'jpg'), null);
+    assert.equal(imageDimensions(Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x01, 0x00, 0x00]), 'jpg'), null);
+  });
+  it('za krótkie PNG i WebP → null', () => {
+    assert.equal(imageDimensions(png(10, 10).subarray(0, 20), 'png'), null);
+    assert.equal(imageDimensions(webpVp8x(10, 10).subarray(0, 25), 'webp'), null);
+  });
+});
+
+describe('checkUploadedImage — granice', () => {
+  it('miniatura 640 px przechodzi, 641 px nie', () => {
+    assert.equal(checkUploadedImage(jpeg(640, 160), 'thumb').ok, true);
+    assert.equal(checkUploadedImage(jpeg(641, 160), 'thumb').ok, false);
+  });
+  it('plik dokładnie 8 MB przechodzi', () => {
+    const head = jpeg(100, 100);
+    const exact = Buffer.concat([head, Buffer.alloc(SUPPLIER_IMAGE_MAX_BYTES - head.length)]);
+    assert.equal(checkUploadedImage(exact, 'image').ok, true);
+  });
+  it('PNG o szerokości 0 → odrzucony; miniatura PNG/WebP przyjęta', () => {
+    assert.equal(checkUploadedImage(png(0, 10), 'image').ok, false);
+    assert.deepEqual(checkUploadedImage(png(200, 160), 'thumb'), { ok: true, type: 'png' });
+    assert.deepEqual(checkUploadedImage(webpVp8l(200, 160), 'thumb'), { ok: true, type: 'webp' });
+  });
+  it('wgrane zdjęcie bez miniatury → kasujemy tylko zdjęcie', () => {
+    assert.deepEqual(imageFilesOf({ source: 'upload', url: UP(`towar-${HEX}.jpg`), createdAt: 'x' }), [`towar-${HEX}.jpg`]);
+  });
+});
+
+describe('validateImageLink — granice', () => {
+  it('długość liczona po normalizacji (polskie litery w ścieżce)', () => {
+    const r = validateImageLink('https://x.pl/' + 'ł'.repeat(400)); // 400 znaków → ok. 2400 po zakodowaniu
+    assert.equal(r.ok, false);
+    assert.match((r as { error: string }).error, /za długi/);
+    assert.equal(validateImageLink('https://x.pl/' + 'ł'.repeat(100)).ok, true);
+  });
+  it('dokładnie 2000 znaków przechodzi, 2001 nie', () => {
+    const base = 'https://x.pl/';
+    assert.equal(validateImageLink(base + 'a'.repeat(2000 - base.length)).ok, true);
+    assert.equal(validateImageLink(base + 'a'.repeat(2001 - base.length)).ok, false);
+  });
+  it('host „.pl”, „sklep.pl.” → odrzucone; HTTPS wielkimi literami → przyjęte', () => {
+    assert.equal(validateImageLink('https://.pl/a.jpg').ok, false);
+    assert.equal(validateImageLink('https://sklep.pl./a.jpg').ok, false);
+    assert.deepEqual(validateImageLink('HTTPS://Sklep.PL/a.jpg'), { ok: true, url: 'https://sklep.pl/a.jpg' });
+  });
+});

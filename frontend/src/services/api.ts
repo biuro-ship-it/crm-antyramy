@@ -136,6 +136,7 @@ export interface Interaction {
   createdAt: string;
   updatedAt?: string;
   updatedBy?: string;
+  orderId?: string; // krótki wpis o zamówieniu do dostawcy (znika razem z wpisem w Historii zamówień)
 }
 
 export interface InteractionFormData {
@@ -1040,7 +1041,11 @@ export interface SupplierOrderSendData {
   body: string;
   notes?: string;
   items: Array<{ materialId?: string; name: string; quantity: number; unit: SupplierMaterial['unit'] }>;
+  requestId?: string; // jeden na podgląd — drugie „Wyślij” z tym samym id backend odrzuci (409) zamiast wysłać ponownie
 }
+
+/** Mail z zamówieniem wyszedł (albo mógł wyjść) — nie wolno go wysyłać ponownie. */
+export class OrderAlreadySentError extends Error {}
 
 export interface SupplierOrderPdfData {
   notes?: string;
@@ -1053,8 +1058,15 @@ export const downloadSupplierOrderPdf = async (supplierId: string, data: Supplie
   const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders/pdf`, { method: 'POST', headers, body: JSON.stringify(data) });
   if (!response.ok) await fail(response, 'Nie udało się przygotować PDF zamówienia');
   const pdfDate = response.headers.get('X-Pdf-Date') ?? new Date().toISOString();
+  const name = /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') ?? '')?.[1] ?? 'Zamowienie.pdf';
+  // Pobranie przez <a download>, nie window.open: okno otwierane po `await` Safari (iPhone, PWA) blokuje
   const url = URL.createObjectURL(await response.blob());
-  window.open(url, '_blank');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
   return { pdfDate };
 };
@@ -1099,7 +1111,11 @@ export const sendSupplierOrder = async (
 ): Promise<{ order: SupplierOrder; interaction: Interaction | null }> => {
   const headers = await getHeaders();
   const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders`, { method: 'POST', headers, body: JSON.stringify(data) });
-  if (!response.ok) await fail(response, 'Nie udało się wysłać zamówienia');
+  if (!response.ok) {
+    const body = await response.clone().json().catch(() => null) as { error?: string; sent?: boolean } | null;
+    if (body?.sent) throw new OrderAlreadySentError(body.error || 'Zamówienie zostało już wysłane — nie wysyłaj ponownie.');
+    await fail(response, 'Nie udało się wysłać zamówienia');
+  }
   return response.json();
 };
 

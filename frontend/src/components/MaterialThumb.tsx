@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { SupplierMaterialImage } from '../services/api';
 import { thumbSrc } from '../utils/materialImage';
 import ImageLightbox from './ImageLightbox';
@@ -7,6 +7,7 @@ interface MaterialThumbProps {
   image?: SupplierMaterialImage;
   name: string;
   size?: 'sm' | 'lg'; // sm = lista towarów (44 px), lg = podgląd w edycji
+  onBrokenChange?: (broken: boolean) => void; // zdjęcie (ani miniatura, ani pełne) się nie wczytuje
 }
 
 const SIZES = { sm: 'w-11 h-11', lg: 'w-24 h-24' };
@@ -23,17 +24,24 @@ const Placeholder = ({ size }: { size: 'sm' | 'lg' }) => (
 );
 
 // Miniaturka towaru; kliknięcie otwiera powiększenie (pełne zdjęcie, nie miniaturę).
-export default function MaterialThumb({ image, name, size = 'sm' }: MaterialThumbProps) {
-  const src = thumbSrc(image);
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+// Gdy nie wczyta się sama miniatura, próbujemy pełnego zdjęcia; dopiero potem ikona.
+export default function MaterialThumb({ image, name, size = 'sm', onBrokenChange }: MaterialThumbProps) {
+  const candidates = image ? [...new Set([thumbSrc(image), image.url].filter((u): u is string => !!u))] : [];
+  const [failed, setFailed] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const close = useCallback(() => setOpen(false), []);
 
-  if (!image || !src || failedSrc === src) return <Placeholder size={size} />;
+  const src = candidates.find(c => !failed.includes(c)) ?? null;
+  const broken = !!image && !src;
+  useEffect(() => { onBrokenChange?.(broken); }, [broken, onBrokenChange]);
+
+  if (!image || !src) return <Placeholder size={size} />;
 
   return (
     <>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`Powiększ zdjęcie: ${name}`}
@@ -45,11 +53,11 @@ export default function MaterialThumb({ image, name, size = 'sm' }: MaterialThum
           loading="lazy"
           decoding="async"
           referrerPolicy="no-referrer"
-          onError={() => setFailedSrc(src)}
+          onError={() => setFailed(prev => [...prev, src])}
           className="w-full h-full object-cover"
         />
       </button>
-      {open && <ImageLightbox src={image.url} label={`Zdjęcie: ${name}`} onClose={close} />}
+      {open && <ImageLightbox src={image.url} label={`Zdjęcie: ${name}`} onClose={close} returnFocusRef={buttonRef} />}
     </>
   );
 }

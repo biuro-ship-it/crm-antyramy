@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Supplier, SupplierFormData, getSuppliers, createSupplier, updateSupplier, deleteSupplier } from '../services/api';
+import { Supplier, SupplierFormData, getSuppliers, createSupplier, updateSupplier, deleteSupplier, getSupplierOrders, getMe } from '../services/api';
 import SupplierCard from './SupplierCard';
 import HdfCalculator from './HdfCalculator';
 
@@ -79,13 +79,31 @@ export default function SuppliersPanel() {
     }
   };
 
+  // Historia zamówień jest niezmienna — dostawcę z zamówieniami usuwa tylko administrator (backend też to sprawdza)
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Usunąć dostawcę?')) return;
+    let orderCount = 0;
+    let admin = false;
+    try {
+      const [orders, me] = await Promise.all([getSupplierOrders(id), getMe()]);
+      orderCount = orders.length;
+      admin = me.isAdmin;
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Nie udało się sprawdzić historii zamówień dostawcy.');
+      return;
+    }
+    if (orderCount > 0 && !admin) {
+      alert(`Ten dostawca ma ${orderCount} zamówień w historii — usunąć go może tylko administrator.`);
+      return;
+    }
+    const question = orderCount > 0
+      ? `Usunąć dostawcę razem z historią ${orderCount} zamówień i ich PDF-ami?\n\nTego nie da się cofnąć.`
+      : 'Usunąć dostawcę?';
+    if (!window.confirm(question)) return;
     try {
       await deleteSupplier(id);
       setSuppliers(prev => prev.filter(s => s.id !== id));
-    } catch {
-      alert('Błąd Screena/Usuwania');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Nie udało się usunąć dostawcy.');
     }
   };
 

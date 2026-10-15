@@ -8,7 +8,7 @@ Wewnętrzny CRM firmy Antyramy (crm.antyramy.eu): klienci, produkty, kampanie ma
 
 ## Przed rozpoczęciem pracy
 1. Przeczytaj `HANDOVER.md` – aktualny stan, testy ręczne do zrobienia.
-2. Przy większych zmianach sprawdź `DECISIONS.md` (najnowsze wpisy na dole sekcji).
+2. Przy większych zmianach sprawdź `DECISIONS.md` (najnowsze wpisy na górze; archiwum Kampanii na dole pliku).
 3. Po sesji zaktualizuj `HANDOVER.md`; nową decyzję dopisz do `DECISIONS.md` (wpisy numerowane, **na górze**). Nową funkcję opisz najpierw w `SPEC.md`.
 
 ## Stack

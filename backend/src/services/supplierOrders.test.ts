@@ -2,8 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildOrderItems, estimatedTotalNet, buildOrderEntry, orderInteraction, orderPdfLayout,
-  orderPdfFilename, orderPdfFilenameFromUrl, orderBodyToHtml, ORDERING_COMPANY, OrderItem,
-  buildManualOrderEntry, sentDateError, pdfDateFrom, warsawDate,
+  orderPdfFilename, orderPdfLocationFromUrl, orderBodyToHtml, ORDERING_COMPANY, OrderItem,
+  buildManualOrderEntry, sentDateError, pdfDateFrom, warsawDate, orderAttachmentName, isValidRecipient,
 } from './supplierOrders';
 
 const catalog = [
@@ -17,6 +17,19 @@ const items: OrderItem[] = [
 ];
 
 describe('buildOrderItems — pozycje zamówienia', () => {
+  it('pusta lista, NaN, nieskończoność, ilość ujemna → brak pozycji', () => {
+    assert.deepEqual(buildOrderItems([], catalog), []);
+    assert.deepEqual(buildOrderItems([
+      { name: 'A', quantity: NaN, unit: 'szt' },
+      { name: 'B', quantity: Infinity, unit: 'szt' },
+      { name: 'C', quantity: -2, unit: 'szt' },
+    ], catalog), []);
+  });
+  it('cena w katalogu nie-liczbowa → brak ceny (null), nie NaN', () => {
+    const out = buildOrderItems([{ materialId: 'x', name: 'X', quantity: 1, unit: 'szt' }],
+      [{ id: 'x', name: 'X', unit: 'szt', price: '12' as unknown as number }]);
+    assert.equal(out[0].unitPriceNet, null);
+  });
   it('pomija ilość 0 i puste nazwy, przycina nazwy, dobiera cenę z katalogu', () => {
     const out = buildOrderItems([
       { materialId: 'm1', name: '  Szkło 3 mm ', quantity: 10, unit: 'm²' },
@@ -66,6 +79,7 @@ describe('buildOrderEntry — wpis Historii zamówień', () => {
     assert.equal(i.contactDate, '2026-10-15');
     assert.equal(i.channel, 'mail');
     assert.match(i.notes, /^📦 Zamówienie wysłane: 2 poz\./);
+    assert.equal(i.tradeNotes, 'Do: dostawca@x.pl · Zamówienie — Antyramy (15.10.2026)');
   });
 });
 
@@ -94,11 +108,43 @@ describe('plik PDF zamówienia', () => {
   it('nazwa z datą i bezpieczną losową końcówką', () => {
     assert.equal(orderPdfFilename(new Date('2026-10-15T10:00:00Z'), 'ABCdef12/../'), 'zamowienie-2026-10-15-ABCdef12.pdf');
   });
-  it('nazwa z adresu tylko dla PDF-ów zamówień', () => {
-    assert.equal(orderPdfFilenameFromUrl('https://crm.antyramy.eu/uploads/zamowienie-2026-10-15-abcdef12.pdf'), 'zamowienie-2026-10-15-abcdef12.pdf');
-    assert.equal(orderPdfFilenameFromUrl('https://crm.antyramy.eu/uploads/cennik-123.pdf'), null);
-    assert.equal(orderPdfFilenameFromUrl('https://crm.antyramy.eu/uploads/../zamowienie-2026-10-15-abcdef12.pdf/x'), null);
-    assert.equal(orderPdfFilenameFromUrl(undefined), null);
+  it('data polska, nie UTC (o 0:30 w Polsce już nowy dzień)', () => {
+    const lateNight = new Date('2026-10-15T22:30:00Z');
+    assert.equal(orderPdfFilename(lateNight, 'abcdef12'), 'zamowienie-2026-10-16-abcdef12.pdf');
+    assert.equal(orderAttachmentName(lateNight), 'Zamowienie-2026-10-16.pdf');
+  });
+  it('za krótka losowa końcówka → błąd (sprzątanie by jej nie rozpoznało)', () => {
+    assert.throws(() => orderPdfFilename(new Date(), 'abc'), /krótka/);
+    assert.throws(() => orderPdfFilename(new Date(), '../../!!'), /krótka/);
+  });
+  it('nazwa tam i z powrotem: utworzony plik zawsze rozpoznany przy sprzątaniu', () => {
+    for (const hex of ['abcdef12', 'a'.repeat(24), 'f'.repeat(40)]) {
+      const name = orderPdfFilename(new Date('2026-10-15T10:00:00Z'), hex);
+      assert.deepEqual(orderPdfLocationFromUrl(`https://crm.antyramy.eu/uploads/orders/${name}`), { filename: name, subdir: 'orders' });
+    }
+  });
+  it('położenie z adresu: nowe w orders/, stare w uploads/, inne pliki → null', () => {
+    assert.deepEqual(orderPdfLocationFromUrl('https://crm.antyramy.eu/uploads/orders/zamowienie-2026-10-15-abcdef12.pdf'),
+      { filename: 'zamowienie-2026-10-15-abcdef12.pdf', subdir: 'orders' });
+    assert.deepEqual(orderPdfLocationFromUrl('https://crm.antyramy.eu/uploads/zamowienie-2026-10-15-abcdef12.pdf'),
+      { filename: 'zamowienie-2026-10-15-abcdef12.pdf' });
+    assert.equal(orderPdfLocationFromUrl('https://crm.antyramy.eu/uploads/cennik-123.pdf'), null);
+    assert.equal(orderPdfLocationFromUrl('https://crm.antyramy.eu/uploads/suppliers/zamowienie-2026-10-15-abcdef12.pdf'), null);
+    assert.equal(orderPdfLocationFromUrl('https://crm.antyramy.eu/uploads/../zamowienie-2026-10-15-abcdef12.pdf/x'), null);
+    assert.equal(orderPdfLocationFromUrl(undefined), null);
+  });
+});
+
+describe('isValidRecipient — adres dostawcy jako adresat', () => {
+  it('pojedynczy adres przechodzi', () => {
+    assert.equal(isValidRecipient('zamowienia@dostawca.pl'), true);
+    assert.equal(isValidRecipient('jan.kowalski+crm@sklep.com.pl'), true);
+  });
+  it('kilka adresów, spacje, nawiasy, brak domeny, nowe linie → odrzucone', () => {
+    for (const bad of ['', 'a@b', 'a@b.pl, c@d.pl', 'a@b.pl;c@d.pl', 'Jan <a@b.pl>', 'a b@c.pl', 'a@b.pl\r\nBcc: x@y.pl', '"a"@b.pl',
+      `${'a'.repeat(250)}@b.pl`]) {
+      assert.equal(isValidRecipient(bad), false, bad);
+    }
   });
 });
 
@@ -154,6 +200,10 @@ describe('sentDateError — data wysyłki z okna', () => {
     assert.match(sentDateError('2026-02-30', now) ?? '', /Nieprawidłowa/);
     assert.match(sentDateError('2025-01-01', now) ?? '', /starsza/);
   });
+  it('granica roku: 2025-10-14 jeszcze tak, 2025-10-13 już nie', () => {
+    assert.equal(sentDateError('2025-10-14', now), null);
+    assert.match(sentDateError('2025-10-13', now) ?? '', /starsza/);
+  });
   it('o 00:30 w Polsce „dziś” to już nowy dzień', () => {
     assert.equal(sentDateError('2026-10-16', new Date('2026-10-15T22:30:00.000Z')), null);
     assert.equal(warsawDate(new Date('2026-10-15T22:30:00.000Z')), '2026-10-16');
@@ -170,5 +220,11 @@ describe('pdfDateFrom — data na kopii PDF', () => {
     assert.equal(pdfDateFrom('xx', now), now);
     assert.equal(pdfDateFrom('2026-10-16T10:00:00.000Z', now), now);
     assert.equal(pdfDateFrom('2026-08-01T10:00:00.000Z', now), now);
+  });
+  it('granice: +5 min i −30 dni', () => {
+    assert.equal(pdfDateFrom('2026-10-15T10:05:00.000Z', now).toISOString(), '2026-10-15T10:05:00.000Z');
+    assert.equal(pdfDateFrom('2026-10-15T10:05:01.000Z', now), now);
+    assert.equal(pdfDateFrom('2026-09-15T10:00:00.000Z', now).toISOString(), '2026-09-15T10:00:00.000Z');
+    assert.equal(pdfDateFrom('2026-09-15T09:59:59.000Z', now), now);
   });
 });

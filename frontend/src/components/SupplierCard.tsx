@@ -41,7 +41,7 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
   const handleDeleteOrder = async (order: SupplierOrder) => {
     await deleteSupplierOrder(supplier.id, order.id);
     setOrders(prev => prev.filter(o => o.id !== order.id));
-    setInteractions(prev => prev.filter(i => (i as Interaction & { orderId?: string }).orderId !== order.id));
+    setInteractions(prev => prev.filter(i => i.orderId !== order.id));
   };
 
   useEffect(() => {

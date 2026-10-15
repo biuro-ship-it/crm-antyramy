@@ -45,6 +45,13 @@ describe('sortOrdersNewestFirst', () => {
     expect(sortOrdersNewestFirst(input).map(x => x.id)).toEqual(['2', '3', '1']);
     expect(input[0].id).toBe('1');
   });
+  it('ten sam dzień, starszy wpis bez recordedAt → porównanie po sentAt', () => {
+    const sorted = sortOrdersNewestFirst([
+      { id: 'stary', sentAt: '2026-10-15T08:00:00Z' } as SupplierOrder,
+      { id: 'nowy', sentAt: '2026-10-15', recordedAt: '2026-10-15T09:00:00Z' } as SupplierOrder,
+    ]);
+    expect(sorted.map(x => x.id)).toEqual(['nowy', 'stary']);
+  });
 });
 
 describe('sortOrdersNewestFirst — wpisy z CRM i oznaczone ręcznie', () => {

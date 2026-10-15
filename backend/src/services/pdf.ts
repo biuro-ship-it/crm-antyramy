@@ -23,14 +23,32 @@ interface TextOptions {
   maxWidth?: number;
 }
 
-const wrapText = (text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] => {
-  const words = text.split(' ');
+// Słowo szersze niż kolumna (długi link, kod) dzielimy po znakach — inaczej wychodziło poza tabelę.
+const splitLongWord = (word: string, measure: (s: string) => number, maxWidth: number): string[] => {
+  if (measure(word) <= maxWidth) return [word];
+  const parts: string[] = [];
+  let part = '';
+  for (const ch of word) {
+    if (part && measure(part + ch) > maxWidth) {
+      parts.push(part);
+      part = ch;
+    } else {
+      part += ch;
+    }
+  }
+  if (part) parts.push(part);
+  return parts;
+};
+
+/** Łamanie tekstu do szerokości kolumny; `measure` = szerokość napisu w punktach (w testach — atrapa). */
+export const wrapLines = (text: string, measure: (s: string) => number, maxWidth: number): string[] => {
+  const words = text.split(' ').flatMap(w => splitLongWord(w, measure, maxWidth));
   const lines: string[] = [];
   let current = '';
 
   for (const word of words) {
     const test = current ? `${current} ${word}` : word;
-    if (font.widthOfTextAtSize(test, fontSize) <= maxWidth) {
+    if (measure(test) <= maxWidth) {
       current = test;
     } else {
       if (current) lines.push(current);
@@ -40,6 +58,9 @@ const wrapText = (text: string, font: PDFFont, fontSize: number, maxWidth: numbe
   if (current) lines.push(current);
   return lines;
 };
+
+const wrapText = (text: string, font: PDFFont, fontSize: number, maxWidth: number): string[] =>
+  wrapLines(text, s => font.widthOfTextAtSize(s, fontSize), maxWidth);
 
 const drawText = (page: PDFPage, text: string, opts: TextOptions): number => {
   const { x, y, size, font, color = rgb(0.1, 0.1, 0.1), maxWidth } = opts;

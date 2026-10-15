@@ -22,7 +22,7 @@ const COLLECTIONS = [
   { name: 'products',       subcollections: [] },
   { name: 'followups',      subcollections: [] },
   { name: 'notes',          subcollections: [] },
-  { name: 'suppliers',      subcollections: ['interactions'] },
+  { name: 'suppliers',      subcollections: ['interactions', 'orders'] },
   { name: 'emailTemplates', subcollections: [] },
   { name: 'promotions',     subcollections: [] },
   { name: 'campaigns',      subcollections: [] },
