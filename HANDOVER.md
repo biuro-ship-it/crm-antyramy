@@ -1,7 +1,7 @@
 # CRM Antyramy – handover
 
 **Ostatnia aktualizacja:** 2026-10-15
-**Wersja produkcyjna:** commit `7d5a8fe` — https://crm.antyramy.eu (deploy 2026-10-15, `/health` = 200). Brak niewypchniętych zmian w kodzie.
+**Wersja produkcyjna:** commit `7d5a8fe` — https://crm.antyramy.eu (deploy 2026-10-15, `/health` = 200). **Niewypchnięte:** zdjęcia towarów dostawców (#014, commit lokalny z 2026-10-15).
 
 Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DECISIONS.md](DECISIONS.md). Instrukcja dla Claude: [CLAUDE.md](CLAUDE.md), opis funkcji: [SPEC.md](SPEC.md).
 
@@ -16,6 +16,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - **„Sprawdź odpowiedzi” naprawione (2026-10-14):** komunikat „Brak uprawnienia do czytania poczty” był fałszywy — blokował limit zapytań Gmaila (ok. 70 pobrań wątku/min). Teraz: lista poczty przychodzącej i pobieranie tylko wątków z nową pocztą (#010), ponawianie przy limicie i osobny komunikat (#009), odpowiedzi ze zmienionym tematem w nowym wątku rozpoznawane po `In-Reply-To`/`References` (#011). Na produkcji potwierdzone dla `67c557e` („Sprawdzono 62 wątków … 0”); `8fd19e8` (#011) sprawdzone na sucho na prawdziwych danych — 1 nowa odpowiedź (biuro@fotogasek.pl, 12.10).
 
 ### 🔧 W trakcie
+- **Zdjęcia towarów dostawców (#014) — zrobione lokalnie, niewdrożone.** Testy automatyczne i build przechodzą; ekran sprawdzony na tymczasowej stronie testowej (zmniejszenie 4000×3000 → 1600×1200 + miniatura 213×160, powiększenie: ✕ / tło / Esc, powrót fokusu, błędny link, tryb ciemny). Po pushu: testy ręczne na produkcji — sekcja „Zdjęcia towarów dostawców” niżej.
 - **Testy ręczne historii zamówień** (obie drogi, admin, usuwanie dostawcy) — niezrobione; lista w sekcji „Historia zamówień do dostawców” niżej. Prawdziwej wysyłki zamówienia ani okna „Oznacz jako wysłane” nikt jeszcze nie sprawdził.
 - **Kliknięcie „📬 Sprawdź odpowiedzi” po wdrożeniu `8fd19e8` nie zostało potwierdzone** — w kampanii z 8.10 powinna dojść 1 odpowiedź (FotoGAsek), w historii kontaktów klienta wpis „Odpowiedź na kampanię: Kampania bez nazwy” z 12.10.
 - **Czekają testy ręczne na produkcji** — wysyłka testowa i kolaż (listy niżej, w sekcjach z 2026-10-08 i 2026-10-07). Prawdziwy mail `[TEST]` jeszcze ani razu nie doszedł.
@@ -31,6 +32,7 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - Outlook blokuje kolaż do kliknięcia „Pokaż obrazy” (inline CID — osobne zadanie). Pliki-sieroty kolażu nie są sprzątane.
 
 ## Następne kroki (kolejność = priorytet)
+- **Po pushu `#014`:** testy ręczne zdjęć towarów (sekcja „Zdjęcia towarów dostawców” niżej); Claude sprawdza przez SSH, czy pliki w `uploads/suppliers/` znikają.
 - **Najpierw:** testy ręczne historii zamówień (sekcja „Historia zamówień do dostawców” niżej, punkty 1–10) — na dostawcy testowym z Twoim adresem e-mail; po usunięciu dostawcy testowego Claude sprawdza przez SSH, czy jego pliki zniknęły.
 0. **Google Cloud Console:** status aplikacji OAuth („Testing” → „Internal” albo „Publish app”), żeby token nie wygasał co 7 dni; przy okazji limity Gmail API („per minute per user”). Gdy poczta znów stanie: `node backend/scripts/get-gmail-token.js` → linia `GMAIL_REFRESH_TOKEN` do `public_nodejs/.env` na serwerze → `devil www restart crm.antyramy.eu`.
 1. Kliknąć „📬 Sprawdź odpowiedzi” w kampanii z 8.10 i potwierdzić odpowiedź FotoGAska (wyżej).
@@ -46,15 +48,34 @@ Decyzje (numerowane, najnowsze na górze; archiwum Kampanii na dole pliku): [DEC
 - Kolaże i uploady testować tylko na produkcji (plik wgrany lokalnie nie wyświetli się w mailu).
 
 ## Historia sesji
+- **2026-10-15 (wieczór)** — Zdjęcie towaru dostawcy (#014): plik (zmniejszany w przeglądarce) albo link https://, miniaturka na liście, powiększenie, sekcja „Zdjęcie” w edycji towaru; pliki w `uploads/suppliers/` poza repo, sprzątanie przy zastąpieniu / usunięciu zdjęcia, towaru i dostawcy; CSP `img-src https:`. Commit lokalny, niewdrożone.
 - **2026-10-15** — Historia zamówień do dostawców: wysyłka przez Gmail z PDF (zamiast `mailto:`), podkolekcja `orders`, sekcja w karcie (#012, wdrożone `19a35c9`); potem „Pobierz PDF” + „Oznacz jako wysłane”, usuwanie wpisu przez admina (`ADMIN_EMAILS`), sprzątanie wszystkich plików dostawcy (#013). Oba etapy wdrożone (`19a35c9`, `7d5a8fe`), testy ręczne czekają.
 - **2026-10-14 (wieczór)** — Błąd „Brak uprawnienia do czytania poczty”: token Gmail odnowiony i przeniesiony na serwer, ale prawdziwą przyczyną był limit zapytań Gmaila. Poprawki „Sprawdź odpowiedzi”: #009 ponawianie i osobny komunikat (`fb0a428`), #010 pobieranie tylko wątków z nową pocztą (`67c557e`, potwierdzone na produkcji), #011 odpowiedzi ze zmienionym tematem (`8fd19e8`, sprawdzone na sucho). Wdrożony też `b0d5dc9` i dokumentacja (`bdffc4c`).
 - **2026-10-14** — Dokumentacja całej aplikacji według szablonu: `SPEC.md` rozszerzony z modułu Kampanie na cały CRM, `DECISIONS.md` z numerowanymi wpisami #001–#008 (stary dziennik Kampanii zachowany jako archiwum), `HANDOVER.md` i `CLAUDE.md` uzupełnione. Bez zmian w kodzie.
 - **2026-10-08** — Naprawa: kampania z samym kolażem nie dawała się wysłać. Kolaż przeniesiony do kroku 1, nowa kolejność kroków, obowiązkowa wysyłka testowa na info@pluszek.pl. Wdrożone (`81b8677`). Wieczorem: test nie doszedł, bo wygasł token Gmail (`invalid_grant`) — token odnowiony i przeniesiony na serwer; lokalnie czytelniejszy komunikat błędu (`b0d5dc9`, niewdrożone).
-- **2026-10-07** — Kolaż z 3 zdjęć „Oferta tygodnia” (Canvas w przeglądarce, `heroImageUrl`, bezpieczne kasowanie plików). Wdrożone tego samego dnia (`2fbe062`).
 
 ---
 
 # Szczegóły
+
+## Zdjęcia towarów dostawców — 2026-10-15, niewdrożone (#014)
+
+Pliki: serwer `public_nodejs/public/uploads/suppliers/` (`towar-<32 hex>.jpg` + `towar-<…>-min.jpg`), lokalnie `backend/public/uploads/suppliers/`
+(w `.gitignore`). Deploy ich nie rusza (`rsync --exclude='uploads/'`). Testować **tylko na produkcji** (upload zwraca adres hosta żądania).
+Do testów użyj dostawcy testowego (np. „TEST zamówienia”) z 2–3 surowcami.
+
+1. **Wgranie z komputera:** ✎ Edytuj przy surowcu → „Zdjęcie” → „⬆️ Wgraj zdjęcie” → duże zdjęcie JPG (kilka MB) → „Przygotowuję i wgrywam…” → podgląd + „Wgrane zdjęcie”. Na liście miniaturka 44 px obok nazwy.
+2. **Telefon:** to samo przez „📷 Zrób zdjęcie” (aparat) i „Wgraj zdjęcie” (galeria, też zdjęcie z iPhone'a HEIC) — oba działają.
+3. **Zły plik:** PDF albo GIF → czytelny komunikat, nic się nie zapisuje.
+4. **Link:** inny surowiec → „Link do zdjęcia” `https://…jpg` → „Zapisz link” → miniaturka. `http://…` → komunikat „Dozwolone tylko linki https://”. Link do nieistniejącego obrazka → na liście neutralna ikona.
+5. **Zastąpienie pliku linkiem:** surowiec z punktu 1 → „Zmień” → zapisz link → miniaturka z linku; **stary plik i miniatura znikają** z `uploads/suppliers/` (Claude sprawdza przez SSH).
+6. **Powiększenie:** klik w miniaturkę → duże zdjęcie; zamknij kolejno ✕, kliknięciem w tło, klawiszem Esc. Na telefonie zdjęcie mieści się w ekranie, tło się nie przewija.
+7. **Zapis formularza nie rusza zdjęć:** zmień nazwę/cenę surowca („Zapisz”), edytuj dane dostawcy (formularz) i dodaj surowiec z kalkulatora HDF → zdjęcia zostają.
+8. **Usunięcie zdjęcia:** „Usuń” → potwierdzenie (Anuluj = nic) → OK → ikona zamiast miniaturki; pliki znikają z serwera.
+9. **Usunięcie surowca ze zdjęciem** → jego pliki znikają z serwera.
+10. **Usunięcie dostawcy testowego** → znikają pliki zdjęć wszystkich jego towarów (SSH: `ls public_nodejs/public/uploads/suppliers/`).
+11. **Tryb ciemny** — sekcja „Zdjęcie” i okno powiększenia czytelne. PDF i mail zamówienia **bez** zdjęć.
+
 
 ## Historia zamówień do dostawców — 2026-10-15, wdrożone (`19a35c9`, `7d5a8fe`), testy ręczne niezrobione
 

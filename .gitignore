@@ -42,3 +42,7 @@ notatki.md
 .npmrc
 repomix-autput.xml
 deploy.bat
+# pliki wgrane przez użytkowników (zdjęcia towarów, kolaże, PDF-y) — nigdy do repo;
+# na serwerze leżą w public_nodejs/public/uploads/ (deploy ich nie rusza: rsync --exclude='uploads/')
+backend/public/uploads/
+public/uploads/

@@ -297,11 +297,20 @@ export interface SupplierFile {
   uploadedAt: string;
 }
 
+// Zdjęcie towaru: wgrany plik (uploads/suppliers/, z miniaturą) albo link https:// (nie pobierany na serwer).
+export interface SupplierMaterialImage {
+  source: 'upload' | 'link';
+  url: string;
+  thumbUrl?: string;
+  createdAt: string;
+}
+
 export interface SupplierMaterial {
   id: string;
   name: string;
   unit: 'szt' | 'm²' | 'ark.' | 'kpl';
   price: number; // cena netto za jednostkę
+  image?: SupplierMaterialImage; // zmieniane tylko przez …/materials/:id/image (PUT dostawcy go nie rusza)
 }
 
 export interface Supplier {
@@ -951,6 +960,42 @@ export const updateSupplier = async (id: string, data: SupplierFormData): Promis
   const headers = await getHeaders();
   const response = await fetch(`${SUPPLIERS_URL}/${id}`, { method: 'PUT', headers, body: JSON.stringify(data) });
   if (!response.ok) await fail(response, 'Nie udało się zaktualizować dostawcy');
+  return response.json();
+};
+
+// ─── Zdjęcie towaru dostawcy ── każda funkcja zwraca zaktualizowanego dostawcę
+
+const materialImageUrl = (supplierId: string, materialId: string) =>
+  `${SUPPLIERS_URL}/${supplierId}/materials/${encodeURIComponent(materialId)}/image`;
+
+/** Wgrywa zdjęcie zmniejszone w przeglądarce (≤ 1600 px) + miniaturę; poprzednie zdjęcie znika. */
+export const uploadSupplierMaterialImage = async (supplierId: string, materialId: string, image: Blob, thumb: Blob): Promise<Supplier> => {
+  const auth = getAuth();
+  const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
+  const formData = new FormData();
+  formData.append('image', image, 'zdjecie.jpg');
+  formData.append('thumb', thumb, 'miniatura.jpg');
+  const response = await fetch(materialImageUrl(supplierId, materialId), {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData,
+  });
+  if (!response.ok) await fail(response, 'Nie udało się wgrać zdjęcia');
+  return response.json();
+};
+
+/** Ustawia link https:// jako zdjęcie towaru; wgrane wcześniej pliki znikają z serwera. */
+export const setSupplierMaterialImageLink = async (supplierId: string, materialId: string, url: string): Promise<Supplier> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${materialImageUrl(supplierId, materialId)}/link`, { method: 'PUT', headers, body: JSON.stringify({ url }) });
+  if (!response.ok) await fail(response, 'Nie udało się zapisać linku do zdjęcia');
+  return response.json();
+};
+
+export const deleteSupplierMaterialImage = async (supplierId: string, materialId: string): Promise<Supplier> => {
+  const headers = await getHeaders();
+  const response = await fetch(materialImageUrl(supplierId, materialId), { method: 'DELETE', headers });
+  if (!response.ok) await fail(response, 'Nie udało się usunąć zdjęcia');
   return response.json();
 };
 

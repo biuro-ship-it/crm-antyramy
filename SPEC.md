@@ -27,7 +27,7 @@ do klientów z mierzeniem, co przyniosły. Zamiast notatek w arkuszach i skrzync
 - ☑ **Kampanie** — tygodniowe oferty mailowe z kolażem, testem A/B, obowiązkową wysyłką testową i pomiarem wyników (opis niżej).
 - ☑ **Szablony maili** — edytor z wersjonowaniem treści, kategorie, wysyłka z szablonu do klienta.
 - ☑ **Notatki** — notatki z kolorami (etykiety kolorów ustawiane w Administracji).
-- ☑ **Dostawcy** — karta dostawcy (kontakty, ustalenia: rabat / termin płatności / dostawy, materiały z cenami, pliki, historia kontaktów)
+- ☑ **Dostawcy** — karta dostawcy (kontakty, ustalenia: rabat / termin płatności / dostawy, materiały z cenami i zdjęciem, pliki, historia kontaktów)
   oraz kalkulator HDF (cena z m² i cięcia, zapis ceny do materiałów dostawcy). Zamówienie z karty: wysyłka z CRM (Gmail, PDF
   w załączniku) albo „Pobierz PDF” + „Oznacz jako wysłane”; obie drogi trafiają do **Historii zamówień** — opis niżej.
 - ☑ **Archiwum** — pełna kopia danych (JSON odtwarzalny skryptem `backup restore`), paczka ZIP z plikami, eksport do Excela.
@@ -58,7 +58,7 @@ Zakładki w górnym pasku (na telefonie — menu dolne):
 | Kampanie (id `promotions`) | lista kampanii, ranking, ustawienia | edytor w 4 krokach, wysyłka, raport, duplikat |
 | Szablony maili | lista szablonów, edytor, historia wersji | utwórz, edytuj, wyślij |
 | Notatki | lista notatek | dodaj / edytuj / usuń |
-| Dostawcy | lista i karta dostawcy, kalkulator HDF, historia zamówień | dodaj dostawcę, kontakt, materiał, plik; wyślij zamówienie / pobierz PDF i oznacz jako wysłane, pobierz PDF z historii, usuń wpis (admin) |
+| Dostawcy | lista i karta dostawcy, kalkulator HDF, historia zamówień | dodaj dostawcę, kontakt, materiał (ze zdjęciem: plik lub link), plik; wyślij zamówienie / pobierz PDF i oznacz jako wysłane, pobierz PDF z historii, usuń wpis (admin) |
 | Archiwum | eksporty danych | pobierz JSON / ZIP / Excel |
 | Administracja | etykiety kolorów, analityka, podpis, ustawienia kampanii | edytuj ustawienia |
 
@@ -125,10 +125,29 @@ Obie drogi zapisują zamówienie w tej samej **Historii zamówień** (z oznaczen
 - Usunięcie dostawcy kasuje jego historię zamówień i **wszystkie jego pliki** (PDF-y zamówień, cenniki i inne załączniki z karty).
 - Mobile-first, czerń/biel + akcent magenta, tryb ciemny.
 
+## Zdjęcia towarów dostawcy
+Karta dostawcy → „📦 Surowce i zamówienia”: każdy towar (surowiec) może mieć **jedno** zdjęcie (opcjonalne).
+- **Lista towarów:** miniaturka 44 px (zaokrąglona, kadr wypełniony) obok nazwy, ładowana leniwie. Brak zdjęcia albo
+  niedziałający link = neutralna ikona. Kliknięcie miniaturki → okno z powiększeniem; zamykanie: ✕, kliknięcie w tło, Esc.
+  Na telefonie zdjęcie mieści się w ekranie, tło się nie przewija; po zamknięciu fokus wraca na miniaturkę.
+- **Edycja towaru (✎ Edytuj) → sekcja „Zdjęcie”:** „Wgraj zdjęcie” (na telefonie także „📷 Zrób zdjęcie” aparatem),
+  pole „Link do zdjęcia” + „Zapisz link”, podgląd bieżącego zdjęcia z „Zmień” i „Usuń” (z potwierdzeniem),
+  stan ładowania i czytelny komunikat błędu. Zdjęcie dodaje się do towaru już zapisanego w katalogu.
+- **Wgranie pliku:** JPG, PNG, WebP (telefon może dać też HEIC — przeglądarka przerabia na JPG). Przeglądarka zmniejsza
+  zdjęcie (dłuższy bok do 1600 px) i robi miniaturę (krótszy bok 160 px), oba jako JPG — jak kolaż, bez bibliotek na serwerze.
+  Serwer przyjmuje do 8 MB na plik, sprawdza typ po zawartości (nie po rozszerzeniu) i wymiary, nadaje losową nazwę.
+- **Link:** tylko `https://`, poprawny adres bez loginu/hasła. Linku nie pobieramy na serwer — przeglądarka wyświetla go wprost.
+- Nowe zdjęcie (plik albo link) **zastępuje** poprzednie; jeśli poprzednie było wgranym plikiem — oba jego pliki znikają z serwera.
+  Usunięcie zdjęcia, towaru albo dostawcy też kasuje pliki. Zdjęcia nie trafiają do PDF ani maila zamówienia.
+- Działa, gdy: po wgraniu na liście widać miniaturkę, a w `uploads/suppliers/` leżą 2 pliki (zdjęcie + miniatura);
+  po zastąpieniu linkiem, usunięciu zdjęcia, towaru lub dostawcy tych plików już nie ma; zapis nazwy lub ceny towaru
+  nie zmienia zdjęcia.
+
 ## Dane
 Firestore (Firebase): `clients` (+ podkolekcja `interactions`), `products`, `followups`, `notes`, `suppliers` (+ `interactions`, `orders`),
 `emailTemplates`, `kanbanTasks`, `campaigns`, `settings`; `promotions` zostaje jako kopia sprzed migracji.
-Pliki (zdjęcia produktów, dokumenty klientów i dostawców, kolaże) leżą na serwerze w `public_nodejs/public/uploads/`.
+Pliki (zdjęcia produktów, dokumenty klientów i dostawców, kolaże) leżą na serwerze w `public_nodejs/public/uploads/`;
+zdjęcia towarów dostawców w podkatalogu `uploads/suppliers/`. Katalog uploadów jest poza repo (deploy go pomija).
 **Dane osobowe:** osoby kontaktowe, e-maile i telefony klientów oraz treść korespondencji — dostęp tylko dla kont z listy
 `ALLOWED_EMAILS`. Klucze (`serviceAccountKey.json`, `.env`, token Gmail) tylko na serwerze i lokalnie, nigdy w repo.
 Region bazy Firestore: nie zapisano — do potwierdzenia w konsoli Firebase.

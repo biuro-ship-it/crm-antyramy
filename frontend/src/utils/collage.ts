@@ -118,7 +118,7 @@ export const fitJpegQuality = async (
 
 // ─── Przeglądarka ───────────────────────────────────────────────────────────
 
-interface DecodedImage {
+export interface DecodedImage {
   source: CanvasImageSource;
   width: number;
   height: number;
@@ -127,7 +127,7 @@ interface DecodedImage {
 
 // Orientacja z EXIF: createImageBitmap z 'from-image'. Gdy ta ścieżka zawiedzie
 // (starsze przeglądarki), dekodowanie przez <img> — przeglądarki też obracają wg EXIF.
-const decodeImage = async (file: File): Promise<DecodedImage> => {
+export const decodeImage = async (file: File): Promise<DecodedImage> => {
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
     return { source: bitmap, width: bitmap.width, height: bitmap.height, release: () => bitmap.close() };

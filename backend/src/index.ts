@@ -31,6 +31,8 @@ app.set('trust proxy', 1);
 // Bezpieczeństwo (COOP ustawione na unsafe-none — wymagane dla Google Sign-In popup)
 app.use(helmet({
   crossOriginOpenerPolicy: { policy: 'unsafe-none' },
+  // Zdjęcia towarów dostawców mogą być linkami https:// z innych stron — tylko obrazki, reszta CSP bez zmian.
+  contentSecurityPolicy: { directives: { 'img-src': ["'self'", 'data:', 'blob:', 'https:'] } },
 }));
 
 // CORS

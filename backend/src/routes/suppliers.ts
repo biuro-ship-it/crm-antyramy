@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { db } from '../services/firebase';
 import { authenticate } from '../middleware/auth';
@@ -15,6 +16,10 @@ import {
 } from '../services/supplierOrders';
 import { isAdmin } from '../services/admins';
 import { uploadFilenameOf } from '../services/collageFiles';
+import {
+  MaterialImage, SUPPLIER_IMAGE_MAX_BYTES, SUPPLIER_IMAGE_SUBDIR, checkUploadedImage, supplierImageFilenames,
+  imageFilesOf, validateImageLink, buildUploadedImage, buildLinkImage, mergeMaterialImages, replaceMaterialImage,
+} from '../services/supplierImages';
 
 const router = Router();
 router.use(authenticate);
@@ -35,6 +40,14 @@ const MaterialSchema = z.object({
   name: z.string().min(1),
   unit: z.enum(['szt', 'm²', 'ark.', 'kpl']).default('szt'),
   price: z.number().nonnegative().default(0),
+  // Samo .optional(): formularz, który nie wysyła zdjęcia, nie może go wyczyścić. I tak serwer bierze
+  // zdjęcie z bazy (mergeMaterialImages) — zmieniają je tylko trasy …/materials/:materialId/image niżej.
+  image: z.object({
+    source: z.enum(['upload', 'link']),
+    url: z.string().max(2000),
+    thumbUrl: z.string().max(2000).optional(),
+    createdAt: z.string(),
+  }).optional(),
 });
 
 const SupplierSchema = z.object({
@@ -74,6 +87,14 @@ const InteractionSchema = z.object({
   tradeNotes: z.string().optional(),
 });
 
+// Kasuje pliki wgranego zdjęcia towaru (zdjęcie + miniatura); link nie ma plików. Nigdy nie rzuca.
+const deleteImageFiles = async (image: MaterialImage | null | undefined): Promise<void> => {
+  for (const file of imageFilesOf(image)) {
+    await deleteUploadFile(file, SUPPLIER_IMAGE_SUBDIR).catch(err =>
+      console.error(`[suppliers] nie usunięto zdjęcia towaru ${file}:`, err));
+  }
+};
+
 // --- DOSTAWCY ---
 
 router.get('/', async (_req: AuthenticatedRequest, res: Response) => {
@@ -93,7 +114,9 @@ router.post('/', async (req: AuthenticatedRequest, res: Response) => {
   
   try {
     const now = new Date().toISOString();
-    const data = { ...parsed.data, lastContactAt: null, createdAt: now, updatedAt: now };
+    // Nowy dostawca nie ma jeszcze zdjęć towarów (zdjęcie dodaje się do zapisanego towaru)
+    const materials = mergeMaterialImages([], parsed.data.materials).materials;
+    const data = { ...parsed.data, materials, lastContactAt: null, createdAt: now, updatedAt: now };
     const docRef = await db.collection(COLLECTION).add(data);
     res.status(201).json({ id: docRef.id, ...data });
   } catch (err) {
@@ -108,9 +131,21 @@ router.put('/:id', async (req: AuthenticatedRequest, res: Response) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   
   try {
-    const updateData = { ...parsed.data, updatedAt: new Date().toISOString() };
-    await db.collection(COLLECTION).doc(id).update(updateData);
-    const updated = await db.collection(COLLECTION).doc(id).get();
+    // Zdjęcia towarów zostają z bazy; pliki zdjęć towarów usuniętych z katalogu sprzątamy po zapisie.
+    const ref = db.collection(COLLECTION).doc(id);
+    const orphaned = await db.runTransaction(async tx => {
+      const snap = await tx.get(ref);
+      if (!snap.exists) return null;
+      const merged = mergeMaterialImages(snap.data()?.materials, parsed.data.materials);
+      tx.update(ref, { ...parsed.data, materials: merged.materials, updatedAt: new Date().toISOString() });
+      return merged.orphaned;
+    });
+    if (!orphaned) {
+      res.status(404).json({ error: 'Dostawca nie istnieje' });
+      return;
+    }
+    for (const image of orphaned) await deleteImageFiles(image);
+    const updated = await ref.get();
     res.json({ id: updated.id, ...updated.data() });
   } catch (err) {
     if (isNotFound(err)) {
@@ -153,6 +188,8 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
 
     // Pliki z karty dostawcy (cenniki i inne załączniki) — też znikają z serwera
     const supplierSnap = await db.collection(COLLECTION).doc(id).get();
+    const materials: Array<{ image?: MaterialImage }> = Array.isArray(supplierSnap.data()?.materials) ? supplierSnap.data()!.materials : [];
+    for (const m of materials) await deleteImageFiles(m.image);
     const files: Array<{ url?: string }> = Array.isArray(supplierSnap.data()?.files) ? supplierSnap.data()!.files : [];
     for (const f of files) {
       const filename = uploadFilenameOf(f.url);
@@ -167,6 +204,114 @@ router.delete('/:id', async (req: AuthenticatedRequest, res: Response) => {
   } catch (err) {
     console.error('[suppliers] DELETE /:id błąd:', err);
     res.status(500).json({ error: 'Błąd usuwania dostawcy' });
+  }
+});
+
+// --- ZDJĘCIE TOWARU (surowca) ---
+// Przeglądarka zmniejsza zdjęcie (≤ 1600 px) i robi miniaturę; serwer sprawdza typ po zawartości i wymiary.
+
+const imageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: SUPPLIER_IMAGE_MAX_BYTES, files: 2, fields: 0 },
+}).fields([{ name: 'image', maxCount: 1 }, { name: 'thumb', maxCount: 1 }]);
+
+type ImageChange = { status: 'ok'; previous: MaterialImage | null } | { status: 'no-supplier' | 'no-material' };
+
+// Ustawia (null = usuwa) zdjęcie towaru w transakcji; pliki poprzedniego zdjęcia kasuje finishImageChange.
+const setMaterialImage = (supplierId: string, materialId: string, image: MaterialImage | null): Promise<ImageChange> => {
+  const ref = db.collection(COLLECTION).doc(supplierId);
+  return db.runTransaction(async (tx): Promise<ImageChange> => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) return { status: 'no-supplier' };
+    const materials = Array.isArray(snap.data()?.materials) ? snap.data()!.materials : [];
+    const result = replaceMaterialImage(materials, materialId, image);
+    if (!result) return { status: 'no-material' };
+    tx.update(ref, { materials: result.materials, updatedAt: new Date().toISOString() });
+    return { status: 'ok', previous: result.previous };
+  });
+};
+
+// 404 albo sprzątnięcie plików poprzedniego zdjęcia i aktualny dostawca w odpowiedzi.
+const finishImageChange = async (res: Response, supplierId: string, change: ImageChange) => {
+  if (change.status !== 'ok') {
+    const error = change.status === 'no-supplier' ? 'Dostawca nie istnieje' : 'Towaru nie ma już w katalogu — odśwież kartę';
+    return res.status(404).json({ error });
+  }
+  await deleteImageFiles(change.previous);
+  const updated = await db.collection(COLLECTION).doc(supplierId).get();
+  return res.json({ id: updated.id, ...updated.data() });
+};
+
+// POST /:id/materials/:materialId/image — multipart: `image` (≤ 1600 px) i `thumb` (miniatura)
+router.post('/:id/materials/:materialId/image', (req: AuthenticatedRequest, res: Response) => {
+  imageUpload(req, res, async (uploadErr) => {
+    if (uploadErr instanceof multer.MulterError) {
+      const msg = uploadErr.code === 'LIMIT_FILE_SIZE' ? 'Plik większy niż 8 MB' : `Błąd uploadu: ${uploadErr.message}`;
+      return res.status(400).json({ error: msg });
+    }
+    if (uploadErr) {
+      console.error('[suppliers] zdjęcie towaru — multer:', uploadErr);
+      return res.status(400).json({ error: 'Nie udało się odebrać pliku' });
+    }
+    const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+    const image = files?.image?.[0];
+    const thumb = files?.thumb?.[0];
+    if (!image || !thumb) return res.status(400).json({ error: 'Brak zdjęcia lub miniatury' });
+
+    const checkedImage = checkUploadedImage(image.buffer, 'image');
+    if (!checkedImage.ok) return res.status(400).json({ error: checkedImage.error });
+    const checkedThumb = checkUploadedImage(thumb.buffer, 'thumb');
+    if (!checkedThumb.ok) return res.status(400).json({ error: checkedThumb.error });
+
+    const { id, materialId } = req.params;
+    const names = supplierImageFilenames(checkedImage.type, checkedThumb.type);
+    const base = `${req.protocol}://${req.get('host')}/uploads/${SUPPLIER_IMAGE_SUBDIR}`;
+    const entry = buildUploadedImage(`${base}/${names.image}`, `${base}/${names.thumb}`, new Date().toISOString());
+
+    try {
+      await saveUploadFile(names.image, image.buffer, SUPPLIER_IMAGE_SUBDIR);
+      await saveUploadFile(names.thumb, thumb.buffer, SUPPLIER_IMAGE_SUBDIR);
+    } catch (err) {
+      await deleteImageFiles(entry);
+      console.error('[suppliers] zdjęcie towaru — zapis pliku:', err);
+      return res.status(500).json({ error: 'Nie udało się zapisać zdjęcia na serwerze' });
+    }
+
+    try {
+      const change = await setMaterialImage(id, materialId, entry);
+      if (change.status !== 'ok') await deleteImageFiles(entry);
+      return await finishImageChange(res, id, change);
+    } catch (err) {
+      await deleteImageFiles(entry);
+      console.error('[suppliers] zdjęcie towaru — zapis w bazie:', err);
+      return res.status(500).json({ error: 'Nie udało się zapisać zdjęcia' });
+    }
+  });
+});
+
+// PUT /:id/materials/:materialId/image/link — { url } tylko https://; linku nie pobieramy na serwer
+router.put('/:id/materials/:materialId/image/link', async (req: AuthenticatedRequest, res: Response) => {
+  const link = validateImageLink(req.body?.url);
+  if (!link.ok) return res.status(400).json({ error: link.error });
+  const { id, materialId } = req.params;
+  try {
+    const change = await setMaterialImage(id, materialId, buildLinkImage(link.url, new Date().toISOString()));
+    return await finishImageChange(res, id, change);
+  } catch (err) {
+    console.error('[suppliers] zdjęcie towaru — link:', err);
+    return res.status(500).json({ error: 'Nie udało się zapisać linku do zdjęcia' });
+  }
+});
+
+// DELETE /:id/materials/:materialId/image — usuwa zdjęcie (wgrane: razem z plikami)
+router.delete('/:id/materials/:materialId/image', async (req: AuthenticatedRequest, res: Response) => {
+  const { id, materialId } = req.params;
+  try {
+    const change = await setMaterialImage(id, materialId, null);
+    return await finishImageChange(res, id, change);
+  } catch (err) {
+    console.error('[suppliers] zdjęcie towaru — usuwanie:', err);
+    return res.status(500).json({ error: 'Nie udało się usunąć zdjęcia' });
   }
 });
 

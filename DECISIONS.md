@@ -9,6 +9,32 @@ zostaje bez zmian w sekcji **Archiwum** na dole pliku.
 
 <!-- Nowe wpisy dodawaj NA GÓRZE -->
 
+## #014 – 2026-10-15 – Zdjęcie towaru dostawcy: zmniejszanie w przeglądarce, pliki w `uploads/suppliers/`, zdjęcie zmieniają tylko osobne trasy
+- **Status:** obowiązuje
+- **Decyzja:** Towar (`materials[]` w dokumencie dostawcy) ma opcjonalne pole `image: { source: 'upload' | 'link', url, thumbUrl?, createdAt }`.
+  Zdjęcie zmniejsza **przeglądarka** (Canvas, jak kolaż; dłuższy bok ≤ 1600 px + miniatura z krótszym bokiem 160 px, JPG) i wysyła oba pliki
+  na `POST /api/suppliers/:id/materials/:materialId/image`. Serwer sprawdza typ **po zawartości** (JPG/PNG/WebP), wymiary z nagłówka
+  (≤ 1600 / ≤ 640 px), limit 8 MB na plik i nadaje losową nazwę `towar-<32 hex>[-min].jpg`. Link: `PUT …/image/link`, tylko `https://`,
+  nie pobierany na serwer. Usunięcie: `DELETE …/image`. Nowe zdjęcie zastępuje stare, a pliki starego (wgranego) kasuje serwer.
+  Pliki leżą w `public_nodejs/public/uploads/suppliers/` (lokalnie `backend/public/uploads/suppliers/`) — **poza repo**.
+  `PUT /suppliers/:id` (formularz, katalog, kalkulator HDF) **nie zmienia zdjęć**: `image` w zod ma samo `.optional()`, a serwer
+  w transakcji bierze zdjęcie z bazy po `id` towaru (`mergeMaterialImages`); zdjęcia towarów usuniętych z katalogu kasuje po zapisie.
+  Usunięcie dostawcy kasuje też zdjęcia jego towarów. CSP (helmet): `img-src` rozszerzone o `https:` i `blob:` — inaczej linki z innych stron
+  byłyby blokowane na produkcji (było `'self' data:`).
+- **Dlaczego:** Pliki użytkownika w repo trafiałyby do deployu i historii gita (push na main = deploy), a `rsync --delete` mógłby je kasować;
+  katalog uploadów jest już wyłączony z rsync (`--exclude='uploads/'`), dlatego zostaje tam, a lokalny `backend/public/uploads/` dopisany do
+  `.gitignore`. W backendzie nie ma biblioteki do obrazów, a `sharp` nie ma gotowych binarek na FreeBSD (mydevil) i wymaga systemowego libvips —
+  ryzyko, że `npm install` przy deployu się wysypie (Krzysiek wybrał przeglądarkę). Zmniejszanie w przeglądarce przy okazji przerabia HEIC
+  z iPhone'a na JPG i oszczędza transfer z telefonu. Osobne trasy zamiast pola w PUT, bo każdy zapis formularza wysyła cały dokument dostawcy
+  — zdjęcie nie może zależeć od tego, czy dany formularz je przepisze (wzorzec błędu z #003).
+- **Odrzucone opcje:** `sharp` na serwerze (FreeBSD/libvips); `jimp` (wolny i pamięciożerny na Passengerze, WebP z dodatkiem); zdjęcie przez
+  ogólne `POST /api/upload` (typ tylko po MIME z przeglądarki, brak podkatalogu i miniatury, kasowanie po stronie przeglądarki); pobieranie
+  linków na serwer (ryzyko SSRF, prawa autorskie — wymaganie: nie pobieramy); zdjęcie przy dodawaniu nowego towaru (towar musi istnieć w bazie).
+- **Konsekwencje:** Serwer ufa, że miniatura jest miniaturą tylko w granicach limitu wymiarów (≤ 640 px). Zdjęcie dodaje się do zapisanego
+  towaru (✎ Edytuj). Link może przestać działać — lista pokazuje wtedy ikonę. Zdjęcia nie trafiają do PDF ani maila zamówienia. Kopia plików:
+  `backup.js --include-uploads` pakuje cały katalog z podkatalogami. Funkcje: `services/supplierImages.ts` (testy), `uploadStore.ts`
+  (parametr `subdir`), `utils/materialImage.ts` (testy), `components/MaterialThumb.tsx`, `ImageLightbox.tsx`, `MaterialImageEditor.tsx`.
+
 ## #013 – 2026-10-15 – Zamówienia: druga droga „Pobierz PDF → Oznacz jako wysłane”, administratorzy, sprzątanie wszystkich plików dostawcy
 - **Status:** obowiązuje (częściowo zastępuje #012 — patrz „Konsekwencje”)
 - **Decyzja:** Obok wysyłki z CRM (#012, zostaje) jest droga bez wysyłki: „⬇️ Pobierz PDF” (`POST /api/suppliers/:id/orders/pdf`, nic nie zapisuje) → wysyłka własnym programem → „✅ Oznacz jako wysłane” (okno: data wysyłki, domyślnie dziś, notatka) → `POST …/orders/mark-sent` zapisuje wpis `method: 'manual'` z kopią PDF. Przycisk „Oznacz” działa tylko dla zamówienia, którego PDF pobrano (odcisk pozycji + uwag), a kopia powstaje z tymi samymi danymi i datą pobrania — historia pokazuje to, co poszło do dostawcy. Wpis ma osobno datę wysyłki (`sentAt`) i zapisu (`recordedAt`), kto zapisał (`recordedBy`), notatkę (`note`). Błędny wpis usuwa tylko administrator (`DELETE …/orders/:orderId`, potwierdzenie w oknie) — razem z kopią PDF i powiązanym wpisem w kontaktach. Administratorzy: `ADMIN_EMAILS` w `.env` backendu (po przecinku), domyślnie biuro@antyramy.eu; front pyta `GET /api/settings/me`. Usunięcie dostawcy kasuje **wszystkie** jego pliki (PDF-y zamówień + `files`: cenniki, załączniki).

@@ -5,6 +5,8 @@ import {
 } from '../services/api';
 import { buildOrderSendItems, orderPdfKey } from '../utils/supplierOrders';
 import { todayISO } from '../utils/date';
+import MaterialThumb from './MaterialThumb';
+import MaterialImageEditor from './MaterialImageEditor';
 
 interface SupplierMaterialsProps {
   supplier: Supplier;
@@ -281,38 +283,44 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
                 className={`rounded-xl border border-hairline-soft p-3 shadow-sm transition-colors ${qty > 0 ? 'bg-block-mint' : 'bg-canvas'}`}
               >
                 {isEditing ? (
-                  <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
-                    <input
-                      autoFocus
-                      value={editDraft.name}
-                      onChange={e => setEditDraft({ ...editDraft, name: e.target.value })}
-                      placeholder="Nazwa surowca"
-                      className="flex-1 bg-canvas border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
-                    />
-                    <select
-                      value={editDraft.unit}
-                      onChange={e => setEditDraft({ ...editDraft, unit: e.target.value as SupplierMaterial['unit'] })}
-                      className="bg-canvas border border-hairline rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
-                    >
-                      {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                    <input
-                      value={editDraft.price}
-                      onChange={e => setEditDraft({ ...editDraft, price: e.target.value })}
-                      inputMode="decimal"
-                      placeholder="Cena netto"
-                      className="w-28 bg-canvas border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
-                    />
-                    <div className="flex gap-2">
-                      <button type="button" onClick={handleEditSave} disabled={saving} className="btn-primary px-4 py-1.5 text-xs disabled:opacity-60">Zapisz</button>
-                      <button type="button" onClick={() => { setEditingId(null); setEditDraft(emptyDraft); }} className="btn-secondary px-4 py-1.5 text-xs">Anuluj</button>
+                  <div>
+                    <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                      <input
+                        autoFocus
+                        value={editDraft.name}
+                        onChange={e => setEditDraft({ ...editDraft, name: e.target.value })}
+                        placeholder="Nazwa surowca"
+                        className="flex-1 bg-canvas border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+                      />
+                      <select
+                        value={editDraft.unit}
+                        onChange={e => setEditDraft({ ...editDraft, unit: e.target.value as SupplierMaterial['unit'] })}
+                        className="bg-canvas border border-hairline rounded-lg px-2 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+                      >
+                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                      <input
+                        value={editDraft.price}
+                        onChange={e => setEditDraft({ ...editDraft, price: e.target.value })}
+                        inputMode="decimal"
+                        placeholder="Cena netto"
+                        className="w-28 bg-canvas border border-hairline rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-ink text-body-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button type="button" onClick={handleEditSave} disabled={saving} className="btn-primary px-4 py-1.5 text-xs disabled:opacity-60">Zapisz</button>
+                        <button type="button" onClick={() => { setEditingId(null); setEditDraft(emptyDraft); }} className="btn-secondary px-4 py-1.5 text-xs">Anuluj</button>
+                      </div>
                     </div>
+                    <MaterialImageEditor supplierId={supplier.id} material={m} onSupplierUpdated={onSupplierUpdated} />
                   </div>
                 ) : (
                   <div className="flex flex-wrap items-center gap-3">
-                    <div className="flex-1 min-w-[10rem]">
-                      <span className="font-bold text-body-sm text-ink">{m.name}</span>
-                      <span className="text-xs text-ink/50 ml-2">{zl(m.price)} zł netto / {m.unit}</span>
+                    <div className="flex-1 min-w-[10rem] flex items-center gap-3">
+                      <MaterialThumb key={m.image?.url ?? 'brak'} image={m.image} name={m.name} />
+                      <div className="min-w-0">
+                        <span className="font-bold text-body-sm text-ink">{m.name}</span>
+                        <span className="text-xs text-ink/50 ml-2">{zl(m.price)} zł netto / {m.unit}</span>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="text-xs font-bold text-ink/60">Ilość:</label>
@@ -364,6 +372,7 @@ export default function SupplierMaterials({ supplier, onSupplierUpdated, onOrder
           ＋ Dodaj surowiec
         </button>
       </div>
+      <p className="text-xs text-ink/40 -mt-3 mb-5">Zdjęcie dodasz po zapisaniu surowca: ✎ Edytuj → „Zdjęcie”.</p>
 
       {/* ZAMÓWIENIE */}
       <div className="border-t border-hairline-soft pt-4">
