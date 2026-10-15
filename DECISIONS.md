@@ -9,6 +9,13 @@ zostaje bez zmian w sekcji **Archiwum** na dole pliku.
 
 <!-- Nowe wpisy dodawaj NA GÓRZE -->
 
+## #012 – 2026-10-15 – Zamówienia do dostawców wysyła CRM (Gmail + PDF), historia w podkolekcji `orders`
+- **Status:** obowiązuje
+- **Decyzja:** Zamówienie z karty dostawcy wychodzi z backendu przez Gmail API (`POST /api/suppliers/:id/orders`) po kliknięciu „Wyślij” w podglądzie — zamiast `mailto:`. Kolejność: PDF (backend, `pdf-lib`, akcent `#1a56db`) → zapis w `uploads/zamowienie-<data>-<losowe>.pdf` → wysyłka z PDF w załączniku → dopiero wtedy wpis w `suppliers/{id}/orders` + krótki wpis w `interactions`. Nieudana wysyłka = nic nie zapisujemy, PDF kasujemy. Adresat zawsze z karty dostawcy w bazie. Wpisy niezmienne: brak PUT/DELETE pojedynczego wpisu; znikają z dostawcą (razem z PDF-ami) albo po usunięciu przez administratora w konsoli Firestore (CRM nie ma ról — każde konto z `ALLOWED_EMAILS` ma te same prawa).
+- **Dlaczego:** Przy `mailto:` CRM zapisywał wpis, zanim cokolwiek wyszło, nie znał identyfikatora Gmail i nie mógł dołączyć PDF. Podkolekcja (jak `interactions`), bo `PUT /suppliers/:id` ma `.default([])` przy tablicach — historia jako pole dostawcy mogłaby zostać nadpisana zapisem formularza; do tego dokument dostawcy nie rośnie bez końca.
+- **Odrzucone opcje:** Zostawienie `mailto:` (brak pewności wysyłki i załącznika); historia jako pole `orders[]` w dokumencie dostawcy (ryzyko nadpisania, limit 1 MB dokumentu); PDF za logowaniem przez osobny endpoint (inne pliki CRM też leżą w `/uploads` — losowa nazwa jak przy reszcie); usuwanie wpisu w CRM (wymaganie niezmienności).
+- **Konsekwencje:** Przycisk „Wyślij bez zapisu” usunięty. Mail jest też w „Wysłanych” w Gmailu. Ceny tylko w historii („wartość wg cennika CRM”), nie w mailu ani PDF. Usunięcie dostawcy kasuje PDF-y zamówień, ale nadal **nie** kasuje jego cenników (`files`) — osobne zadanie. Gdy mail wyjdzie, a zapis historii się nie uda — komunikat „nie wysyłaj ponownie”, pełny wpis w `logs/error.log`. Funkcje: `services/supplierOrders.ts`, `services/uploadStore.ts`, `generateSupplierOrderPdf` (pdf.ts), `components/SupplierOrderHistory.tsx`, `utils/supplierOrders.ts` (testy).
+
 ## #011 – 2026-10-14 – Odpowiedź ze zmienionym tematem też jest odpowiedzią na kampanię
 - **Status:** obowiązuje
 - **Decyzja:** Po sprawdzeniu wątków kampanii `checkReplies` szuka maili od odbiorców bez odpowiedzi (`from:(…) after:<wysyłka − 1 h>`, po 25 adresów na zapytanie, ze spamem) poza wątkami kampanii. Mail liczy się jako odpowiedź tylko wtedy, gdy jego `In-Reply-To` / `References` wskazują na `Message-ID` naszego maila kampanii do tego odbiorcy; mail na inny temat — nie. Filtr cytatu rozpoznaje też nagłówek „W liście datowanym … napisano:” (Onet / Interia / WP).

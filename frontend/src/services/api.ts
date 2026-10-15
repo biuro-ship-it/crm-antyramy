@@ -960,6 +960,57 @@ export const deleteSupplier = async (id: string): Promise<void> => {
   if (!response.ok) await fail(response, 'Nie udało się usunąć dostawcy');
 };
 
+// ─── Historia zamówień do dostawcy (SPEC.md, „Zamówienia do dostawców”) ───
+
+export interface SupplierOrderItem {
+  materialId: string | null;
+  name: string;
+  quantity: number;
+  unit: SupplierMaterial['unit'];
+  unitPriceNet: number | null;
+}
+
+export interface SupplierOrder {
+  id: string;
+  sentAt: string;
+  to: string;
+  subject: string;
+  body: string;
+  items: SupplierOrderItem[];
+  notes: string;
+  estimatedTotalNet: number | null;
+  sentBy: string;
+  gmailMessageId: string | null;
+  gmailThreadId: string | null;
+  pdfUrl: string;
+  pdfFilename: string;
+}
+
+export interface SupplierOrderSendData {
+  subject: string;
+  body: string;
+  notes?: string;
+  items: Array<{ materialId?: string; name: string; quantity: number; unit: SupplierMaterial['unit'] }>;
+}
+
+export const getSupplierOrders = async (supplierId: string): Promise<SupplierOrder[]> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders`, { headers });
+  if (!response.ok) await fail(response, 'Nie udało się pobrać historii zamówień');
+  return response.json();
+};
+
+/** Wysyła zamówienie z CRM (Gmail + PDF) — wywoływane tylko przyciskiem „Wyślij” w podglądzie. */
+export const sendSupplierOrder = async (
+  supplierId: string,
+  data: SupplierOrderSendData,
+): Promise<{ order: SupplierOrder; interaction: Interaction | null }> => {
+  const headers = await getHeaders();
+  const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/orders`, { method: 'POST', headers, body: JSON.stringify(data) });
+  if (!response.ok) await fail(response, 'Nie udało się wysłać zamówienia');
+  return response.json();
+};
+
 export const getSupplierInteractions = async (supplierId: string): Promise<Interaction[]> => {
   const headers = await getHeaders();
   const response = await fetch(`${SUPPLIERS_URL}/${supplierId}/interactions`, { headers });

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Supplier, SupplierFile, Interaction, InteractionFormData, getSupplierInteractions, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage, deleteUpload } from '../services/api';
+import { Supplier, SupplierFile, SupplierOrder, Interaction, InteractionFormData, getSupplierInteractions, getSupplierOrders, createSupplierInteraction, updateSupplierInteraction, updateSupplier, uploadImage, deleteUpload } from '../services/api';
 import SupplierMaterials from './SupplierMaterials';
+import SupplierOrderHistory from './SupplierOrderHistory';
+import { sortOrdersNewestFirst } from '../utils/supplierOrders';
 import { openFile } from '../utils/files';
 import { todayISO } from '../utils/date';
 
@@ -26,12 +28,24 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
   const [savingEdit, setSavingEdit] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [orders, setOrders] = useState<SupplierOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   useEffect(() => {
     getSupplierInteractions(supplier.id)
       .then(setInteractions)
       .catch(err => console.error(err))
       .finally(() => setLoading(false));
+  }, [supplier.id]);
+
+  useEffect(() => {
+    setOrdersLoading(true);
+    setOrdersError(null);
+    getSupplierOrders(supplier.id)
+      .then(list => setOrders(sortOrdersNewestFirst(list)))
+      .catch(err => setOrdersError(err instanceof Error ? err.message : 'Nie udało się pobrać historii zamówień'))
+      .finally(() => setOrdersLoading(false));
   }, [supplier.id]);
 
   const handleAddNote = async (e: React.FormEvent) => {
@@ -256,8 +270,14 @@ export default function SupplierCard({ supplier, onClose, onSupplierUpdated }: S
       <SupplierMaterials
         supplier={supplier}
         onSupplierUpdated={onSupplierUpdated}
-        onOrderLogged={interaction => setInteractions(prev => [interaction, ...prev])}
+        onOrderSent={(order, interaction) => {
+          setOrders(prev => sortOrdersNewestFirst([order, ...prev]));
+          if (interaction) setInteractions(prev => [interaction, ...prev]);
+        }}
       />
+
+      {/* 3.6 HISTORIA ZAMÓWIEŃ */}
+      <SupplierOrderHistory orders={orders} loading={ordersLoading} error={ordersError} />
 
       {/* 4. OŚ CZASU (ROZMOWY I USTALENIA) */}
       <div className="mt-8">

@@ -28,7 +28,8 @@ do klientów z mierzeniem, co przyniosły. Zamiast notatek w arkuszach i skrzync
 - ☑ **Szablony maili** — edytor z wersjonowaniem treści, kategorie, wysyłka z szablonu do klienta.
 - ☑ **Notatki** — notatki z kolorami (etykiety kolorów ustawiane w Administracji).
 - ☑ **Dostawcy** — karta dostawcy (kontakty, ustalenia: rabat / termin płatności / dostawy, materiały z cenami, pliki, historia kontaktów)
-  oraz kalkulator HDF (cena z m² i cięcia, zapis ceny do materiałów dostawcy).
+  oraz kalkulator HDF (cena z m² i cięcia, zapis ceny do materiałów dostawcy). Zamówienie z karty wychodzi z CRM (Gmail) z PDF
+  w załączniku i trafia do **Historii zamówień** — opis niżej, „Zamówienia do dostawców”.
 - ☑ **Archiwum** — pełna kopia danych (JSON odtwarzalny skryptem `backup restore`), paczka ZIP z plikami, eksport do Excela.
 - ☑ **Administracja** — etykiety kolorów (klienci, notatki), analityka (rozkład Kanban, klienci, sprzedaż wg klientów),
   podpis w mailach, ustawienia kampanii.
@@ -57,7 +58,7 @@ Zakładki w górnym pasku (na telefonie — menu dolne):
 | Kampanie (id `promotions`) | lista kampanii, ranking, ustawienia | edytor w 4 krokach, wysyłka, raport, duplikat |
 | Szablony maili | lista szablonów, edytor, historia wersji | utwórz, edytuj, wyślij |
 | Notatki | lista notatek | dodaj / edytuj / usuń |
-| Dostawcy | lista i karta dostawcy, kalkulator HDF | dodaj dostawcę, kontakt, materiał, plik |
+| Dostawcy | lista i karta dostawcy, kalkulator HDF, historia zamówień | dodaj dostawcę, kontakt, materiał, plik; wyślij zamówienie, pobierz PDF zamówienia |
 | Archiwum | eksporty danych | pobierz JSON / ZIP / Excel |
 | Administracja | etykiety kolorów, analityka, podpis, ustawienia kampanii | edytuj ustawienia |
 
@@ -90,8 +91,29 @@ Dodatkowo: szkice, „Duplikuj kampanię”, „Wklej z JSON” (wypełnia formu
 - Obrazek osadzony w mailu (inline CID) — kolaż idzie jako link do pliku na crm.antyramy.eu; możliwe później.
 - Automatyczna wysyłka bez kliknięcia „Wyślij”.
 
+## Zamówienia do dostawców
+Karta dostawcy → „📦 Surowce i zamówienia”: ilości przy surowcach, uwagi → **podgląd** (treść maila można poprawić) → **„Wyślij”**.
+
+### Wysyłka
+- Mail wychodzi przez Gmail API z biuro@antyramy.eu na adres zapisany w karcie dostawcy (adres bierze backend z bazy, nie z formularza).
+  W mailu: treść z podglądu (bez cen) + **PDF zamówienia w załączniku**. Mail jest też w „Wysłanych” w Gmailu.
+- Nic nie wychodzi bez kliknięcia „Wyślij” w podglądzie; żadnej automatycznej wysyłki.
+- PDF (backend, `pdf-lib`, font LiberationSans): pasek i nagłówki w kolorze `#1a56db`, dane zamawiającego (Pluszek sp. z o.o. / Antyramy,
+  ul. Monopolowa 11, 33-100 Tarnów, NIP 993-068-10-97, biuro@antyramy.eu, tel. 500 601 601), dane dostawcy (firma, adres, e-mail),
+  data, tabela pozycji (lp., nazwa, ilość, jednostka — bez cen), uwagi. Zapisany jako plik w `uploads/` (`zamowienie-….pdf`).
+- Działa, gdy: po udanej wysyłce powstaje wpis w Historii zamówień i krótki wpis w historii kontaktów („📦 Zamówienie wysłane: N poz.”,
+  aktualizuje „ostatni kontakt”); gdy wysyłka się nie uda — **nie powstaje nic** (ani wpis, ani plik), a w podglądzie widać błąd.
+
+### Historia zamówień (sekcja w karcie dostawcy)
+- Lista od najnowszych: data i godzina, temat, liczba pozycji. Klik rozwija: adresat, pozycje (nazwa, ilość, jednostka), uwagi,
+  wartość wg cennika CRM (tylko informacyjnie — nie ma jej w mailu ani w PDF), treść maila, kto wysłał, identyfikator wiadomości Gmail,
+  przycisk **„Pobierz PDF”**. Pusty stan: „Brak wysłanych zamówień”.
+- Wpis jest **niezmienny** — w CRM nie ma edycji ani usuwania pojedynczego wpisu. Znika tylko razem z dostawcą (razem z PDF-ami)
+  albo po świadomym usunięciu przez administratora w konsoli Firestore.
+- Mobile-first, czerń/biel + akcent magenta, tryb ciemny.
+
 ## Dane
-Firestore (Firebase): `clients` (+ podkolekcja `interactions`), `products`, `followups`, `notes`, `suppliers` (+ `interactions`),
+Firestore (Firebase): `clients` (+ podkolekcja `interactions`), `products`, `followups`, `notes`, `suppliers` (+ `interactions`, `orders`),
 `emailTemplates`, `kanbanTasks`, `campaigns`, `settings`; `promotions` zostaje jako kopia sprzed migracji.
 Pliki (zdjęcia produktów, dokumenty klientów i dostawców, kolaże) leżą na serwerze w `public_nodejs/public/uploads/`.
 **Dane osobowe:** osoby kontaktowe, e-maile i telefony klientów oraz treść korespondencji — dostęp tylko dla kont z listy

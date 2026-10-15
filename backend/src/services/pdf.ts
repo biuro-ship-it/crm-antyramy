@@ -1,6 +1,7 @@
 import { PDFDocument, rgb, PDFFont, PDFPage } from 'pdf-lib';
 import fontkit from '@pdf-lib/fontkit';
 import axios from 'axios';
+import { OrderPdfLayout, ORDERING_COMPANY } from './supplierOrders';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -270,4 +271,110 @@ export const generatePromotionPdf = async (
 
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes);
+};
+
+// ─── Zamówienie do dostawcy ────────────────────────────────────────────────
+// Układ danych (bez cen) buduje orderPdfLayout w supplierOrders.ts; tu tylko rysowanie.
+
+const ORDER_BLUE = rgb(0x1a / 255, 0x56 / 255, 0xdb / 255); // #1a56db
+
+export const generateSupplierOrderPdf = async (layout: OrderPdfLayout): Promise<Buffer> => {
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.registerFontkit(fontkit);
+  const font = await pdfDoc.embedFont(fs.readFileSync(path.join(FONTS_DIR, 'LiberationSans-Regular.ttf')), { subset: true });
+  const bold = await pdfDoc.embedFont(fs.readFileSync(path.join(FONTS_DIR, 'LiberationSans-Bold.ttf')), { subset: true });
+
+  const PAGE_W = 595;
+  const PAGE_H = 842;
+  const MARGIN = 48;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+  const DARK = rgb(0.1, 0.1, 0.1);
+  const ROW_ALT = rgb(0.95, 0.96, 0.99);
+  const WHITE = rgb(1, 1, 1);
+
+  let page = pdfDoc.addPage([PAGE_W, PAGE_H]);
+  const newPage = () => { page = pdfDoc.addPage([PAGE_W, PAGE_H]); return PAGE_H - MARGIN; };
+
+  // Pasek nagłówka
+  page.drawRectangle({ x: 0, y: PAGE_H - 70, width: PAGE_W, height: 70, color: ORDER_BLUE });
+  page.drawText(layout.title.toUpperCase(), { x: MARGIN, y: PAGE_H - 44, size: 22, font: bold, color: WHITE });
+  const dW = font.widthOfTextAtSize(layout.dateLabel, 11);
+  page.drawText(layout.dateLabel, { x: PAGE_W - MARGIN - dW, y: PAGE_H - 42, size: 11, font, color: WHITE });
+
+  // Zamawiający | Dostawca
+  let y = PAGE_H - 100;
+  const colW = (CONTENT_W - 24) / 2;
+  const drawParty = (label: string, lines: string[], x: number): number => {
+    let yy = y;
+    page.drawText(label, { x, y: yy, size: 10, font: bold, color: ORDER_BLUE });
+    yy -= 16;
+    lines.forEach((line, i) => {
+      for (const w of wrapText(line, i === 0 ? bold : font, 10, colW)) {
+        page.drawText(w, { x, y: yy, size: 10, font: i === 0 ? bold : font, color: DARK });
+        yy -= 14;
+      }
+    });
+    return yy;
+  };
+  y = Math.min(drawParty('ZAMAWIAJĄCY', layout.buyer, MARGIN), drawParty('DOSTAWCA', layout.supplier, MARGIN + colW + 24)) - 16;
+
+  // Tabela pozycji
+  const cols = [
+    { title: 'Lp.', w: 36, align: 'left' as const },
+    { title: 'Nazwa', w: CONTENT_W - 36 - 80 - 70, align: 'left' as const },
+    { title: 'Ilość', w: 80, align: 'right' as const },
+    { title: 'Jedn.', w: 70, align: 'left' as const },
+  ];
+  const drawHeader = () => {
+    page.drawRectangle({ x: MARGIN, y: y - 6, width: CONTENT_W, height: 22, color: ORDER_BLUE });
+    let x = MARGIN;
+    for (const c of cols) {
+      const tx = c.align === 'right' ? x + c.w - 8 - bold.widthOfTextAtSize(c.title, 10) : x + 8;
+      page.drawText(c.title, { x: tx, y, size: 10, font: bold, color: WHITE });
+      x += c.w;
+    }
+    y -= 24;
+  };
+  drawHeader();
+  layout.rows.forEach((row, idx) => {
+    const nameLines = wrapText(row[1], font, 10, cols[1].w - 16);
+    const rowH = Math.max(1, nameLines.length) * 14 + 8;
+    if (y - rowH < 70) { y = newPage(); drawHeader(); }
+    if (idx % 2 === 1) page.drawRectangle({ x: MARGIN, y: y - rowH + 14, width: CONTENT_W, height: rowH, color: ROW_ALT });
+    let x = MARGIN;
+    cols.forEach((c, ci) => {
+      const lines = ci === 1 ? nameLines : [row[ci]];
+      lines.forEach((line, li) => {
+        const tx = c.align === 'right' ? x + c.w - 8 - font.widthOfTextAtSize(line, 10) : x + 8;
+        page.drawText(line, { x: tx, y: y - li * 14, size: 10, font, color: DARK });
+      });
+      x += c.w;
+    });
+    y -= rowH;
+  });
+  page.drawRectangle({ x: MARGIN, y: y + 8, width: CONTENT_W, height: 1, color: ORDER_BLUE });
+  y -= 16;
+
+  // Uwagi
+  if (layout.notes) {
+    if (y < 120) y = newPage();
+    page.drawText('UWAGI', { x: MARGIN, y, size: 10, font: bold, color: ORDER_BLUE });
+    y -= 16;
+    for (const para of layout.notes.split(/\r?\n/)) {
+      for (const w of wrapText(para, font, 10, CONTENT_W)) {
+        if (y < 70) y = newPage();
+        page.drawText(w, { x: MARGIN, y, size: 10, font, color: DARK });
+        y -= 14;
+      }
+    }
+  }
+
+  // Stopka na każdej stronie
+  for (const p of pdfDoc.getPages()) {
+    p.drawRectangle({ x: 0, y: 0, width: PAGE_W, height: 32, color: ORDER_BLUE });
+    p.drawText('antyramy.eu', { x: MARGIN, y: 11, size: 9, font, color: WHITE });
+    const right = `${ORDERING_COMPANY.email} · tel. ${ORDERING_COMPANY.phone}`;
+    p.drawText(right, { x: PAGE_W - MARGIN - font.widthOfTextAtSize(right, 9), y: 11, size: 9, font, color: WHITE });
+  }
+  return Buffer.from(await pdfDoc.save());
 };
